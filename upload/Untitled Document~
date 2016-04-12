@@ -1,0 +1,4 @@
+heroku buildpacks:add https://github.com/matteotiziano/heroku-buildpack-tesseract
+heroku buildpacks:add https://github.com/ello/heroku-buildpack-imagemagick
+heroku buildpacks:add https://github.com/BauCloud/heroku-buildpack-poppler
+
