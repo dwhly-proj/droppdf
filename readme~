@@ -1,5 +1,5 @@
 - How to run server on digital ocean server.
 
-In pdfocr/, run: 
+In droppdf/, run: 
 
 $ python manage.py runserver 45.55.226.24:80
