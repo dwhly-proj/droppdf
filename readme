@@ -6,3 +6,10 @@ $ git clone https://github.com/dwhly-proj/droppdf.git
 - Run web server with the project
 In droppdf/, run:
 $ python manage.py runserver 45.55.226.24:80
+
+
+- Install two packages
+
+$ sudo pip install docx
+
+$ sudo pip install xlrd

@@ -1,5 +1,14 @@
-- How to run server on digital ocean server.
+1.Intall the program on digital ocean.
 
-In droppdf/, run: 
+- Get the project file from github
+$ git clone https://github.com/dwhly-proj/droppdf.git
 
+- Run web server with the project
+In droppdf/, run:
 $ python manage.py runserver 45.55.226.24:80
+
+
+- Install two packages
+
+$ sudo pip install docx
+download xtopdf in https://sourceforge.net/projects/xtopdf/ and install it

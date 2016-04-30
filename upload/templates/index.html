@@ -47,7 +47,10 @@
 	var ocr_progress_status = 0;
 	var estimated_time = 0;
 
+	var type = "";
+
 	$(document).ready(function(){
+
 		$( "#progressbar" ).progressbar({
 			value: 0
 		});
@@ -68,7 +71,8 @@
 					var extention = file.name.split(".");
 					extention = extention[extention.length-1];
 				
-					if (extention == 'pdf'){
+					if (extention == 'pdf' || extention == 'docx' || extention == 'xlsx' || extention == 'doc' || extention == 'xls'|| extention == 'csv'){
+						type = extention
 						if (addedFile == 0) {
 							addedFile = 1;
 						}
@@ -83,68 +87,76 @@
 				});
 
 		    this.on("success", function(file, filename_server) {
-				
-		        filename = filename_server;
-		 		check_list = filename.split("-");
-				check = check_list[0];
-				page_num = check_list[1];
-				temp = [];
-
-				for(i=2; i<check_list.length; i++)
-					temp.push(check_list[i]);
-
-				temp = temp.join("-");
-
-				// start to ocr pdf
-				if(check == "false")
+				if(type == 'pdf' || type == 'docx' || type == 'doc')
 				{
-					estimated_time = Math.round( page_num * 8 );
-					
-					label = '<div style="font-size:18px">' + page_num.toString() + ' pages to OCR, estimate ' + estimated_time.toString() + ' seconds to complete</div>';
-					$(".main .label").html("OCRing..." + label);
+				    filename = filename_server;
+			 		check_list = filename.split("-");
+					check = check_list[0];
+					page_num = check_list[1];
+					temp = [];
 
-					$( "#progressbar" ).show();
-					ocr_progress = setInterval(function(){ 
-										if(ocr_progress_status <= estimated_time * 1000)
-										{
-											remain_time = Math.round((estimated_time * 1000 - ocr_progress_status) / 1000)
-											label = '<div style="font-size:18px">' + page_num.toString() + ' pages to OCR, estimate ' + remain_time.toString() + ' seconds to complete</div>';
-											$(".main .label").html("OCRing..." + label);
-											ocr_progress_status += estimated_time * 10;
-											$( "#progressbar" ).progressbar({
-												value: ocr_progress_status / (estimated_time * 10)
-											});
-										}
-										else{
-											clearInterval(ocr_progress);
-										}
-									}, estimated_time * 10);
+					for(i=2; i<check_list.length; i++)
+						temp.push(check_list[i]);
 
-					$.ajax({
-		                type: "GET",
-		                url:  '{% url "ocr" %}?filename=' + temp,
-		                success: function (data) {
-							clearInterval(ocr_progress);
-							ocr_progress_status = 0;
-							estimated_time = 0;
-							$( "#progressbar" ).hide();
-							$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
-		                    window.location.href = 'pdf/' + data + '/';
-		                },
-		                error: function (x, e) {
-		                }
-		            })
-				}
-				else if(check == 'true')
-				{
+					temp = temp.join("-");
+
+					// start to ocr pdf
+					if(check == "false")
+					{
+						estimated_time = Math.round( page_num * 8 );
 					
-					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
-		        	window.location.href = 'pdf/' + temp + '/';
+						label = '<div style="font-size:18px">' + page_num.toString() + ' pages to OCR, estimate ' + estimated_time.toString() + ' seconds to complete</div>';
+						$(".main .label").html("OCRing..." + label);
+
+						$( "#progressbar" ).show();
+						ocr_progress = setInterval(function(){ 
+											if(ocr_progress_status <= estimated_time * 1000)
+											{
+												remain_time = Math.round((estimated_time * 1000 - ocr_progress_status) / 1000)
+												label = '<div style="font-size:18px">' + page_num.toString() + ' pages to OCR, estimate ' + remain_time.toString() + ' seconds to complete</div>';
+												$(".main .label").html("OCRing..." + label);
+												ocr_progress_status += estimated_time * 10;
+												$( "#progressbar" ).progressbar({
+													value: ocr_progress_status / (estimated_time * 10)
+												});
+											}
+											else{
+												clearInterval(ocr_progress);
+											}
+										}, estimated_time * 10);
+
+						$.ajax({
+				            type: "GET",
+				            url:  '{% url "ocr" %}?filename=' + temp,
+				            success: function (data) {
+								clearInterval(ocr_progress);
+								ocr_progress_status = 0;
+								estimated_time = 0;
+								$( "#progressbar" ).hide();
+								$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
+				                window.location.href = 'pdf/' + data + '/';
+				            },
+				            error: function (x, e) {
+				            }
+				        })
+					}
+					else if(check == 'true')
+					{
+					
+						$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
+				    	window.location.href = 'pdf/' + temp + '/';
+					}
+					else
+					{
+						alert("This file is not a pdf or corrupted.");
+						$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>")
+					}
 				}
 				else
 				{
-					alert("This file is not a pdf or corrupted.");
-					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>")
+					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
+					var ip = location.host;
+					window.location.href = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url= http://" + ip + "/static/" + "drop-pdf/" + filename_server;
 				}
 
 		       	

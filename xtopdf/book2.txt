@@ -1,0 +1,5 @@
+book2-chapter1.txt:Chapter 1. Preface.
+book2-chapter2.txt:Chapter 2. Introduction.
+book2-chapter3.txt:Chapter 3. The problem.
+book2-chapter4.txt:Chapter 4. The possible solutions.
+book2-chapter5.txt:Chapter 5. The decision.
