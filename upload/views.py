@@ -42,7 +42,7 @@ def csvAsTable(request, filename):
 	with open(file_path) as f:
 		lines = f.readlines()
 
-	title = lines[0].encode('utf8').split(",")
+	title = lines[0].encode('utf8').split("\",")
 	content = lines[1:]
 
 	for index in range(0, len(content)):
