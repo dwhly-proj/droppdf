@@ -37,11 +37,11 @@ def csvAsTable(request, filename):
 	with open(file_path) as f:
 		lines = f.readlines()
 
-	title = lines[0].split(",")
+	title = lines[0].encode('utf8').split(",")
 	content = lines[1:]
 
 	for index in range(0, len(content)):
-		content[index] = content[index].split(",")
+		content[index] = content[index].encode('utf8').split("\",")
 
 	return render_to_response('table.html', locals())
 
