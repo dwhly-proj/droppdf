@@ -22,5 +22,5 @@ urlpatterns = [
     url(r'^drop/', views.drop, name="drop"),
     url(r'^pdf/(?P<filename>.+\.pdf)/$', views.pdf, name="pdf"),
     url(r'^ocr/', views.ocr, name="ocr"),
-    url(r'^check_text/', views.check_text, name="check_text")
+	url(r'^csv/(?P<filename>.+)/$', views.csv, name="csv"),
 ]

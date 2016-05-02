@@ -30,6 +30,21 @@ def pdf(request, filename):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
+def csvAsTable(request, filename):
+	
+	file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)
+
+	with open(file_path) as f:
+		lines = f.readlines()
+
+	title = lines[0].split(",")
+	content = lines[1:]
+
+	for index in range(0, len(content)):
+		content[index] = content[index].split(",")
+
+	return render_to_response('table.html', locals())
+
 
 @csrf_exempt
 def upload(request):
@@ -103,7 +118,7 @@ def save_file(file, path='', extension='pdf'):
 
 		return 'true-0-' + pdf_name
 	elif extension == 'xlsx' or extension == 'xls':
-		csv_name = filename_noextension + "-" + rand_key + '.pdf'
+		csv_name = filename_noextension + "-" + rand_key + '.csv'
 		csv_path = '%s/%s' % (temp, str(csv_name))
 
 		csv_from_excel('%s/%s' % (temp, str(filename)), csv_path)

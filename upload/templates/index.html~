@@ -155,8 +155,10 @@
 				else
 				{
 					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
-					var ip = location.host;
-					window.location.href = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url= http://" + ip + "/";
+					//var ip = location.host;
+					//window.location.href = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url= http://" + ip + "/static/" + "drop-pdf/" + filename_server;
+					
+					window.location.href = 'pdf/' + filename_server + '/';
 				}
 
 		       	

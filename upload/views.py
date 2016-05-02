@@ -30,6 +30,21 @@ def pdf(request, filename):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
+def csvAsTable(request, filename):
+	
+	file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)
+
+	with open(file_path) as f:
+		lines = f.readlines()
+
+	title = lines[0].split(",")
+	content = lines[1:]
+
+	for index in range(0, len(content)):
+		content[index] = content[index].split(",")
+
+	return render_to_response('table.html', locals())
+
 
 @csrf_exempt
 def upload(request):
@@ -136,7 +151,9 @@ def docx_to_pdf(infilename, outfilename):
     # Extract the text from the DOCX file object infile and write it to 
     # a PDF file.
 
-    try:
+	os.system("unoconv --listener")
+	os.system("doc2pdf " + infilename)
+    '''try:
         infil = opendocx(infilename)
     except Exception, e:
         print "Error opening infilename"
@@ -163,7 +180,7 @@ def docx_to_pdf(infilename, outfilename):
         pw.writeLine("")
 
     pw.savePage()
-    pw.close()
+    pw.close()'''
 
 
 def csv_from_excel(excel_file, csv_name):
