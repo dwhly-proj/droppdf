@@ -5,7 +5,7 @@
 <head>
 	<meta charset="utf-8">
 
-	<title>Drag and Drop PDF</title>
+	<title>Drag and Drop a document</title>
 
 	<!--
 	  DO NOT SIMPLY COPY THOSE LINES. Download the JS and CSS files from the
@@ -28,8 +28,12 @@
 
 	    <div id="myId" class="dropzone_new">
 			<div class="label">
-				Drag and Drop a PDF here<br/>
+				Drag and drop your document to annotate it.<br/>
 				<span style="font-size:18px">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</span>
+				<br/>
+				<p style="font-size:18px">The OCR service uses Tesseract (LINK: https://github.com/tesseract-ocr), an open source library.</p>
+				<p style="font-size:18px">You may have better results using a professional tool (tutorial LINK: https://www.youtube.com/watch?v=7Gq3ehpv-h0).</p>
+				
 			</div>
 
 			<img src="{% static 'drag&dropfileupload/background.png' %}"></img>
