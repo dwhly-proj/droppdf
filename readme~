@@ -11,4 +11,5 @@ $ python manage.py runserver 45.55.226.24:80
 - Install two packages
 
 $ sudo pip install docx
-download xtopdf in https://sourceforge.net/projects/xtopdf/ and install it
+
+$ sudo pip install xlrd
