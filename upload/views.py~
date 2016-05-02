@@ -1,4 +1,4 @@
-# encoding=utf8 
+# encoding=utf8
 
 from django.shortcuts import render
 from django.shortcuts import render_to_response
@@ -19,6 +19,11 @@ from xtopdf.PDFWriter import PDFWriter
 
 import xlrd
 import csv
+
+import sys  
+
+reload(sys)  
+sys.setdefaultencoding('utf8')
 
 def randomword(length):
    return ''.join(random.choice(string.lowercase + string.uppercase + string.digits) for i in range(length))

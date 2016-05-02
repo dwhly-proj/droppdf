@@ -20,6 +20,9 @@ from xtopdf.PDFWriter import PDFWriter
 import xlrd
 import csv
 
+reload(sys)  
+sys.setdefaultencoding('utf8')
+
 def randomword(length):
    return ''.join(random.choice(string.lowercase + string.uppercase + string.digits) for i in range(length))
 
