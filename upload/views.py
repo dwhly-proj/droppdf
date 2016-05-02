@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+# encoding=utf8
 
 from django.shortcuts import render
 from django.shortcuts import render_to_response
