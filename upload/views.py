@@ -151,7 +151,7 @@ def docx_to_pdf(infilename, outfilename):
     # Extract the text from the DOCX file object infile and write it to 
     # a PDF file.
 
-	os.system("unoconv --listener")
+	#os.system("unoconv --listener")
 	os.system("doc2pdf " + infilename)
 	'''try:
 		infil = opendocx(infilename)
