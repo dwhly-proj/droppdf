@@ -151,7 +151,9 @@ def docx_to_pdf(infilename, outfilename):
     # Extract the text from the DOCX file object infile and write it to 
     # a PDF file.
 
-    try:
+	os.system("unoconv --listener")
+	os.system("doc2pdf " + infilename)
+    '''try:
         infil = opendocx(infilename)
     except Exception, e:
         print "Error opening infilename"
@@ -178,7 +180,7 @@ def docx_to_pdf(infilename, outfilename):
         pw.writeLine("")
 
     pw.savePage()
-    pw.close()
+    pw.close()'''
 
 
 def csv_from_excel(excel_file, csv_name):
