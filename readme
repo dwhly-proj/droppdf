@@ -5,6 +5,8 @@ $ git clone https://github.com/dwhly-proj/droppdf.git
 
 - Run web server with the project
 In droppdf/, run:
+
+$ unoconv --listener
 $ python manage.py runserver 45.55.226.24:80
 
 
