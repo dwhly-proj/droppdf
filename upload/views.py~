@@ -35,6 +35,10 @@ def pdf(request, filename):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
+def pdf(request, filename):
+    pdf_name = filename
+    return render_to_response('embed.html', locals())
+
 def csvAsTable(request, filename):
 	
 	file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)

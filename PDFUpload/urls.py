@@ -22,6 +22,4 @@ urlpatterns = [
     url(r'^drop/', views.drop, name="drop"),
     url(r'^pdf/(?P<filename>.+\.pdf)/$', views.pdf, name="pdf"),
     url(r'^ocr/', views.ocr, name="ocr"),
-		url(r'^csv/(?P<filename>.+)/$', views.csvAsTable, name="csv"),
-		url(r'embed/(?P<filename>.+\.pdf/$', views.embed, name="embed")
-]
+		url(r'^csv/(?P<filename>.+)/$', views.csvAsTable, name="csv")
