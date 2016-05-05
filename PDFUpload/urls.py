@@ -23,3 +23,4 @@ urlpatterns = [
     url(r'^pdf/(?P<filename>.+\.pdf)/$', views.pdf, name="pdf"),
     url(r'^ocr/', views.ocr, name="ocr"),
 		url(r'^csv/(?P<filename>.+)/$', views.csvAsTable, name="csv")
+]
