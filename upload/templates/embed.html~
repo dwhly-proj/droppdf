@@ -1,0 +1,13 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+		<script src="{% static 'drag&dropfileupload/jquery-ui.js' %}"></script>
+
+		<link rel="stylesheet" type="text/css" href="{% static "drag&dropfileupload/jquery-ui.css" %}" />
+	</head>
+	<body>
+	</body>
+</html>

@@ -196,8 +196,11 @@
 	function dropUpload() {
 	    if(addedFile == 1){
 		myDropzone.removeFile(fileObj);
-		$(".main .label").html('Drag and Drop a PDF here<br/>\
-									<span style="font-size:18px">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</span>')
+		$(".main .label").html('Drag and drop a document to annotate it.<br/>\
+			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>\
+				<p style="font-size:15px;">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>\
+				<p style="font-size:15px">The OCR service uses <a href="https://github.com/tesseract-ocr" style="color: #5bbc2e;">Tesseract</a>, an open source library.<br/>\
+				You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0" style="color: #5bbc2e;">tutorial</a>).</p>')
 			addedFile = 0;
 			fileObj = null;
 	    	filename = "";
