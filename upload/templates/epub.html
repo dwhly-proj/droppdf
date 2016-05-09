@@ -200,7 +200,6 @@
   </div>
   <script>
 
-  #attempted to render file inline
   var book_file = '/static/drop-pdf/{{ filename }}'
   var book = ePub(book_file);
   //var Book = ePub({spreads: true, restore: true});
@@ -209,17 +208,17 @@
 
 
   var hash = window.location.hash.slice(2);
-  rendition.display(hash || 1);
+  //rendition.display(hash || 1);
 
     var next = document.getElementById("next");
     next.addEventListener("click", function(e){
-      rendition.next();
+      //rendition.next();
       e.preventDefault();
     }, false);
 
     var prev = document.getElementById("prev");
     prev.addEventListener("click", function(e){
-      rendition.prev();
+      //rendition.prev();
       e.preventDefault();
     }, false);
 
@@ -232,9 +231,9 @@
 
         if(nextNav) {
           nextLabel = nextNav.label;
-        } else {
-          nextLabel = "next";
-        }
+       } else {
+         nextLabel = "next";
+     }
 
         next.textContent = nextLabel + " »";
       } else {
