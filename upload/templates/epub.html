@@ -1,0 +1,376 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html style="height: auto;">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ filename }}</title>
+
+  <!--files source from epub.js build-->
+  <script src="{% static 'js/zip.min.js' %}"></script>
+  <script src="{% static 'js/epub.min.js' %}"></script>
+
+  <!--sourced from fchasen's epub demo page -->
+  <!--<script src="{% static 'js/epub.js' %}"></script>-->
+
+  <link type="application/annotator+html" href="https://hypothes.is/app.html" rel="sidebar">
+  <script src="{% static 'js/polyfills.js' %}" type="text/javascript"></script>
+  <script src="{% static 'js/jquery.js' %}" type="text/javascript"></script>
+  <script src="{% static 'js/injector.js' %}" type="text/javascript"></script>
+  <link href="{% static 'css/icomoon.css' %}" type="text/css" rel="stylesheet">
+  <link href="{% static 'css/inject.css' %}" type="text/css" rel="stylesheet">
+  <link href="{% static 'css/pdfjs-overrides.css' %}" type="text/css" rel="stylesheet">
+
+  <script src="{% static 'js/embed.js' %}"></script>
+
+  <link type="application/annotator+html" href="https://hypothes.is/app.html" rel="sidebar">
+
+  <style type="text/css">
+    body {
+      margin: 0;
+      background: #fafafa;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: #333;
+
+    }
+
+    #navigation {
+      width: 200px;
+      margin-top: 60px;
+      float: left;
+      padding: 0 0 0 100px;
+    }
+
+    #navigation h1 {
+      font-size: 16px;
+      font-weight: normal;
+      color: #777;
+      margin-bottom: 10px;
+    }
+
+    #navigation h2 {
+      font-size: 14px;
+      font-weight: normal;
+      color: #B0B0B0;
+      margin-bottom: 20px;
+    }
+
+    #navigation ul {
+      padding-left: 0;
+      margin-left: 0;
+    }
+
+    #navigation ul li {
+      list-style: decimal;
+      margin-bottom: 10px;
+      color: #cccddd;
+      font-size: 12px;
+      padding-left: 0;
+      margin-left: 0;
+    }
+
+    #navigation ul li a {
+      color: #ccc;
+      text-decoration: none;
+    }
+
+    #navigation ul li a:hover {
+      color: #777;
+      text-decoration: underline;
+    }
+
+    #navigation ul li a.active {
+      color: #000;
+    }
+
+    #viewer {
+
+      overflow: hidden;
+      width: 800px;
+      margin: 0 50px;
+      background: url('ajax-loader.gif') center center no-repeat;
+
+    }
+
+    #viewer .epub-view {
+        background: white;
+        box-shadow: 0 0 4px #ccc;
+        margin: 10px;
+        padding: 20px;
+    }
+
+    #main {
+      margin-left: 300px;
+      width: 800px;
+    }
+
+    #pagination {
+      text-align: center;
+      margin-left: 80px;
+      /*padding: 0 50px;*/
+    }
+
+    .arrow {
+      margin: 14px;
+      display: inline-block;
+      text-align: center;
+      text-decoration: none;
+      color: #ccc;
+    }
+
+    .arrow:hover {
+      color: #777;
+    }
+
+    .arrow:active {
+      color: #000;
+    }
+
+    #prev {
+      float: left;
+    }
+
+    #next {
+      float: right;
+    }
+
+    #toc {
+      display: block;
+      margin: 10px auto;
+    }
+
+    #hypothesis-custom {
+      overflow: hidden;
+      /*position: absolute;*/
+      right: 0;
+      /*top: 0;*/
+      height: 100%;
+      width: 200px;
+      /*z-index: -2;*/
+    }
+
+    #hypothesis-custom iframe {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+    }
+
+    /*#annotation-controls {
+      position: absolute;
+      top: -7px;
+      left: 0px;
+    }
+
+    #annotation-controls ul {
+      list-style-type: none;
+    }
+
+    #annotation-controls ul li button {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+      background: #fff;
+      border: none;
+      opacity: .5;
+    }
+
+    #annotation-controls ul li button:hover {
+      opacity: .8;
+    }
+
+    #annotation-controls ul li button:focus {
+      border: none !important;
+    }*/
+  </style>
+<!--<link href="http://fchasen.com/epubjs/inline/books/alice/OPS/chapter_008.xhtml" rel="canonical">-->
+<!--<script src="{% static 'js/embed.js' %}"></script>-->
+<!--<script src="js/embed.js" async="" type="text/javascript"></script>-->
+</head>
+<body>
+   <!--<div id="annotation-controls"></div> -->
+   <!--<div id="hypothesis">-->
+    <!--<iframe src="//hypothes.is/app.html" seamless></iframe>-->
+  <!--</div> -->
+    <div id="viewer"><div style="word-spacing: 0px; line-height: 0; vertical-align: top; width: 800px;" class="epub-container" id="epubjs-container:b025fcd1-07c0-4da0-d921-5ca34e29dafd"><div style="overflow: hidden; display: block; visibility: visible;" class="epub-view"><div style="overflow: hidden; word-spacing: initial; line-height: initial; visibility: visible; width: 740px; height: auto;" id="epubjs-view:9ae151da-5c1f-4bd3-9256-36bb30b66fe5">
+    </div>
+  <div id="nav">
+      <div id="prev" onclick="book.prevPage();"><</div>
+      <div id="next" onclick="book.nextPage();">></div>
+  </div>
+  <script>
+
+  #attempted to render file inline
+  var book_file = '/static/drop-pdf/{{ filename }}'
+  var book = ePub(book_file);
+  //var Book = ePub({spreads: true, restore: true});
+  //Book.open(book_file);
+  var rendition = book.renderTo("viewer", { view: "inline" });
+
+
+  var hash = window.location.hash.slice(2);
+  rendition.display(hash || 1);
+
+    var next = document.getElementById("next");
+    next.addEventListener("click", function(e){
+      rendition.next();
+      e.preventDefault();
+    }, false);
+
+    var prev = document.getElementById("prev");
+    prev.addEventListener("click", function(e){
+      rendition.prev();
+      e.preventDefault();
+    }, false);
+
+    rendition.on("rendered", function(section){
+      var nextSection = section.next();
+      var prevSection = section.prev();
+
+      if(nextSection) {
+        nextNav = book.navigation.get(nextSection.href);
+
+        if(nextNav) {
+          nextLabel = nextNav.label;
+        } else {
+          nextLabel = "next";
+        }
+
+        next.textContent = nextLabel + " »";
+      } else {
+        next.textContent = "";
+      }
+
+      if(prevSection) {
+        prevNav = book.navigation.get(prevSection.href);
+
+        if(prevNav) {
+          prevLabel = prevNav.label;
+        } else {
+          prevLabel = "previous";
+        }
+
+        prev.textContent = "« " + prevLabel;
+      } else {
+        prev.textContent = "";
+      }
+
+      // Add CFI fragment to the history
+      history.pushState({}, '', section.href);
+      // window.location.hash = "#/"+section.href
+    });
+
+    book.loaded.navigation.then(function(toc){
+      var $nav = document.getElementById("toc"),
+          docfrag = document.createDocumentFragment();
+
+      toc.forEach(function(chapter) {
+        var item = document.createElement("li");
+        var link = document.createElement("a");
+        link.textContent = chapter.label;
+        link.href = chapter.href;
+        item.appendChild(link);
+        docfrag.appendChild(item);
+
+        link.onclick = function(){
+          var url = link.getAttribute("href");
+          console.log(url)
+          rendition.display(url);
+          return false;
+        };
+
+      });
+
+      $nav.appendChild(docfrag);
+
+
+    });
+
+    book.loaded.metadata.then(function(meta){
+      var $title = document.getElementById("title");
+      var $author = document.getElementById("author");
+      $title.textContent = meta.title;
+      $author.textContent = meta.creator;
+    });
+
+    book.rendition.hooks.content.register(function(view) {
+      view.contents.addScript("//hypothes.is/embed.js").then(function() {
+        view.window.hypothesisConfig = function () {
+
+      		return {
+      			constructor: this.Annotator.Guest,
+            app: 'https://hypothes.is/app.html',
+            showHighlights:true
+      		};
+      	};
+      })
+    });
+
+  </script>
+  <script>
+  // //  Hypothesis Customized embedding
+  // //  This hypothesis config function returns a new constructor which modifies
+  // //  annotator for a better integration. Below we create our own EpubAnnotationSidebar
+  // //  Constructor, customizing the show and hide function to take acount for the reader UI.
+  //
+  // window.hypothesisConfig = function() {
+  //   var Annotator = window.Annotator;
+  //   var $main = $("#main");
+  //
+  //   function EpubAnnotationSidebar(elem, options) {
+  //     options = {
+  //       server: true,
+  //       origin: true,
+  //       showHighlights: true,
+  //       Toolbar: {container: '#annotation-controls'}
+  //     }
+  //
+  //     Annotator.Host.call(this, elem, options);
+  //   }
+  //
+  //   EpubAnnotationSidebar.prototype = Object.create(Annotator.Host.prototype);
+  //
+  //   // EpubAnnotationSidebar.prototype.show = function() {
+  //   //   this.frame.css({
+  //   //     'margin-left': (-1 * this.frame.width()) + "px"
+  //   //   });
+  //   //   this.frame.removeClass('annotator-collapsed');
+  //   //   if (!$main.hasClass('single')) {
+  //   //     $main.addClass("single");
+  //   //     this.toolbar.find('[name=sidebar-toggle]').removeClass('h-icon-chevron-left').addClass('h-icon-chevron-right');
+  //   //     this.setVisibleHighlights(true);
+  //   //   }
+  //   // };
+  //   //
+  //   // EpubAnnotationSidebar.prototype.hide = function() {
+  //   //   this.frame.css({
+  //   //     'margin-left': ''
+  //   //   });
+  //   //   this.frame.addClass('annotator-collapsed');
+  //   //   if ($main.hasClass('single')) {
+  //   //     $main.removeClass("single");
+  //   //     this.toolbar.find('[name=sidebar-toggle]').removeClass('h-icon-chevron-right').addClass('h-icon-chevron-left');
+  //   //     this.setVisibleHighlights(false);
+  //   //   }
+  //   // };
+  //
+  //   return {
+  //     constructor: EpubAnnotationSidebar
+  //   }
+  // };
+  //</script>
+
+
+<!--<div class="annotator-notice"></div><div class="annotator-frame annotator-outer annotator-collapsed" style=""><div class="annotator-bucket-bar">-->
+<!--<div style="top: 68px; margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div><div style="top: 136.5px; margin-top: -11px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator upper"><div class="label">0</div></div><div style="top: 190.417px; margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div><div style="top: 275.333px; margin-top: -8px;" title="Show one annotation" class="annotator-bucket-indicator"><div class="label">1</div></div><div style="top: 367.333px; margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div><div style="margin-top: -8px; top: 448.833px;" title="Show one annotation" class="annotator-bucket-indicator"><div class="label">1</div></div><div style="top: 628.417px; margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div><div style="top: 787.5px; margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div><div style="top: 798.5px; margin-top: -11px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator lower"><div class="label">0</div></div><div style="margin-top: -8px; display: none;" title="Show 0 annotations" class="annotator-bucket-indicator"><div class="label">0</div></div></div><div class="annotator-toolbar"><ul><li><button style="-moz-user-select: none;" class="annotator-frame-button annotator-frame-button--sidebar_toggle h-icon-chevron-left" name="sidebar-toggle" title="Toggle or Resize Sidebar" href=""></button></li><li><button class="annotator-frame-button h-icon-visibility" name="highlight-visibility" title="Hide Highlights" href=""></button></li><li><button class="annotator-frame-button h-icon-note" name="insert-comment" title="New Page Note" href=""></button></li></ul></div><iframe class="h-sidebar-iframe" src="epub_basic_files/app." seamless="" allowfullscreen="" name="hyp_sidebar_frame"></iframe></div><hypothesis-adder style="display: block; visibility: hidden;" class="annotator-adder">-->
+    <!--<hypothesis-adder-actions class="annotator-adder-actions">-->
+      <!--<button class="annotator-adder-actions__button h-icon-annotate" data-action="comment">-->
+        <!--<span class="annotator-adder-actions__label" data-action="comment">Annotate</span>-->
+      <!--</button>-->
+      <!--<button class="annotator-adder-actions__button h-icon-highlight" data-action="highlight">-->
+        <!--<span class="annotator-adder-actions__label" data-action="highlight">Highlight</span>-->
+      <!--</button>-->
+    <!--</hypothesis-adder-actions>-->
+<!--</hypothesis-adder>-->
+</body>
+</html>

@@ -29,7 +29,7 @@
 	    <div id="myId" class="dropzone_new">
 			<div class="label">
 				Drag and drop a document to annotate it.<br/>
-			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>
+			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>
 				<p style="font-size:15px;">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>
 				
 				<p style="font-size:15px">The OCR service uses <a href="https://github.com/tesseract-ocr" style="color: #5bbc2e;">Tesseract</a>, an open source library.<br/>
@@ -76,7 +76,7 @@
 					var extention = file.name.split(".");
 					extention = extention[extention.length-1];
 				
-					if (extention == 'pdf' || extention == 'docx' || extention == 'xlsx' || extention == 'doc' || extention == 'xls'|| extention == 'csv'){
+					if (extention == 'pdf' || extention == 'docx' || extention == 'xlsx' || extention == 'doc' || extention == 'xls'|| extention == 'csv' || extention == 'epub'){
 						type = extention
 						if (addedFile == 0) {
 							addedFile = 1;
@@ -157,6 +157,10 @@
 						$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>")
 					}
 				}
+                else if (type == "epub") {
+					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
+					window.location.href = 'epub/' + filename_server + '/';
+                }
 				else
 				{
 					$(".main .label").html("<a href='javascript:void(0)' onclick='dropUpload()'>Drop to upload</a>");
@@ -166,7 +170,6 @@
 					window.location.href = 'csv/' + filename_server + '/';
 				}
 
-		       	
 		    });
 
 		    this.on("removedfile", function(file) {
@@ -197,7 +200,7 @@
 	    if(addedFile == 1){
 		myDropzone.removeFile(fileObj);
 		$(".main .label").html('Drag and drop a document to annotate it.<br/>\
-			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>\
+			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>\
 				<p style="font-size:15px;">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>\
 				<p style="font-size:15px">The OCR service uses <a href="https://github.com/tesseract-ocr" style="color: #5bbc2e;">Tesseract</a>, an open source library.<br/>\
 				You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0" style="color: #5bbc2e;">tutorial</a>).</p>')
