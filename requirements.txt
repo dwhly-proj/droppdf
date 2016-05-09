@@ -9,7 +9,7 @@ html5lib==0.999
 httplib2==0.8
 lockfile==0.8
 lxml==3.3.3
-oauthlib==0.6.1
+#oauthlib==0.6.1
 #oneconf==0.3.7.14.04.1
 pexpect==3.1
 piston-mini-client==0.7.5
@@ -30,7 +30,7 @@ requests==2.2.1
 #system-service==0.1.6
 #unity-lens-photos==1.0
 #urllib3==1.7.1
-virtualenv==15.0.1
+#virtualenv==15.0.1
 wheel==0.24.0
 whitenoise==3.0
 wsgiref==0.1.2
