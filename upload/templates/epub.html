@@ -282,6 +282,8 @@
       var $title = document.getElementById("title");
       var $author = document.getElementById("author");
       var $cover = document.getElementById("cover");
+      var $nav = document.getElementById('navigation');
+
       $title.textContent = meta.title;
       $author.textContent = meta.creator;
       if (book.archive) {
@@ -291,6 +293,11 @@
           })
       } else {
         $cover.src = book.cover;
+      }
+
+
+      if ($nav.offsetHeight + 60 < window.innerHeight) {
+        $nav.classList.add("fixed");
       }
 
     });
@@ -350,11 +357,7 @@
 
     checkForAnnotator(function () {
       var main = document.querySelector('#main');
-      var nav = document.querySelector('#navigation');
 
-      if (nav.offsetHeight + 60 < window.innerHeight) {
-        nav.classList.add("fixed");
-      }
 
       if(window.innerWidth < 1400) {
         window.annotator.on("show", function () {
