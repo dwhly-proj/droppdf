@@ -7529,6 +7529,7 @@ function qs(el, sel) {
 }
 
 function qsa(el, sel) {
+  
   if (typeof el.querySelector != "undefined") {
     return el.querySelectorAll(sel);
   } else {
@@ -10900,7 +10901,7 @@ Parser.prototype.navItem = function(item, spineIndexByURL, bookSpine){
 
 Parser.prototype.ncx = function(tocXml, spineIndexByURL, bookSpine){
 	// var navPoints = tocXml.querySelectorAll("navMap navPoint");
-  var navPoints = core.qsa("navPoint");
+  var navPoints = core.qsa(tocXml, "navPoint");
 	var length = navPoints.length;
 	var i;
 	var toc = {};
@@ -10926,7 +10927,7 @@ Parser.prototype.ncx = function(tocXml, spineIndexByURL, bookSpine){
 Parser.prototype.ncxItem = function(item, spineIndexByURL, bookSpine){
 	var id = item.getAttribute('id') || false,
 			// content = item.querySelector("content"),
-			content = core.qs("content"),
+			content = core.qs(item, "content"),
 			src = content.getAttribute('src'),
       // navLabel = item.querySelector("navLabel"),
       navLabel = core.qs(item, "navLabel"),
@@ -11767,6 +11768,11 @@ function links(view, renderer) {
   var links = view.document.querySelectorAll("a[href]");
   var replaceLinks = function(link){
     var href = link.getAttribute("href");
+
+    if(href.indexOf("mailto:") === 0){
+      return;
+    }
+    
     var linkUri = URI(href);
     var absolute = linkUri.absoluteTo(view.section.url);
     var relative = absolute.relativeTo(this.book.baseUrl).toString();
