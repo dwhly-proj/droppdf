@@ -11741,6 +11741,27 @@ function base(doc, section){
   base.setAttribute("href", section.url);
 }
 
+function canonical(doc, section){
+  var head;
+  var link;
+
+  if(!doc){
+    return;
+  }
+
+  head = core.qs(doc, "head");
+  link = core.qs(head, "link[rel='canonical']");
+
+  if (link) {
+    link.setAttribute("href", section.url);
+  } else {
+    link = doc.createElement("link");
+    link.setAttribute("rel", "canonical");
+    link.setAttribute("href", section.url);
+    head.appendChild(link);
+  }
+}
+
 function links(view, renderer) {
 
   var links = view.document.querySelectorAll("a[href]");
@@ -11800,6 +11821,7 @@ function substitute(content, urls, replacements) {
 }
 module.exports = {
   'base': base,
+  'canonical' : canonical,
   'links': links,
   'substitute': substitute
 };
@@ -12124,6 +12146,7 @@ function Spine(_request){
 
   // Register replacements
   this.hooks.content.register(replacements.base);
+  this.hooks.content.register(replacements.canonical);
 
   this.epubcfi = new EpubCFI();
 
@@ -13956,6 +13979,16 @@ IframeView.prototype.onLoad = function(event, promise) {
 
     this.rendering = false;
 
+    var link = this.document.querySelector("link[rel='canonical']");
+    if (link) {
+      link.setAttribute("href", this.section.url);
+    } else {
+      link = this.document.createElement("link");
+      link.setAttribute("rel", "canonical");
+      link.setAttribute("href", this.section.url);
+      this.document.querySelector("head").appendChild(link);
+    }
+
     promise.resolve(this.contents);
 };
 
@@ -14405,16 +14438,6 @@ InlineView.prototype.load = function(contents) {
 
   this.contents = new Contents(this.document, this.frame);
 
-  // <link rel="canonical" href="https://blog.example.com/dresses/green-dresses-are-awesome" />
-  var link = this.document.querySelector("link[rel='canonical']");
-  if (link) {
-    link.setAttribute("href", this.section.url);
-  } else {
-    link = this.document.createElement("link");
-    link.setAttribute("rel", "canonical");
-    link.setAttribute("href", this.section.url);
-    this.document.querySelector("head").appendChild(link);
-  }
   this.rendering = false;
 
   loading.resolve(this.contents);
