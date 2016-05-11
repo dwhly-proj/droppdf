@@ -187,7 +187,12 @@
 
     var rendition = book.renderTo("viewer");
 
-    var hash = window.location.hash.slice(2);
+    // var hash = window.location.hash.slice(2);
+    var loc = window.location.href.indexOf("?loc=");
+    if (loc > -1) {
+      var href =  window.location.href.slice(loc + 5);
+      var hash = decodeURIComponent(href);
+    }
     rendition.display(hash || 1);
 
 
@@ -247,8 +252,8 @@
         active.classList.add("active");
       }
       // Add CFI fragment to the history
-      // history.pushState({}, '', section.href);
-      window.location.hash = "#/"+section.href
+      history.pushState({}, '', "?loc=" + encodeURIComponent(section.href));
+      // window.location.hash = "#/"+section.href
     });
 
     book.loaded.navigation.then(function(toc){
