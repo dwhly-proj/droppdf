@@ -138,14 +138,31 @@ def save_file(file, path='', extension='pdf'):
         return filename_noextension + "-" + rand_key + '.csv'
 
     elif extension == 'epub':
-        unzip_epub(temp, filename, filename_noextension, rand_key)
+        #if epub extraction fails user will be alerted
+        if not unzip_epub(temp, filename, filename_noextension, rand_key):
+            return False
+
+        template_data = process_epub_html('%s/%s' % (path, filename_noextension)):
+        #if file structure not as expected user will be alerted
+        if not template_data:
+            return False
+
         return filename_noextension + "-" + rand_key + '.epub'
 
 def unzip_epub(path, filename, filename_noextension, rand_key):
     '''Unzip epub into directory of same name and randkey without epub extension'''
-    zipfl = zipfile.ZipFile('%s/%s' % (path, filename), 'r')
-    zipfl.extractall('%s/%s-%s' % (path, filename_noextension, rand_key))
-    zipfl.close()
+    try:
+        zipfl = zipfile.ZipFile('%s/%s' % (path, filename), 'r')
+        zipfl.extractall('%s/%s-%s' % (path, filename_noextension, rand_key))
+        zipfl.close()
+        return True
+    except:
+        return False
+
+def process_epub_html(path, filename_noextension):
+    '''prepare html to be rendered in template'''
+    os.chdir(path)
+    pass
 
 def ocr(request):
     temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"
