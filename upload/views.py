@@ -20,6 +20,8 @@ from xtopdf.PDFWriter import PDFWriter
 import xlrd
 import csv
 
+import zipfile
+
 reload(sys)  
 sys.setdefaultencoding('utf8')
 
@@ -136,7 +138,14 @@ def save_file(file, path='', extension='pdf'):
         return filename_noextension + "-" + rand_key + '.csv'
 
     elif extension == 'epub':
+        unzip_epub(temp, filename, filename_noextension, rand_key)
         return filename_noextension + "-" + rand_key + '.epub'
+
+def unzip_epub(path, filename, filename_noextension, rand_key):
+    '''Unzip epub into directory of same name and randkey without epub extension'''
+    zipfl = zipfile.ZipFile('%s/%s' % (path, filename), 'r')
+    zipfl.extractall('%s/%s-%s' % (path, filename_noextension, rand_key))
+    zipfl.close()
 
 def ocr(request):
     temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"
