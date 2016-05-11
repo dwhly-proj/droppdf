@@ -11758,7 +11758,7 @@ function canonical(doc, section){
   } else {
     link = doc.createElement("link");
     link.setAttribute("rel", "canonical");
-    link.setAttribute("href", section.url);
+    link.setAttribute("href", window.location.origin +  window.location.pathname + "?loc=" + encodeURIComponent(section.url));
     head.appendChild(link);
   }
 }
@@ -11772,7 +11772,7 @@ function links(view, renderer) {
     if(href.indexOf("mailto:") === 0){
       return;
     }
-    
+
     var linkUri = URI(href);
     var absolute = linkUri.absoluteTo(view.section.url);
     var relative = absolute.relativeTo(this.book.baseUrl).toString();

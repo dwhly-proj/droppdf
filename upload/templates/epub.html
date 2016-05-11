@@ -187,7 +187,12 @@
 
     var rendition = book.renderTo("viewer");
 
-    var hash = window.location.hash.slice(2);
+    // var hash = window.location.hash.slice(2);
+    var loc = window.location.href.indexOf("?loc=");
+    if (loc > -1) {
+      var href =  window.location.href.slice(loc + 5);
+      var hash = decodeURIComponent(href);
+    }
     rendition.display(hash || 1);
 
 
@@ -247,8 +252,8 @@
         active.classList.add("active");
       }
       // Add CFI fragment to the history
-      // history.pushState({}, '', section.href);
-      window.location.hash = "#/"+section.href
+      history.pushState({}, '', "?loc=" + encodeURIComponent(section.href));
+      // window.location.hash = "#/"+section.href
     });
 
     book.loaded.navigation.then(function(toc){
@@ -282,6 +287,8 @@
       var $title = document.getElementById("title");
       var $author = document.getElementById("author");
       var $cover = document.getElementById("cover");
+      var $nav = document.getElementById('navigation');
+
       $title.textContent = meta.title;
       $author.textContent = meta.creator;
       if (book.archive) {
@@ -291,6 +298,11 @@
           })
       } else {
         $cover.src = book.cover;
+      }
+
+
+      if ($nav.offsetHeight + 60 < window.innerHeight) {
+        $nav.classList.add("fixed");
       }
 
     });
@@ -350,11 +362,7 @@
 
     checkForAnnotator(function () {
       var main = document.querySelector('#main');
-      var nav = document.querySelector('#navigation');
 
-      if (nav.offsetHeight + 60 < window.innerHeight) {
-        nav.classList.add("fixed");
-      }
 
       if(window.innerWidth < 1400) {
         window.annotator.on("show", function () {
