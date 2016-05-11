@@ -21,6 +21,9 @@ import xlrd
 import csv
 
 import zipfile
+#from lxml import etree
+#from StringIO import StringIO
+from bs4 import BeautifulSoup as bsoup
 
 reload(sys)  
 sys.setdefaultencoding('utf8')
@@ -67,7 +70,6 @@ def upload(request):
         extension = temp[len(temp) - 1]
 
         filename = save_file(request.FILES['file'], 'drop-pdf', extension)
-        
             
         
     return HttpResponse(filename)
@@ -142,10 +144,14 @@ def save_file(file, path='', extension='pdf'):
         if not unzip_epub(temp, filename, filename_noextension, rand_key):
             return False
 
-        template_data = process_epub_html('%s/%s' % (path, filename_noextension)):
+        filename_w_key = '%s-%s' % (filename_noextension, rand_key)
+        full_path = 'upload/static/%s/%s' % (path, filename_w_key)
+        template_data = process_epub_html(full_path, filename_w_key)
         #if file structure not as expected user will be alerted
         if not template_data:
             return False
+        pages = template_data[0]
+        styles = template_data[1]
 
         return filename_noextension + "-" + rand_key + '.epub'
 
@@ -159,10 +165,121 @@ def unzip_epub(path, filename, filename_noextension, rand_key):
     except:
         return False
 
-def process_epub_html(path, filename_noextension):
+def rewrite_style_sheet(sheet):
+    '''Prefix epub style sheet elements with viewport id.
+    Overwrite existing style sheet.
+    This is to avoid collision with display page styles'''
+    out = ''
+    viewport_id = '#epub-inner-viewport'
+    ss = open(sheet, 'r')
+    for line in ss:
+        start_element = re.search('{', line)
+        if start_element:
+            new_line_els = []
+            #some elements refs have multiple comma seperated elements
+            elems = line.split('{')[0].strip().split(',')
+            for el in elems:
+                el = el.strip()
+                #remove body tags...replace them with viewport id
+                el = el.replace('body', '').replace(' ', '')
+                if len(el) == 0:
+                    new_line_els.append(viewport_id)
+                else:
+                    new_line_els.append('%s %s' % (viewport_id, el))
+            if len(new_line_els) == 1:
+                new_line = new_line_els[0] + ' {\n'
+            else:
+                new_line = ', '.join(new_line_els) + ' {\n'
+            out += new_line
+            continue
+        else:
+            out += line
+    ss.close()
+    ss = open(sheet, 'w')
+    ss.write(out)
+    ss.close()
+
+def process_epub_html(full_path, filename_w_key):
     '''prepare html to be rendered in template'''
-    os.chdir(path)
-    pass
+    #toc file specifies display order
+    toc_file = get_epub_toc(full_path)
+    if not toc_file:
+        return False
+
+    #some epubs contain html files in inner directory.
+    #this appears to be directory containing toc file
+    #find where toc file is and this directory will be inner path
+
+    toc = toc_file[1]
+    path_with_inner = toc_file[0]
+    
+    pages = parse_epub_toc(toc, path_with_inner)
+    style_refs = []
+    
+    for file_name in os.listdir(path_with_inner):
+        print file_name
+
+        #get actual document html files only
+        fs = file_name.split('.')
+        if len(fs) < 2:
+            continue
+
+        file_path = '%s/%s' % (path_with_inner, file_name)
+        #preface styles on css sheets with viewport to avoid conflict with view page styling
+        if fs[1] == 'css':
+            rewrite_style_sheet(file_path)
+            continue
+
+        if fs[-1] not in ['html', 'htm'] or fs[0] == 'toc':
+            continue
+
+        file_ = open(file_path)
+        parse = bsoup(file_.read(), 'lxml')
+        file_.close()
+        
+        #to begin with assume all pages have same stylesheets
+        stylelinks = parse.find_all('link', rel='stylesheet')
+        for s in stylelinks:
+            style_path = '%s/%s' % (path_with_inner, s)
+            if not style_path in style_refs:
+                style_refs.append(style_path)
+
+        #get body inner html. rewrite the existing html page with only that
+        inner_body = parse.find('body')
+        #replace image paths with full path
+        for img in inner_body.find_all('img'):
+            img['src'] = '%s/%s' % (path_with_inner, img['src'])
+
+        inner_html = str(inner_body.renderContents())
+
+        file_ = open(file_path, 'w')
+        file_.write(inner_html)
+        file.close()
+
+        return (pages, style_refs)
+
+def get_epub_toc(full_path):
+    '''
+    Find toc.ncx XML file path. If it doesn't exist return None.
+    Otherwise return tuple of (directory, directory/file) 
+    '''
+    for dir_, subdir, files in os.walk(full_path, topdown=True):
+        for f in files:
+            if f == 'toc.ncx':
+                return (dir_, '%s/%s' % (dir_, f))
+    return None
+
+
+def parse_epub_toc(toc, path_with_inner):
+    '''get document html pages in order'''
+    pages = []
+    xml = open(toc).read()
+    parse = bsoup(xml, 'lxml')
+
+    for i in parse.find_all('content'):
+        pages.append('%s/%s' % (path_with_inner, i['src']))
+
+    return pages
 
 def ocr(request):
     temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"
