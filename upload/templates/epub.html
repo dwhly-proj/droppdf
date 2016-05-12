@@ -68,7 +68,7 @@
   <link href="{{ s }} " rel="stylesheet" type="text/css">
   {% endfor %}
 
-    <!--Below is Fred's hypothes call. It works faster-->
+    <!--Below is Fred's hypothes call. It works faster on local development-->
   <!--<script>-->
   <!--window.hypothesisConfig = function () {-->
     <!--return {-->
@@ -143,12 +143,9 @@
       color: #000;
     }
     #epub-inner-viewport {
-
       overflow: hidden;
       width: 800px;
       margin: 0 50px;
-      background: url('ajax-loader.gif') center center no-repeat;
-
     }
 
     #viewer .epub-view {
@@ -258,19 +255,25 @@
     }
 
     function change_page(new_src) {
+
+        $('#epub-inner-viewport').empty();
+    
+        var base_path = window.location.href.split('/')[0]
+
         var data = {
             page_src: new_src,
             csrfmiddlewaretoken: '{{ csrf_token }}'
         };
         $.ajax({
                 type: 'POST',
-                url: '/epub_page_change/',
+                //url: '/epub_page_change/',
+                url: base_path + '/epub_page_change/',
                 data: data,
                 cache: false,
                 dataType: 'html',
                 async: false,
                 success: function(rspns) {
-                    $('#epub-inner-viewport').empty().append(rspns);
+                    $('#epub-inner-viewport').append(rspns);
                 },
                 error: function(rspns) {
                 }
