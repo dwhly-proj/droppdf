@@ -6,19 +6,78 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
+    <script>
+      wbinfo = {}
+      wbinfo.url = "http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
+      wbinfo.timestamp = "20160430174505";
+      wbinfo.request_ts = "";
+      wbinfo.prefix = "https://via.hypothes.is/";
+      wbinfo.mod = "";
+      wbinfo.top_url = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
+      wbinfo.is_framed = false;
+      wbinfo.is_live = true;
+      wbinfo.coll = "";
+      wbinfo.proxy_magic = "";
+      wbinfo.static_prefix = "https://via.hypothes.is/static/__pywb";
+    </script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.5.0/jszip.min.js"></script>
-  <script src="{% static 'js/epub.js' %}"></script>
+    <script src="https://via.hypothes.is/static/__pywb/wombat.js"> </script>
+    <script>
+      wbinfo.wombat_ts = "20160430174505";
+      wbinfo.wombat_scheme = "http";
+      wbinfo.wombat_host = "datapipes.okfnlabs.org";
+      wbinfo.wombat_sec = "1462038305";
 
-  <script>
-  window.hypothesisConfig = function () {
-    return {
-      constructor: this.Annotator.Sidebar,
-      app: 'http://45.55.144.135:5000/app.html',
-    };
-  };
-  </script>
-  <script src="http://45.55.144.135:5000/embed.js"></script>
+      wbinfo.wombat_opts = {"no_rewrite_prefixes": ["https://hypothes.is/", "/assets/"], "http_cache": "pass"};
+
+
+      if (window && window._WBWombat && !window._wb_js_inited && !window._wb_wombat) {
+        window._wb_wombat = new _WBWombat(wbinfo);
+      }
+    </script>
+
+    <script src="https://via.hypothes.is/static/__pywb/wb.js"> </script>
+    <script src="https://via.hypothes.is/static/__pywb/vidrw.js"> </script>
+
+	<!--[> Set canonical url <]-->
+    <!--<link rel="canonical" href="http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv">-->
+
+	<!--[> Inject Hypothesis <]-->
+    <script>
+    (function () {
+    // Only run injection for top-level window!
+    if (window != window.top) {
+        return;
+    }
+
+    var embed_script = document.createElement("script");
+    embed_script.src = "https://hypothes.is/embed.js";
+    document.head.appendChild(embed_script);
+    window.hypothesisConfig = function() {
+        return {showHighlights: true};
+    }
+    })();
+    </script>
+	<!--[> load banner <]-->
+    <script> if (_wb_js) { _wb_js.load(); }</script>
+
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.5.0/jszip.min.js"></script>-->
+  <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
+
+  {% for s in styles %}
+  <link href="{{ s }} " rel="stylesheet" type="text/css">
+  {% endfor %}
+
+    <!--Below is Fred's hypothes call. It works faster-->
+  <!--<script>-->
+  <!--window.hypothesisConfig = function () {-->
+    <!--return {-->
+      <!--constructor: this.Annotator.Sidebar,-->
+      <!--app: 'http://45.55.144.135:5000/app.html',-->
+    <!--};-->
+  <!--};-->
+  <!--</script>-->
+  <!--<script src="http://45.55.144.135:5000/embed.js"></script>-->
 
   <style type="text/css">
     body {
@@ -69,21 +128,21 @@
       margin-left: 0;
     }
 
-    #navigation ul li a {
+    #navigation ul li {
       color: #ccc;
       text-decoration: none;
     }
 
-    #navigation ul li a:hover {
+    #navigation ul li:hover {
       color: #777;
       text-decoration: underline;
+      cursor: pointer;
     }
 
-    #navigation ul li a.active {
+    #navigation ul li.active {
       color: #000;
     }
-
-    #viewer {
+    #epub-inner-viewport {
 
       overflow: hidden;
       width: 800px;
@@ -173,25 +232,60 @@
     <!--<ul id="toc"></ul>-->
     <ul>
     {% for p in pages %}
-        <li>{{ p.ref }}</li>
+    <li data="{{ p.ref }}">{{ p.text }}</li>
     {% endfor %}
     </ul>
 
 
   </div>
   <div id="main">
-    <div id="epub-inner-viewport"></div>
+    <div id="epub-inner-viewport">
+        {{ first_page | safe }}
+    </div>
     <div id="pagination">
       <a id="prev" href="#prev" class="arrow">...</a>
       <a id="next" href="#next" class="arrow">...</a>
     </div>
   </div>
 
+ {% csrf_token %}
+
   <script>
-    def location_hash(location) {
+
+    function location_hash(location) {
         // Add CFI fragment to the history
         window.location.hash = "#/"+location;
     }
+
+    function change_page(new_src) {
+        var data = {
+            page_src: new_src,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        };
+        $.ajax({
+                type: 'POST',
+                url: '/epub_page_change/',
+                data: data,
+                cache: false,
+                dataType: 'html',
+                async: false,
+                success: function(rspns) {
+                    $('#epub-inner-viewport').empty().append(rspns);
+                },
+                error: function(rspns) {
+                }
+            });
+    }
+
+    $(document).ready(function() {
+        $('#navigation ul li').each(function() {
+            $(this).click(function() {
+                var new_src = $(this).attr('data');
+                change_page(new_src);
+            });
+        });
+    });
+
   </script>
 
 </body>
