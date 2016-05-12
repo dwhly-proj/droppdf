@@ -167,13 +167,19 @@
 </head>
 <body>
   <div id="navigation">
-    <h1 id="title">...</h1>
-    <image id="cover" width="150px"/>
-    <h2 id="author">...</h2>
-    <ul id="toc"></ul>
+    <!--<h1 id="title">...</h1>-->
+    <!--<image id="cover" width="150px"/>-->
+    <!--<h2 id="author">...</h2>-->
+    <!--<ul id="toc"></ul>-->
+    <ul>
+    {% for p in pages %}
+        <li>{{ p }}</li>
+    </ul>
+
+
   </div>
   <div id="main">
-    <div id="viewer"></div>
+    <div id="epub-inner-viewport"></div>
     <div id="pagination">
       <a id="prev" href="#prev" class="arrow">...</a>
       <a id="next" href="#next" class="arrow">...</a>
@@ -181,192 +187,10 @@
   </div>
 
   <script>
-    var currentSectionIndex = 8;
-    // Load the opf
-    var book = ePub("/static/drop-pdf/{{ filename }}");
-
-    var rendition = book.renderTo("viewer");
-
-    var hash = window.location.hash.slice(2);
-    rendition.display(hash || 1);
-
-
-    var next = document.getElementById("next");
-    next.addEventListener("click", function(e){
-      window.scrollTo(0,0);
-      rendition.next();
-      e.preventDefault();
-    }, false);
-
-    var prev = document.getElementById("prev");
-    prev.addEventListener("click", function(e){
-      window.scrollTo(0,0);
-      rendition.prev();
-      e.preventDefault();
-    }, false);
-
-    rendition.on("rendered", function(section){
-      var nextSection = section.next();
-      var prevSection = section.prev();
-
-      if(nextSection) {
-        nextNav = book.navigation.get(nextSection.href);
-
-        if(nextNav) {
-          nextLabel = nextNav.label;
-        } else {
-          nextLabel = "next";
-        }
-
-        next.textContent = nextLabel + " »";
-      } else {
-        next.textContent = "";
-      }
-
-      if(prevSection) {
-        prevNav = book.navigation.get(prevSection.href);
-
-        if(prevNav) {
-          prevLabel = prevNav.label;
-        } else {
-          prevLabel = "previous";
-        }
-
-        prev.textContent = "« " + prevLabel;
-      } else {
-        prev.textContent = "";
-      }
-
-      var old = document.querySelectorAll('.active');
-      Array.prototype.slice.call(old, 0).forEach(function (link) {
-        link.classList.remove("active");
-      })
-
-      var active = document.querySelector('a[href="'+section.href+'"]');
-      if (active) {
-        active.classList.add("active");
-      }
-      // Add CFI fragment to the history
-      // history.pushState({}, '', section.href);
-      window.location.hash = "#/"+section.href
-    });
-
-    book.loaded.navigation.then(function(toc){
-      var $nav = document.getElementById("toc"),
-          docfrag = document.createDocumentFragment();
-
-      toc.forEach(function(chapter, index) {
-        var item = document.createElement("li");
-        var link = document.createElement("a");
-        link.id = "chap-" + chapter.id;
-        link.textContent = chapter.label;
-        link.href = chapter.href;
-        item.appendChild(link);
-        docfrag.appendChild(item);
-
-        link.onclick = function(){
-          var url = link.getAttribute("href");
-          console.log(url)
-          rendition.display(url);
-          return false;
-        };
-
-      });
-
-      $nav.appendChild(docfrag);
-
-
-    });
-
-    book.loaded.metadata.then(function(meta){
-      var $title = document.getElementById("title");
-      var $author = document.getElementById("author");
-      var $cover = document.getElementById("cover");
-      $title.textContent = meta.title;
-      $author.textContent = meta.creator;
-      if (book.archive) {
-        book.archive.createUrl(book.cover)
-          .then(function (url) {
-            $cover.src = url;
-          })
-      } else {
-        $cover.src = book.cover;
-      }
-
-    });
-
-    function checkForAnnotator(cb, w) {
-     if (!w) {
-       w = window;
-     }
-     setTimeout(function () {
-        if (w && w.annotator) {
-          cb();
-        } else {
-          checkForAnnotator(cb, w);
-        }
-      }, 100);
+    def location_hash(location) {
+        // Add CFI fragment to the history
+        window.location.hash = "#/"+location;
     }
-
-    book.rendition.hooks.content.register(function(view) {
-
-      view.window.hypothesisConfig = function () {
-
-    		return {
-    			constructor: this.Annotator.Guest,
-          app: 'http://45.55.144.135:5000/app.html'
-    		};
-    	};
-
-      view.contents.addScript("http://45.55.144.135:5000/embed.js").then(function() {
-
-        checkForAnnotator(function () {
-
-          var annotator = view.window.annotator;
-
-          annotator.on("scrollToAnnotation", function (node) {
-            var cfi = view.section.cfiFromElement(node);
-            // var selectors = ev.target[0].selector;
-            // var range = selectors[0];
-            console.log("scrollToAnnotation", cfi);
-            book.rendition.display(cfi);
-          });
-
-          annotator.on("highlightClick", function (annotation) {
-            // console.log(annotation);
-            window.annotator.show();
-          })
-
-          annotator.on("beforeAnnotationCreated", function (annotation) {
-            // console.log(annotation);
-            window.annotator.show();
-          })
-
-        }, view.window);
-
-      });
-
-    });
-
-    checkForAnnotator(function () {
-      var main = document.querySelector('#main');
-      var nav = document.querySelector('#navigation');
-
-      if (nav.offsetHeight + 60 < window.innerHeight) {
-        nav.classList.add("fixed");
-      }
-
-      if(window.innerWidth < 1400) {
-        window.annotator.on("show", function () {
-          main.classList.add("open");
-        });
-
-        window.annotator.on("hide", function () {
-          main.classList.remove("open");
-        });
-      }
-    });
-
   </script>
 
 </body>

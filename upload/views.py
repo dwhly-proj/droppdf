@@ -25,6 +25,9 @@ import zipfile
 #from StringIO import StringIO
 from bs4 import BeautifulSoup as bsoup
 
+import codecs
+import json
+
 reload(sys)  
 sys.setdefaultencoding('utf8')
 
@@ -40,8 +43,28 @@ def pdf(request, filename):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
+#def epub(request, pages, styles, filename):
 def epub(request, filename):
     filename = filename
+        #if epub extraction fails user will be alerted
+        #if not unzip_epub(temp, filename, filename_noextension, rand_key):
+            #return False
+
+        #filename_w_key = '%s-%s' % (filename_noextension, rand_key)
+        #full_path = 'upload/static/%s/%s' % (path, filename_w_key)
+        #template_data = process_epub_html(full_path, filename_w_key)
+        #if file structure not as expected user will be alerted
+        #if not template_data:
+            #return False
+        #pages = template_data[0]
+        #styles = template_data[1]
+        #epub_data = {'pages': pages, 'styles': styles, 'filename': filename_w_key}
+        
+        #return epub_data
+    #print epub_data
+    #filename = epub_data['filename']
+    #styles = epub_data['styles']
+    #pages = epub_data['pages']
     return render_to_response('epub.html', locals())
 
 def csvAsTable(request, filename):
@@ -71,7 +94,6 @@ def upload(request):
 
         filename = save_file(request.FILES['file'], 'drop-pdf', extension)
             
-        
     return HttpResponse(filename)
 
 def drop(request):
@@ -152,8 +174,15 @@ def save_file(file, path='', extension='pdf'):
             return False
         pages = template_data[0]
         styles = template_data[1]
+        epub_data = {'pages': pages, 'styles': styles, 'filename': filename_w_key}
 
-        return filename_noextension + "-" + rand_key + '.epub'
+        #write a configuration file to be read when file url is requested
+        #this data will be used to construct the template
+        config_path = full_path + '/toc.json'
+        with codecs.open(config_path, 'w', 'utf8') as f:
+                 f.write(json.dumps(epub_data, sort_keys = True, ensure_ascii=False))
+
+        return filename_w_key
 
 def unzip_epub(path, filename, filename_noextension, rand_key):
     '''Unzip epub into directory of same name and randkey without epub extension'''
@@ -217,7 +246,6 @@ def process_epub_html(full_path, filename_w_key):
     style_refs = []
     
     for file_name in os.listdir(path_with_inner):
-        print file_name
 
         #get actual document html files only
         fs = file_name.split('.')
@@ -254,7 +282,7 @@ def process_epub_html(full_path, filename_w_key):
 
         file_ = open(file_path, 'w')
         file_.write(inner_html)
-        file.close()
+        file_.close()
 
         return (pages, style_refs)
 
