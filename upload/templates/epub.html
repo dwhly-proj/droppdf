@@ -173,7 +173,8 @@
     <!--<ul id="toc"></ul>-->
     <ul>
     {% for p in pages %}
-        <li>{{ p }}</li>
+        <li>{{ p.ref }}</li>
+    {% endfor %}
     </ul>
 
 

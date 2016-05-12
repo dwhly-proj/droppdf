@@ -46,26 +46,28 @@ def pdf(request, filename):
 #def epub(request, pages, styles, filename):
 def epub(request, filename):
     filename = filename
-        #if epub extraction fails user will be alerted
-        #if not unzip_epub(temp, filename, filename_noextension, rand_key):
-            #return False
+    basepath = 'upload/static/drop-pdf'
+    
+    #file where toc.ncx is located appears to be where html content is stored
+    toc_location = get_epub_toc(basepath + '/' + filename)
+    if not toc_location:
+        #TODO- show error
+        return 'none'
 
-        #filename_w_key = '%s-%s' % (filename_noextension, rand_key)
-        #full_path = 'upload/static/%s/%s' % (path, filename_w_key)
-        #template_data = process_epub_html(full_path, filename_w_key)
-        #if file structure not as expected user will be alerted
-        #if not template_data:
-            #return False
-        #pages = template_data[0]
-        #styles = template_data[1]
-        #epub_data = {'pages': pages, 'styles': styles, 'filename': filename_w_key}
-        
-        #return epub_data
-    #print epub_data
-    #filename = epub_data['filename']
-    #styles = epub_data['styles']
-    #pages = epub_data['pages']
-    return render_to_response('epub.html', locals())
+    #sometimes html files can be located in inner directory
+    full_path = toc_location[0]
+
+    #get configurations
+    #TODO try/except this
+    with open(full_path + '/toc.json') as file_:
+        config = json.load(file_)
+
+    out = {
+            'pages': config['pages'],
+            'styles': config['styles']
+            }
+
+    return render_to_response('epub.html', out)
 
 def csvAsTable(request, filename):
     file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)
@@ -268,7 +270,7 @@ def process_epub_html(full_path, filename_w_key):
         #to begin with assume all pages have same stylesheets
         stylelinks = parse.find_all('link', rel='stylesheet')
         for s in stylelinks:
-            style_path = '%s/%s' % (path_with_inner, s)
+            style_path = '%s/%s' % (path_with_inner, s['href'])
             if not style_path in style_refs:
                 style_refs.append(style_path)
 
@@ -297,15 +299,20 @@ def get_epub_toc(full_path):
                 return (dir_, '%s/%s' % (dir_, f))
     return None
 
-
 def parse_epub_toc(toc, path_with_inner):
-    '''get document html pages in order'''
+    '''Get document html pages in order.
+    Returns: list of dictionaries.
+    '''
     pages = []
     xml = open(toc).read()
-    parse = bsoup(xml, 'lxml')
+    parse = bsoup(xml, 'xml')
 
-    for i in parse.find_all('content'):
-        pages.append('%s/%s' % (path_with_inner, i['src']))
+    #for i in parse.find_all('content'):
+    for i in parse.find_all('navPoint'):
+        text = i.find('navLabel').find('text').string
+        cont = i.find('content')['src']
+        ref = '%s/%s' % (path_with_inner, cont)
+        pages.append({'text': text, 'ref': ref})
 
     return pages
 
