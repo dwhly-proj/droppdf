@@ -1,5 +1,6 @@
 # encoding=utf8
 
+from django.shortcuts import redirect
 from django.shortcuts import render
 from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_exempt
@@ -44,11 +45,7 @@ def pdf(request, filename):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
-#def epub(request, pages, styles, filename):
 def epub(request, filename):
-    #print filename, page, 'ZZ'
-    #print filename.split('/'), 'aAAr'
-    #filename = filename
     
     #find html file if exists
     filepath = filename.split('/')
@@ -57,8 +54,6 @@ def epub(request, filename):
         filename = filepath[0]
     else:
         page = None
-
-    print filename, page, 'ZZ'
 
     basepath = 'upload/static/drop-pdf'
 
@@ -76,8 +71,10 @@ def epub(request, filename):
     out['page'] = 'Error fetching resource'
 
     if page is None:
-        #get content for first page
-        out['page'] = read_epub_page(out['pages'][0]['ref'])
+        #don't have two paths to same page. otherwise annotations won't be consistant.
+        return redirect('/epub/%s/%s' % (filename, out['pages'][0]['short_ref']))
+        #get first page
+        #out['page'] = read_epub_page(out['pages'][0]['ref'])
 
     else:
         #get content for page specified in url
