@@ -96,11 +96,11 @@ def epub_resource(request):
 
     return HttpResponse(response)
 
-def epub_page_change(request):
-    '''Send back html snippet to replace book page.'''
-    src = request.POST.get("page_src")
-    html = read_epub_page(src)
-    return HttpResponse(html)
+#def epub_page_change(request):
+    #'''Send back html snippet to replace book page.'''
+    #src = request.POST.get("page_src")
+    #html = read_epub_page(src)
+    #return HttpResponse(html)
 
 def csvAsTable(request, filename):
     file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)
@@ -316,6 +316,14 @@ def process_epub_html(full_path, filename_w_key):
                 if not style_path in style_refs:
                     style_refs.append(style_path)
 
+            #remove links. navigation won't work through pages
+            for a in parse.find_all('a'):
+                a['href'] = ''
+
+            #remove any script. epubs should not have them but just in case a user gets clever...
+            for s in parse.find_all('script'):
+                s.extract()
+
             #get body inner html. rewrite the existing html page with only that
             inner_body = parse.find('body')
 
@@ -358,62 +366,64 @@ def parse_epub_toc(toc, path_with_inner):
     xml = open(toc).read()
     parse = bsoup(xml, 'xml')
 
-    #TODO this can be consolidated
-    for i in parse.find_all('pageTarget'):
-        text = i.find('navLabel').find('text').string
-        cont = i.find('content')['src']
+    #TODO this can be consolidated in one parse find but order is important.
+    #navpoint pages appear at top even though they appear to have info from last documents'
+    for root_tag in ['pageTarget', 'navPoint']:
+        for i in parse.find_all(root_tag):
+            text = i.find('navLabel').find('text').string
+            cont = i.find('content')['src']
 
-        #some books have a hash after doc name
-        cont = cont.split('#')[0]
+            #some books have a hash after doc name
+            cont = cont.split('#')[0]
 
-        #exclude the page from index if any following terms contained in src
-        include = True
-        #excludes = ['table-of-contents', 'pressbooks']
-        #for term in excludes:
-            #if re.search(term, str(cont)):
-                #include = False
-                #break
-        if include:
-            ref = '%s/%s' % (path_with_inner, cont)
-    
-            #tack extra text on existing for pages with multiple text
-            if ref in found_pages:
-                for p in pages:
-                    if p['ref'] == ref:
-                        p['text'] += ', ' + text
-                        continue
-            else:
-                pages.append({'text': text, 'ref': ref, 'short_ref': cont})
-                found_pages.append(ref)
+            #exclude the page from index if any following terms contained in src
+            include = True
+            #excludes = ['table-of-contents', 'pressbooks']
+            #for term in excludes:
+                #if re.search(term, str(cont)):
+                    #include = False
+                    #break
+            if include:
+                ref = '%s/%s' % (path_with_inner, cont)
+        
+                #tack extra text on existing for pages with multiple text
+                if ref in found_pages:
+                    for p in pages:
+                        if p['ref'] == ref:
+                            p['text'] += ', ' + text
+                            continue
+                else:
+                    pages.append({'text': text, 'ref': ref, 'short_ref': cont})
+                    found_pages.append(ref)
 
 
     #for i in parse.find_all('content'):
-    for i in parse.find_all('navPoint'):
-        text = i.find('navLabel').find('text').string
-        cont = i.find('content')['src']
+    #for i in parse.find_all('navPoint'):
+        #text = i.find('navLabel').find('text').string
+        #cont = i.find('content')['src']
 
         #some books have a hash after doc name
-        cont = cont.split('#')[0]
+        #cont = cont.split('#')[0]
 
         #exclude the page from index if any following terms contained in src
-        include = True
+        #include = True
         #excludes = ['table-of-contents', 'pressbooks']
         #for term in excludes:
             #if re.search(term, str(cont)):
                 #include = False
                 #break
-        if include:
-            ref = '%s/%s' % (path_with_inner, cont)
+        #if include:
+            #ref = '%s/%s' % (path_with_inner, cont)
 
             #tack extra text on existing for pages with multiple text
-            if ref in found_pages:
-                for p in pages:
-                    if p['ref'] == ref:
-                        p['text'] += ', ' + text
-                        continue
-            else:
-                pages.append({'text': text, 'ref': ref, 'short_ref': cont})
-                found_pages.append(ref)
+            #if ref in found_pages:
+                #for p in pages:
+                    #if p['ref'] == ref:
+                        #p['text'] += ', ' + text
+                        #continue
+            #else:
+                #pages.append({'text': text, 'ref': ref, 'short_ref': cont})
+                #found_pages.append(ref)
 
     return pages
 
@@ -429,12 +439,6 @@ def find_read_resource(root, resource):
     file_path = find_resource(root, resource)
     
     return open(file_path, 'rb').read()
-    #for dir_, subdir, files in os.walk(root, topdown=True):
-        #for file_name in files:
-            #if file_name == resource:
-
-                #file_path = '%s/%s' % (dir_, file_name)
-                #return open(file_path, 'rb').read()
 
 def ocr(request):
     temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"

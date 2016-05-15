@@ -6,42 +6,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
-    <!--<script>-->
-      <!--wbinfo = {}-->
-      <!--wbinfo.url = "http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";-->
-      <!--wbinfo.timestamp = "20160430174505";-->
-      <!--wbinfo.request_ts = "";-->
-      <!--wbinfo.prefix = "https://via.hypothes.is/";-->
-      <!--wbinfo.mod = "";-->
-      <!--wbinfo.top_url = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";-->
-      <!--wbinfo.is_framed = false;-->
-      <!--wbinfo.is_live = true;-->
-      <!--wbinfo.coll = "";-->
-      <!--wbinfo.proxy_magic = "";-->
-      <!--wbinfo.static_prefix = "https://via.hypothes.is/static/__pywb";-->
-    <!--</script>-->
-
-    <!--<script src="https://via.hypothes.is/static/__pywb/wombat.js"> </script>-->
-    <!--<script>-->
-      <!--wbinfo.wombat_ts = "20160430174505";-->
-      <!--wbinfo.wombat_scheme = "http";-->
-      <!--wbinfo.wombat_host = "datapipes.okfnlabs.org";-->
-      <!--wbinfo.wombat_sec = "1462038305";-->
-
-      <!--wbinfo.wombat_opts = {"no_rewrite_prefixes": ["https://hypothes.is/", "/assets/"], "http_cache": "pass"};-->
-
-
-      <!--if (window && window._WBWombat && !window._wb_js_inited && !window._wb_wombat) {-->
-        <!--window._wb_wombat = new _WBWombat(wbinfo);-->
-      <!--}-->
-    <!--</script>-->
-
-    <!--<script src="https://via.hypothes.is/static/__pywb/wb.js"> </script>-->
-    <!--<script src="https://via.hypothes.is/static/__pywb/vidrw.js"> </script>-->
-
-	<!--[> Set canonical url <]-->
-    <!--<link rel="canonical" href="http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv">-->
-
 	<!--[> Inject Hypothesis <]-->
     <script>
     (function () {
@@ -58,26 +22,10 @@
     }
     })();
     </script>
-	<!--[> load banner <]-->
-    <!--<script> if (_wb_js) { _wb_js.load(); }</script>-->
-
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.5.0/jszip.min.js"></script>-->
-  <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
 
   {% for s in styles %}
   <link href="{{ s }} " rel="stylesheet" type="text/css">
   {% endfor %}
-
-    <!--Below is Fred's hypothes call. It works faster on local development-->
-  <!--<script>-->
-  <!--window.hypothesisConfig = function () {-->
-    <!--return {-->
-      <!--constructor: this.Annotator.Sidebar,-->
-      <!--app: 'http://45.55.144.135:5000/app.html',-->
-    <!--};-->
-  <!--};-->
-  <!--</script>-->
-  <!--<script src="http://45.55.144.135:5000/embed.js"></script>-->
 
   <style type="text/css">
     body {
@@ -89,10 +37,10 @@
 
     #navigation {
       width: 300px;
-      position: absolute;
+      position: fixed;
       overflow: auto;
       top: 60px;
-      left: 1000px
+      left: 0px
     }
 
     #navigation.fixed {
@@ -124,8 +72,8 @@
       margin-bottom: 10px;
       color: #cccddd;
       font-size: 12px;
-      padding-left: 0;
-      margin-left: 0;
+      padding-left: 5px;
+      margin-left: 10px;
     }
 
     #navigation ul li {
@@ -144,7 +92,7 @@
     }
     #epub-inner-viewport {
       overflow: hidden;
-      width: 800px;
+      min-width: 320px;
       margin: 0 50px;
     }
 
@@ -156,12 +104,9 @@
     }
 
     #main {
-      position: absolute;
-      top: 50px;
-      left: 100px;
-      width: 800px;
-      z-index: 2;
-      transition: left .15s cubic-bezier(.55, 0, .2, .8) .08s;
+        padding-top: 2em;
+        padding-left: 330px;
+        padding-right: 100px;
     }
 
     #main.open {
@@ -223,6 +168,7 @@
 </head>
 <body>
   <div id="navigation">
+    <!--<div id="nav-slide"><</div>-->
     <!--<h1 id="title">...</h1>-->
     <!--<image id="cover" width="150px"/>-->
     <!--<h2 id="author">...</h2>-->
