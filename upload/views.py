@@ -46,11 +46,12 @@ def pdf(request, filename):
     return render_to_response('redirect.html', locals())
 
 def epub(request, filename):
+    print filename, 'AABA'
     
     #find html file if exists
     filepath = filename.split('/')
-    if len(filepath) == 2:
-        page = filepath[1]
+    if len(filepath) > 1:
+        page = filepath[-1]
         filename = filepath[0]
     else:
         page = None
@@ -376,6 +377,9 @@ def parse_epub_toc(toc, path_with_inner):
             #some books have a hash after doc name
             cont = cont.split('#')[0]
 
+            #file may be some directories in
+            short_ref = cont.split('/')[-1]
+
             #exclude the page from index if any following terms contained in src
             include = True
             #excludes = ['table-of-contents', 'pressbooks']
@@ -393,7 +397,7 @@ def parse_epub_toc(toc, path_with_inner):
                             p['text'] += ', ' + text
                             continue
                 else:
-                    pages.append({'text': text, 'ref': ref, 'short_ref': cont})
+                    pages.append({'text': text, 'ref': ref, 'short_ref': short_ref})
                     found_pages.append(ref)
 
 

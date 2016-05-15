@@ -6,6 +6,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
+
+  <script src=
 	<!--[> Inject Hypothesis <]-->
     <script>
     (function () {
@@ -36,15 +38,26 @@
     }
 
     #navigation {
-      width: 300px;
+      /*width: 300px;*/
+      width: 260px;
       position: fixed;
       overflow: auto;
-      top: 60px;
+      /*top: 30px;*/
+      
       left: 0px
     }
 
     #navigation.fixed {
       position: fixed;
+    }
+
+    #nav-slide {
+        color: #c2c2c2;
+        border: 1px solid #c2c2c2;
+        padding: 10px;
+        position: absolute;
+        top: 0;
+        left: 220px;
     }
 
     #navigation h1 {
@@ -105,8 +118,8 @@
 
     #main {
         padding-top: 2em;
-        padding-left: 330px;
-        padding-right: 100px;
+        padding-left: 280px;
+        padding-right: 420px;
     }
 
     #main.open {
@@ -168,12 +181,12 @@
 </head>
 <body>
   <div id="navigation">
-    <!--<div id="nav-slide"><</div>-->
+    <div id="nav-slide" onclick="toggleNav();"><</div>
     <!--<h1 id="title">...</h1>-->
     <!--<image id="cover" width="150px"/>-->
     <!--<h2 id="author">...</h2>-->
     <!--<ul id="toc"></ul>-->
-    <ul>
+    <ul id="nav-list">
     {% for p in pages %}
     <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
     {% endfor %}
@@ -193,6 +206,19 @@
 
 
   <script>
+    function toggleNav() {
+        var n = document.getElementById('navigation'); 
+        var ns = document.getElementById('nav-slide'); 
+        var nl = document.getElementById('nav-list');
+        var dirct = ns.textContent;
+        if (dirct === '<') {
+            nl.style.display = 'none';
+            n.style.width = '25px';
+            ns.style.position = 'absolute';
+            ns.style.top = '0px';
+        }
+
+    }
 
   </script>
 
