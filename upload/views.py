@@ -46,7 +46,20 @@ def pdf(request, filename):
 
 #def epub(request, pages, styles, filename):
 def epub(request, filename):
-    filename = filename
+    #print filename, page, 'ZZ'
+    #print filename.split('/'), 'aAAr'
+    #filename = filename
+    
+    #find html file if exists
+    filepath = filename.split('/')
+    if len(filepath) == 2:
+        page = filepath[1]
+        filename = filepath[0]
+    else:
+        page = None
+
+    print filename, page, 'ZZ'
+
     basepath = 'upload/static/drop-pdf'
 
     toc_path = find_resource('%s/%s' % (basepath, filename), 'toc.json')
@@ -55,12 +68,23 @@ def epub(request, filename):
         config = json.load(file_)
 
     out = {
+            'filename': filename,
             'pages': config['pages'],
             'styles': config['styles']
             }
 
-    #get content for first page
-    out['first_page'] = read_epub_page(out['pages'][0]['ref'])
+    out['page'] = 'Error fetching resource'
+
+    if page is None:
+        #get content for first page
+        out['page'] = read_epub_page(out['pages'][0]['ref'])
+
+    else:
+        #get content for page specified in url
+        for p in config['pages']:
+            if p['short_ref'] == page:
+                out['page'] = read_epub_page(p['ref'])
+                break
 
     return render_to_response('epub.html', out, context_instance=RequestContext(request))
 
@@ -362,7 +386,7 @@ def parse_epub_toc(toc, path_with_inner):
                         p['text'] += ', ' + text
                         continue
             else:
-                pages.append({'text': text, 'ref': ref})
+                pages.append({'text': text, 'ref': ref, 'short_ref': cont})
                 found_pages.append(ref)
 
 
@@ -391,7 +415,7 @@ def parse_epub_toc(toc, path_with_inner):
                         p['text'] += ', ' + text
                         continue
             else:
-                pages.append({'text': text, 'ref': ref})
+                pages.append({'text': text, 'ref': ref, 'short_ref': cont})
                 found_pages.append(ref)
 
     return pages

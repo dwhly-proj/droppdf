@@ -6,38 +6,38 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
-    <script>
-      wbinfo = {}
-      wbinfo.url = "http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
-      wbinfo.timestamp = "20160430174505";
-      wbinfo.request_ts = "";
-      wbinfo.prefix = "https://via.hypothes.is/";
-      wbinfo.mod = "";
-      wbinfo.top_url = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
-      wbinfo.is_framed = false;
-      wbinfo.is_live = true;
-      wbinfo.coll = "";
-      wbinfo.proxy_magic = "";
-      wbinfo.static_prefix = "https://via.hypothes.is/static/__pywb";
-    </script>
+    <!--<script>-->
+      <!--wbinfo = {}-->
+      <!--wbinfo.url = "http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";-->
+      <!--wbinfo.timestamp = "20160430174505";-->
+      <!--wbinfo.request_ts = "";-->
+      <!--wbinfo.prefix = "https://via.hypothes.is/";-->
+      <!--wbinfo.mod = "";-->
+      <!--wbinfo.top_url = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";-->
+      <!--wbinfo.is_framed = false;-->
+      <!--wbinfo.is_live = true;-->
+      <!--wbinfo.coll = "";-->
+      <!--wbinfo.proxy_magic = "";-->
+      <!--wbinfo.static_prefix = "https://via.hypothes.is/static/__pywb";-->
+    <!--</script>-->
 
-    <script src="https://via.hypothes.is/static/__pywb/wombat.js"> </script>
-    <script>
-      wbinfo.wombat_ts = "20160430174505";
-      wbinfo.wombat_scheme = "http";
-      wbinfo.wombat_host = "datapipes.okfnlabs.org";
-      wbinfo.wombat_sec = "1462038305";
+    <!--<script src="https://via.hypothes.is/static/__pywb/wombat.js"> </script>-->
+    <!--<script>-->
+      <!--wbinfo.wombat_ts = "20160430174505";-->
+      <!--wbinfo.wombat_scheme = "http";-->
+      <!--wbinfo.wombat_host = "datapipes.okfnlabs.org";-->
+      <!--wbinfo.wombat_sec = "1462038305";-->
 
-      wbinfo.wombat_opts = {"no_rewrite_prefixes": ["https://hypothes.is/", "/assets/"], "http_cache": "pass"};
+      <!--wbinfo.wombat_opts = {"no_rewrite_prefixes": ["https://hypothes.is/", "/assets/"], "http_cache": "pass"};-->
 
 
-      if (window && window._WBWombat && !window._wb_js_inited && !window._wb_wombat) {
-        window._wb_wombat = new _WBWombat(wbinfo);
-      }
-    </script>
+      <!--if (window && window._WBWombat && !window._wb_js_inited && !window._wb_wombat) {-->
+        <!--window._wb_wombat = new _WBWombat(wbinfo);-->
+      <!--}-->
+    <!--</script>-->
 
-    <script src="https://via.hypothes.is/static/__pywb/wb.js"> </script>
-    <script src="https://via.hypothes.is/static/__pywb/vidrw.js"> </script>
+    <!--<script src="https://via.hypothes.is/static/__pywb/wb.js"> </script>-->
+    <!--<script src="https://via.hypothes.is/static/__pywb/vidrw.js"> </script>-->
 
 	<!--[> Set canonical url <]-->
     <!--<link rel="canonical" href="http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv">-->
@@ -59,7 +59,7 @@
     })();
     </script>
 	<!--[> load banner <]-->
-    <script> if (_wb_js) { _wb_js.load(); }</script>
+    <!--<script> if (_wb_js) { _wb_js.load(); }</script>-->
 
   <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.5.0/jszip.min.js"></script>-->
   <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
@@ -229,7 +229,7 @@
     <!--<ul id="toc"></ul>-->
     <ul>
     {% for p in pages %}
-    <li data="{{ p.ref }}">{{ p.text }}</li>
+    <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
     {% endfor %}
     </ul>
 
@@ -237,7 +237,7 @@
   </div>
   <div id="main">
     <div id="epub-inner-viewport">
-        {{ first_page | safe }}
+        {{ page | safe }}
     </div>
     <div id="pagination">
       <a id="prev" href="#prev" class="arrow">...</a>
@@ -245,49 +245,8 @@
     </div>
   </div>
 
- {% csrf_token %}
 
   <script>
-
-    function location_hash(location) {
-        // Add CFI fragment to the history
-        window.location.hash = "#/"+location;
-    }
-
-    function change_page(new_src) {
-
-        $('#epub-inner-viewport').empty();
-    
-        var base_path = window.location.href.split('/')[0]
-
-        var data = {
-            page_src: new_src,
-            csrfmiddlewaretoken: '{{ csrf_token }}'
-        };
-        $.ajax({
-                type: 'POST',
-                //url: '/epub_page_change/',
-                url: base_path + '/epub_page_change/',
-                data: data,
-                cache: false,
-                dataType: 'html',
-                async: false,
-                success: function(rspns) {
-                    $('#epub-inner-viewport').append(rspns);
-                },
-                error: function(rspns) {
-                }
-            });
-    }
-
-    $(document).ready(function() {
-        $('#navigation ul li').each(function() {
-            $(this).click(function() {
-                var new_src = $(this).attr('data');
-                change_page(new_src);
-            });
-        });
-    });
 
   </script>
 

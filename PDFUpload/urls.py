@@ -25,5 +25,4 @@ urlpatterns = [
     url(r'^csv/(?P<filename>.+)/$', views.csvAsTable, name="csv"),
     url(r'^epub/(?P<filename>.+)/$', views.epub, name="epub"),
     url(r'^epub/.+/epub_resources/.+', views.epub_resource, name="epub_resource"),
-    url(r'^epub_page_change/', views.epub_page_change, name="epub_page_change") 
 ]
