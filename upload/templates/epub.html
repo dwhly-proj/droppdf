@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
 
-  <script src=
+    <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
 	<!--[> Inject Hypothesis <]-->
     <script>
     (function () {
@@ -54,10 +54,10 @@
     #nav-slide {
         color: #c2c2c2;
         border: 1px solid #c2c2c2;
-        padding: 10px;
-        position: absolute;
-        top: 0;
-        left: 220px;
+        font-size: 10px; 
+        padding: 4px;
+        width: 20px;
+        text-align: center;
     }
 
     #navigation h1 {
@@ -181,7 +181,7 @@
 </head>
 <body>
   <div id="navigation">
-    <div id="nav-slide" onclick="toggleNav();"><</div>
+    <div id="nav-slide" onclick="toggleNav();"><<</div>
     <!--<h1 id="title">...</h1>-->
     <!--<image id="cover" width="150px"/>-->
     <!--<h2 id="author">...</h2>-->
@@ -207,19 +207,20 @@
 
   <script>
     function toggleNav() {
-        var n = document.getElementById('navigation'); 
-        var ns = document.getElementById('nav-slide'); 
-        var nl = document.getElementById('nav-list');
-        var dirct = ns.textContent;
-        if (dirct === '<') {
-            nl.style.display = 'none';
-            n.style.width = '25px';
-            ns.style.position = 'absolute';
-            ns.style.top = '0px';
+        var ns = $('#nav-slide');
+        if ($(ns).text() == '<<') {
+            $(ns).text('>>');
+            $('#navigation').width('30px');
+            $('#main').css('padding-left', '32px');
         }
+        else {
+            $(ns).text('<<');
+            $('#navigation').width('260px');
+            $('#main').css('padding-left', '280px');
+        }
+        $('#nav-list').toggle();
 
     }
-
   </script>
 
 </body>
