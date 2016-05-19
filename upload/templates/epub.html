@@ -44,22 +44,27 @@
     }
 
     #navigation {
-      /*width: 300px;*/
-      /*background-color: rgba(214, 214, 214, .3);*/
-      background-color: #f2f2f2;
-      height: 100%;
+      background-color: #ffffff;
       width: 230px;
       position: fixed;
-      overflow: show;
+      top: 0;
+      bottom: 0;
+      left: 0;
       padding-top: 0px;
+      overflow-y: auto;
       z-index: 3;
-      /*top: 30px;*/
-      
-      left: 0px
     }
 
     #navigation.fixed {
       position: fixed;
+    }
+
+    #navigation-inner {
+      background-color: #f2f2f2;
+      overflow-y: auto;
+      height: 100%;
+      width: 95%;
+      overflow-y: auto;
     }
 
     #nav-slide {
@@ -69,8 +74,8 @@
         padding: 6px;
         padding-top: 12px;
         padding-bottom: 12px;
-        float: right;
-        margin-right: -9px;
+        position: absolute;
+        right: 0;
         font-size: 8px; 
         width: 20px;
         text-align: center;
@@ -208,19 +213,18 @@
   </style>
 </head>
 <body>
+  <span class="fa fa-chevron-right fa-lg" style="display: none;"></span>
   <div id="navigation">
     <div id="nav-slide" onclick="toggleNav();">
         <span class="fa fa-chevron-left fa-lg"></span>
     </div>
-    <!--<h1 id="title">...</h1>-->
-    <!--<image id="cover" width="150px"/>-->
-    <!--<h2 id="author">...</h2>-->
-    <!--<ul id="toc"></ul>-->
-    <ul id="nav-list">
-    {% for p in pages %}
-    <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
-    {% endfor %}
-    </ul>
+    <div id="navigation-inner">
+        <ul id="nav-list">
+        {% for p in pages %}
+        <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
 
 
   </div>
