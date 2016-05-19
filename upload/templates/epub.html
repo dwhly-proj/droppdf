@@ -32,16 +32,22 @@
   <style type="text/css">
     body {
       margin: 0;
-      background: #fafafa;
+      /* background: #fafafa; */
+      background: #ffffff;
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       color: #333;
     }
 
     #navigation {
       /*width: 300px;*/
-      width: 260px;
+      /*background-color: rgba(214, 214, 214, .3);*/
+      background-color: #f2f2f2;
+      height: 100%;
+      width: 230px;
       position: fixed;
-      overflow: auto;
+      overflow: show;
+      padding-left: 8px;
+      z-index: 3;
       /*top: 30px;*/
       
       left: 0px
@@ -53,11 +59,20 @@
 
     #nav-slide {
         color: #c2c2c2;
+        background-color: #ffffff;
         border: 1px solid #c2c2c2;
+        float: right;
+        margin-right: -9px;
         font-size: 10px; 
-        padding: 4px;
+        padding: 8px 4px 6px 4px;
         width: 20px;
         text-align: center;
+        z-index: 4;
+    }
+
+    #nav-slide:hover {
+        cursor: pointer;
+        color: #000000;
     }
 
     #navigation h1 {
@@ -118,7 +133,7 @@
 
     #main {
         padding-top: 2em;
-        padding-left: 280px;
+        padding-left: 240px;
         padding-right: 420px;
     }
 
@@ -215,8 +230,8 @@
         }
         else {
             $(ns).text('<<');
-            $('#navigation').width('260px');
-            $('#main').css('padding-left', '280px');
+            $('#navigation').width('230px');
+            $('#main').css('padding-left', '240px');
         }
         $('#nav-list').toggle();
 

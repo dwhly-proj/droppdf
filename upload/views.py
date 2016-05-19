@@ -46,7 +46,6 @@ def pdf(request, filename):
     return render_to_response('redirect.html', locals())
 
 def epub(request, filename):
-    print filename, 'AABA'
     
     #find html file if exists
     filepath = filename.split('/')
@@ -319,7 +318,8 @@ def process_epub_html(full_path, filename_w_key):
 
             #remove links. navigation won't work through pages
             for a in parse.find_all('a'):
-                a['href'] = ''
+                a.name = 'div'
+                del a['href']
 
             #remove any script. epubs should not have them but just in case a user gets clever...
             for s in parse.find_all('script'):
@@ -359,6 +359,7 @@ def parse_epub_toc(toc, path_with_inner):
     '''
 
     pages = []
+    page_count = 1
 
     #don't duplicate page finds
     found_pages = []
@@ -378,7 +379,10 @@ def parse_epub_toc(toc, path_with_inner):
             cont = cont.split('#')[0]
 
             #file may be some directories in
-            short_ref = cont.split('/')[-1]
+            #short_ref = cont.split('/')[-1]
+            #shorten url- will just count rather than using real url
+            short_ref = 'page_%s' % page_count  
+
 
             #exclude the page from index if any following terms contained in src
             include = True
@@ -396,9 +400,12 @@ def parse_epub_toc(toc, path_with_inner):
                         if p['ref'] == ref:
                             p['text'] += ', ' + text
                             continue
+
                 else:
                     pages.append({'text': text, 'ref': ref, 'short_ref': short_ref})
                     found_pages.append(ref)
+
+                    page_count += 1
 
 
     #for i in parse.find_all('content'):
