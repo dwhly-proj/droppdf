@@ -381,7 +381,7 @@ def parse_epub_toc(toc, path_with_inner):
             #file may be some directories in
             #short_ref = cont.split('/')[-1]
             #shorten url- will just count rather than using real url
-            short_ref = 'page_%s' % page_count  
+            short_ref = '%s' % page_count  
 
 
             #exclude the page from index if any following terms contained in src
