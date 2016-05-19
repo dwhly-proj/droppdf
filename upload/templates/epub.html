@@ -8,6 +8,10 @@
   <title>{{ filename }}</title>
 
     <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
+
+    <script src="https://use.fontawesome.com/6b7c851b6c.js"></script>
+
+
 	<!--[> Inject Hypothesis <]-->
     <script>
     (function () {
@@ -28,6 +32,7 @@
   {% for s in styles %}
   <link href="{{ s }} " rel="stylesheet" type="text/css">
   {% endfor %}
+
 
   <style type="text/css">
     body {
@@ -61,10 +66,12 @@
         color: #c2c2c2;
         background-color: #ffffff;
         border: 1px solid #c2c2c2;
+        padding: 6px;
+        padding-top: 12px;
+        padding-bottom: 12px;
         float: right;
         margin-right: -9px;
-        font-size: 10px; 
-        padding: 8px 4px 6px 4px;
+        font-size: 8px; 
         width: 20px;
         text-align: center;
         z-index: 4;
@@ -119,9 +126,9 @@
       color: #000;
     }
     #epub-inner-viewport {
-      overflow: hidden;
+      overflow: show;
       min-width: 320px;
-      margin: 0 50px;
+      margin: 0 20px;
     }
 
     #viewer .epub-view {
@@ -144,7 +151,6 @@
     #pagination {
       text-align: center;
       margin-left: 80px;
-      /*padding: 0 50px;*/
     }
 
     .arrow {
@@ -192,11 +198,19 @@
       height: 100%;
     }
 
+    @media (max-width: 1024px) {
+      #main {
+          padding-right: 45px;
+      }
+    }
+
   </style>
 </head>
 <body>
   <div id="navigation">
-    <div id="nav-slide" onclick="toggleNav();"><<</div>
+    <div id="nav-slide" onclick="toggleNav();">
+        <span class="fa fa-chevron-left fa-lg"></span>
+    </div>
     <!--<h1 id="title">...</h1>-->
     <!--<image id="cover" width="150px"/>-->
     <!--<h2 id="author">...</h2>-->
@@ -222,14 +236,14 @@
 
   <script>
     function toggleNav() {
-        var ns = $('#nav-slide');
-        if ($(ns).text() == '<<') {
-            $(ns).text('>>');
+        var ns = $('#nav-slide').find('span').first();
+        if ($(ns).hasClass('fa-chevron-left')) {
+            $(ns).removeClass('fa-chevron-left').addClass('fa-chevron-right');
             $('#navigation').width('30px');
             $('#main').css('padding-left', '32px');
         }
         else {
-            $(ns).text('<<');
+            $(ns).removeClass('fa-chevron-right').addClass('fa-chevron-left');
             $('#navigation').width('230px');
             $('#main').css('padding-left', '240px');
         }
