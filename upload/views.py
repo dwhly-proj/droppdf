@@ -321,7 +321,8 @@ def process_epub_html(full_path, filename_w_key):
                 a.name = 'div'
                 del a['href']
 
-            #remove any script. epubs should not have them but just in case a user gets clever...
+            #remove any script. epubs should not have them (I don't think)
+            #but just in case a user gets clever...
             for s in parse.find_all('script'):
                 s.extract()
 
@@ -333,6 +334,11 @@ def process_epub_html(full_path, filename_w_key):
                 #we can find it in view by walking directory
                 img_file = img['src'].split('/')[-1]
                 img['src'] = 'epub_resources/%s' % img_file 
+
+            #xhtml had image with hrefs
+            for img in inner_body.find_all('image'):
+                img_file = img['xlink:href'].split('/')[-1]
+                img['xlink:href'] = 'epub_resources/%s' % img_file 
 
             inner_html = str(inner_body.renderContents())
 
