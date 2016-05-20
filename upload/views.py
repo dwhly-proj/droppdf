@@ -300,7 +300,7 @@ def process_epub_html(full_path, filename_w_key):
                 rewrite_style_sheet(file_path)
                 continue
 
-            if fs[-1] not in ['html', 'htm'] or fs[0] in ['toc']:
+            if fs[-1] not in ['html', 'htm', 'xhtml'] or fs[0] in ['toc']:
                 continue
 
             file_ = open(file_path)
