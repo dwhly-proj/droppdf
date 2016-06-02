@@ -96,23 +96,13 @@ def epub_resource(request):
 
     return HttpResponse(response)
 
-#def epub_page_change(request):
-    #'''Send back html snippet to replace book page.'''
-    #src = request.POST.get("page_src")
-    #html = read_epub_page(src)
-    #return HttpResponse(html)
-
 def csvAsTable(request, filename):
     file_path = "%s/%s" % (settings.BASE_DIR + settings.STATIC_URL + 'drop-pdf', filename)
 
-    with open(file_path) as f:
-        lines = f.readlines()
-
-    title = lines[0].encode('utf8').split("\",")
-    content = lines[1:]
-
-    for index in range(0, len(content)):
-        content[index] = content[index].encode('utf8').split("\",")
+    with open(file_path, 'rU') as file_:
+        reader = csv.reader(file_)
+        title = reader.next()
+        content = [i for i in reader]
 
     return render_to_response('table.html', locals())
 
