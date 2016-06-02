@@ -76,7 +76,7 @@
 			<tr>
 				<th class="counter header"></th>
 				{% for element in title %}
-				<th class="header" title="{{ element | format }}">{{ element | format }}</th>
+				<th class="header" title="{{ element | format_utf8 }}">{{ element | format_utf8 }}</th>
 				{% endfor %}
 				
 			</tr>
@@ -86,7 +86,7 @@
 			<tr id="L{{ forloop.counter0 }}">
 				<td class="counter"><a href="#L{{ forloop.counter0 }}">{{ forloop.counter0 }}</a></td>
 				{% for subelem in element %}
-				<td><div>{{ subelem | format }}</div></td>
+				<td><div>{{ subelem | format_utf8 }}</div></td>
 				{% endfor %}
 			</tr>
 			{% endfor %}
