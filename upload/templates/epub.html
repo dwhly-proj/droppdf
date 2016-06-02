@@ -7,37 +7,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/2.5.0/jszip.min.js"></script>
-  <script src="{% static 'js/epub.js' %}"></script>
+    <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
 
-  <script>
-  window.hypothesisConfig = function () {
-    return {
-      constructor: this.Annotator.Sidebar,
-      app: 'http://45.55.144.135:5000/app.html',
-    };
-  };
-  </script>
-  <script src="http://45.55.144.135:5000/embed.js"></script>
+    <script src="https://use.fontawesome.com/6b7c851b6c.js"></script>
+
+
+	<!--[> Inject Hypothesis <]-->
+    <script>
+    (function () {
+    // Only run injection for top-level window!
+    if (window != window.top) {
+        return;
+    }
+
+    var embed_script = document.createElement("script");
+    embed_script.src = "https://hypothes.is/embed.js";
+    document.head.appendChild(embed_script);
+    window.hypothesisConfig = function() {
+        return {showHighlights: true};
+    }
+    })();
+    </script>
+
+  {% for s in styles %}
+  <link href="{{ s }} " rel="stylesheet" type="text/css">
+  {% endfor %}
+
 
   <style type="text/css">
     body {
       margin: 0;
-      background: #fafafa;
+      /* background: #fafafa; */
+      background: #ffffff;
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       color: #333;
     }
 
     #navigation {
-      width: 300px;
-      position: absolute;
-      overflow: auto;
-      top: 60px;
-      left: 1000px
+      background-color: #ffffff;
+      width: 230px;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      padding-top: 0px;
+      overflow-y: auto;
+      z-index: 3;
     }
 
     #navigation.fixed {
       position: fixed;
+    }
+
+    #navigation-inner {
+      background-color: #f2f2f2;
+      overflow-y: auto;
+      height: 100%;
+      width: 95%;
+      overflow-y: auto;
+    }
+
+    #nav-slide {
+        color: #c2c2c2;
+        background-color: #ffffff;
+        border: 1px solid #c2c2c2;
+        padding: 6px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        position: absolute;
+        right: 0;
+        font-size: 8px; 
+        width: 20px;
+        text-align: center;
+        z-index: 4;
+    }
+
+    #nav-slide:hover {
+        cursor: pointer;
+        color: #000000;
     }
 
     #navigation h1 {
@@ -65,31 +112,29 @@
       margin-bottom: 10px;
       color: #cccddd;
       font-size: 12px;
-      padding-left: 0;
-      margin-left: 0;
+      padding-left: 5px;
+      padding-right: 8px;
+      margin-left: 10px;
     }
 
-    #navigation ul li a {
+    #navigation ul li {
       color: #ccc;
       text-decoration: none;
     }
 
-    #navigation ul li a:hover {
+    #navigation ul li:hover {
       color: #777;
       text-decoration: underline;
+      cursor: pointer;
     }
 
-    #navigation ul li a.active {
+    #navigation ul li.active {
       color: #000;
     }
-
-    #viewer {
-
-      overflow: hidden;
-      width: 800px;
-      margin: 0 50px;
-      background: url('ajax-loader.gif') center center no-repeat;
-
+    #epub-inner-viewport {
+      overflow: show;
+      min-width: 320px;
+      margin: 0 20px;
     }
 
     #viewer .epub-view {
@@ -100,12 +145,9 @@
     }
 
     #main {
-      position: absolute;
-      top: 50px;
-      left: 100px;
-      width: 800px;
-      z-index: 2;
-      transition: left .15s cubic-bezier(.55, 0, .2, .8) .08s;
+        padding-top: 2em;
+        padding-left: 240px;
+        padding-right: 420px;
     }
 
     #main.open {
@@ -115,7 +157,6 @@
     #pagination {
       text-align: center;
       margin-left: 80px;
-      /*padding: 0 50px;*/
     }
 
     .arrow {
@@ -163,17 +204,34 @@
       height: 100%;
     }
 
+    @media (max-width: 1024px) {
+      #main {
+          padding-right: 45px;
+      }
+    }
+
   </style>
 </head>
 <body>
+  <span class="fa fa-chevron-right fa-lg" style="display: none;"></span>
   <div id="navigation">
-    <h1 id="title">...</h1>
-    <image id="cover" width="150px"/>
-    <h2 id="author">...</h2>
-    <ul id="toc"></ul>
+    <div id="nav-slide" onclick="toggleNav();">
+        <span class="fa fa-chevron-left fa-lg"></span>
+    </div>
+    <div id="navigation-inner">
+        <ul id="nav-list">
+        {% for p in pages %}
+        <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
+
+
   </div>
   <div id="main">
-    <div id="viewer"></div>
+    <div id="epub-inner-viewport">
+        {{ page | safe }}
+    </div>
     <div id="pagination">
       <a id="prev" href="#prev" class="arrow">...</a>
       <a id="next" href="#next" class="arrow">...</a>
@@ -181,199 +239,19 @@
   </div>
 
   <script>
-    var currentSectionIndex = 8;
-    // Load the opf
-    var book = ePub("/static/drop-pdf/{{ filename }}");
-
-    var rendition = book.renderTo("viewer");
-
-    // var hash = window.location.hash.slice(2);
-    var loc = window.location.href.indexOf("?loc=");
-    if (loc > -1) {
-      var href =  window.location.href.slice(loc + 5);
-      var hash = decodeURIComponent(href);
-    }
-    rendition.display(hash || 1);
-
-
-    var next = document.getElementById("next");
-    next.addEventListener("click", function(e){
-      window.scrollTo(0,0);
-      rendition.next();
-      e.preventDefault();
-    }, false);
-
-    var prev = document.getElementById("prev");
-    prev.addEventListener("click", function(e){
-      window.scrollTo(0,0);
-      rendition.prev();
-      e.preventDefault();
-    }, false);
-
-    rendition.on("rendered", function(section){
-      var nextSection = section.next();
-      var prevSection = section.prev();
-
-      if(nextSection) {
-        nextNav = book.navigation.get(nextSection.href);
-
-        if(nextNav) {
-          nextLabel = nextNav.label;
-        } else {
-          nextLabel = "next";
+    function toggleNav() {
+        var ns = $('#nav-slide').find('span').first();
+        if ($(ns).hasClass('fa-chevron-left')) {
+            $(ns).removeClass('fa-chevron-left').addClass('fa-chevron-right');
+            $('#navigation').width('30px');
+            $('#main').css('padding-left', '32px');
         }
-
-        next.textContent = nextLabel + " »";
-      } else {
-        next.textContent = "";
-      }
-
-      if(prevSection) {
-        prevNav = book.navigation.get(prevSection.href);
-
-        if(prevNav) {
-          prevLabel = prevNav.label;
-        } else {
-          prevLabel = "previous";
+        else {
+            $(ns).removeClass('fa-chevron-right').addClass('fa-chevron-left');
+            $('#navigation').width('230px');
+            $('#main').css('padding-left', '240px');
         }
-
-        prev.textContent = "« " + prevLabel;
-      } else {
-        prev.textContent = "";
-      }
-
-      var old = document.querySelectorAll('.active');
-      Array.prototype.slice.call(old, 0).forEach(function (link) {
-        link.classList.remove("active");
-      })
-
-      var active = document.querySelector('a[href="'+section.href+'"]');
-      if (active) {
-        active.classList.add("active");
-      }
-      // Add CFI fragment to the history
-      history.pushState({}, '', "?loc=" + encodeURIComponent(section.href));
-      // window.location.hash = "#/"+section.href
-    });
-
-    book.loaded.navigation.then(function(toc){
-      var $nav = document.getElementById("toc"),
-          docfrag = document.createDocumentFragment();
-
-      toc.forEach(function(chapter, index) {
-        var item = document.createElement("li");
-        var link = document.createElement("a");
-        link.id = "chap-" + chapter.id;
-        link.textContent = chapter.label;
-        link.href = chapter.href;
-        item.appendChild(link);
-        docfrag.appendChild(item);
-
-        link.onclick = function(){
-          var url = link.getAttribute("href");
-          console.log(url)
-          rendition.display(url);
-          return false;
-        };
-
-      });
-
-      $nav.appendChild(docfrag);
-
-
-    });
-
-    book.loaded.metadata.then(function(meta){
-      var $title = document.getElementById("title");
-      var $author = document.getElementById("author");
-      var $cover = document.getElementById("cover");
-      var $nav = document.getElementById('navigation');
-
-      $title.textContent = meta.title;
-      $author.textContent = meta.creator;
-      if (book.archive) {
-        book.archive.createUrl(book.cover)
-          .then(function (url) {
-            $cover.src = url;
-          })
-      } else {
-        $cover.src = book.cover;
-      }
-
-
-      if ($nav.offsetHeight + 60 < window.innerHeight) {
-        $nav.classList.add("fixed");
-      }
-
-    });
-
-    function checkForAnnotator(cb, w) {
-     if (!w) {
-       w = window;
-     }
-     setTimeout(function () {
-        if (w && w.annotator) {
-          cb();
-        } else {
-          checkForAnnotator(cb, w);
-        }
-      }, 100);
-    }
-
-    book.rendition.hooks.content.register(function(view) {
-
-      view.window.hypothesisConfig = function () {
-
-    		return {
-    			constructor: this.Annotator.Guest,
-          app: 'http://45.55.144.135:5000/app.html'
-    		};
-    	};
-
-      view.contents.addScript("http://45.55.144.135:5000/embed.js").then(function() {
-
-        checkForAnnotator(function () {
-
-          var annotator = view.window.annotator;
-
-          annotator.on("scrollToAnnotation", function (node) {
-            var cfi = view.section.cfiFromElement(node);
-            // var selectors = ev.target[0].selector;
-            // var range = selectors[0];
-            console.log("scrollToAnnotation", cfi);
-            book.rendition.display(cfi);
-          });
-
-          annotator.on("highlightClick", function (annotation) {
-            // console.log(annotation);
-            window.annotator.show();
-          })
-
-          annotator.on("beforeAnnotationCreated", function (annotation) {
-            // console.log(annotation);
-            window.annotator.show();
-          })
-
-        }, view.window);
-
-      });
-
-    });
-
-    checkForAnnotator(function () {
-      var main = document.querySelector('#main');
-
-
-      if(window.innerWidth < 1400) {
-        window.annotator.on("show", function () {
-          main.classList.add("open");
-        });
-
-        window.annotator.on("hide", function () {
-          main.classList.remove("open");
-        });
-      }
-    });
+        $('#nav-list').toggle();
 
   </script>
 
