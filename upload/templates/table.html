@@ -3,61 +3,22 @@
 <html>
 <head><!-- WB Insert -->
 	<title>Drag and Drop a document</title>
-	<script>
-	  wbinfo = {}
-	  wbinfo.url = "http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
-	  wbinfo.timestamp = "20160430174505";
-	  wbinfo.request_ts = "";
-	  wbinfo.prefix = "https://via.hypothes.is/";
-	  wbinfo.mod = "";
-	  wbinfo.top_url = "https://via.hypothes.is/http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv";
-	  wbinfo.is_framed = false;
-	  wbinfo.is_live = true;
-	  wbinfo.coll = "";
-	  wbinfo.proxy_magic = "";
-	  wbinfo.static_prefix = "https://via.hypothes.is/static/__pywb";
-	</script>
 
-	<script src="https://via.hypothes.is/static/__pywb/wombat.js"> </script>
-	<script>
-	  wbinfo.wombat_ts = "20160430174505";
-	  wbinfo.wombat_scheme = "http";
-	  wbinfo.wombat_host = "datapipes.okfnlabs.org";
-	  wbinfo.wombat_sec = "1462038305";
+    <script>
+    (function () {
+    // Only run injection for top-level window!
+    if (window != window.top) {
+        return;
+    }
 
-	  wbinfo.wombat_opts = {"no_rewrite_prefixes": ["https://hypothes.is/", "/assets/"], "http_cache": "pass"};
-
-
-	  if (window && window._WBWombat && !window._wb_js_inited && !window._wb_wombat) {
-		window._wb_wombat = new _WBWombat(wbinfo);
-	  }
-	</script>
-
-	<script src="https://via.hypothes.is/static/__pywb/wb.js"> </script>
-	<script src="https://via.hypothes.is/static/__pywb/vidrw.js"> </script>
-
-	<!-- Set canonical url -->
-	<link rel="canonical" href="http://datapipes.okfnlabs.org/csv/html/?url=%20https://raw.github.com/datasets/s-and-p-500-companies/master/data/constituents-financials.csv">
-
-	<!-- Inject Hypothesis -->
-	<script>
-	(function () {
-	// Only run injection for top-level window!
-	if (window != window.top) {
-		return;
-	}
-
-	var embed_script = document.createElement("script");
-	embed_script.src = "https://hypothes.is/embed.js";
-	document.head.appendChild(embed_script);
-	window.hypothesisConfig = function() {
-		return {showHighlights: true};
-	}
-	})();
+    var embed_script = document.createElement("script");
+    embed_script.src = "https://hypothes.is/embed.js";
+    document.head.appendChild(embed_script);
+    window.hypothesisConfig = function() {
+        return {showHighlights: true};
+    }
+    })();
     </script>
-	<!-- load banner -->
-	<script> if (_wb_js) { _wb_js.load(); }</script>
-
 
 	<!-- End WB Insert -->
 	<link rel="stylesheet" href="https://via.hypothes.is/oe_/http://datapipes.okfnlabs.org/css/style.css">
