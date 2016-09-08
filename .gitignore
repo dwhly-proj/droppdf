@@ -73,3 +73,6 @@ ENV/
 .spyderproject
 # Rope project settings
 .ropeproject
+#pdf_annotator secrets
+pdf_annotator/configs.py
+
