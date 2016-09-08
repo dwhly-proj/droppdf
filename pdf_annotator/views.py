@@ -1,7 +1,12 @@
 from django.shortcuts import render
 from django.shortcuts import render_to_response
 
-from configs import CLIENT_ID, API_KEY, SCOPES  
+try:
+    from configs import CLIENT_ID, API_KEY, SCOPES  
+except ImportError:
+    CLIENT_ID = ''
+    API_KEY = ''
+    SCOPES = []
 
 # Create your views here.
 
