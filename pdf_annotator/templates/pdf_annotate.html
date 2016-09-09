@@ -652,6 +652,13 @@ function handleauthresult(authresult) {
             link.href = href;
             document.head.appendChild(link);
         }
+        //append this tool
+        var link = document.createElement('link');
+        link.rel = 'resource';
+        link.href = '/static/view/web/locale/locale.properties';
+        link.type = 'application/l10n'; 
+        document.head.appendChild(link);
+
         //switch page views
         document.getElementById('confirm-home').style.display = 'none';
         document.getElementById('outerContainer').style.display = 'block';
@@ -661,8 +668,8 @@ function handleauthresult(authresult) {
             '/static/viewer/web/compatibility.js',
             '/static/viewer/web/l10n.js',
             '/static/viewer/build/pdf.js',
+            '/static/viewer/web/debugger.js',
             '/static/viewer/web/viewer.js',
-            '/static/viewer/web/debugger.js']
             //'https://hypothes.is/embed.js'];
         for (var i = 0, l = scripts.length; i < l; i ++) {
             var src = scripts[i];
@@ -671,15 +678,10 @@ function handleauthresult(authresult) {
             script.type = 'text/javascript';
             document.head.appendChild(script);
         }
-        //append this tool
-        var link = document.createElement('link');
-        link.rel = 'resource';
-        link.href = '/static/view/web/locale/locale.properties';
-        link.type = 'application/l10n'; 
-        document.head.appendChild(link);
         //load drive api
         loaddriveapi();
     } else {
+        alert('no auth');
         return;
     }
 }
