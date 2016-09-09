@@ -26,17 +26,20 @@ http://sourceforge.net/adobe/cmap/wiki/License/
 <meta name="google" content="notranslate">
 <title>PDF Annotator</title>
 
-<link rel="stylesheet" href="viewer/web/viewer.css"/>
+<link rel="stylesheet" href="/static/viewer/web/viewer.css"/>
 <style>
     body, html {
-        background-color: #2c2c2c;
         margin: 0;
         padding: 0;
+    }
+    body {
+        background-color: #2c2c2c;
     }
     #outerContainer {
         display: none;
     }
     #confirm-home {
+        display: none;
         background-color: #2c2c2c;
         font-family: sans-serif;
         min-width: 350px;
@@ -44,6 +47,14 @@ http://sourceforge.net/adobe/cmap/wiki/License/
         width: 100%;
         padding: 0;
         margin: 0;
+    }
+    #confirm-home h2 {
+        margin: auto;
+        padding: 1em;
+    }
+    #confirm-home p {
+        margin: auto;
+        padding: .2em;
     }
     .ch-nav {
         background-color: #2c2c2c;
@@ -641,50 +652,44 @@ function handleauthresult(authresult) {
         }
         catch(e) {
             //query string not present or else not correct
+            document.getElementById('confirm-home').style.display = 'block';
             alert('Application successfully authorized. Now visit Google drive to start editing PDFs.');
             return;
         }
         //load resources and switch to pdf view;
-        //load stylesheet(s)
-        var styles = ['/static/viewer/web/viewer.css'];
-        for (var i = 0, l = styles.length; i < l; i ++) {
-            var href = styles[i];
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.type = 'text/css';
-            link.href = href;
-            document.head.appendChild(link);
-        }
-        //append this tool
+        //switch page views
+        document.getElementById('confirm-home').style.display = 'none';
+        document.getElementById('outerContainer').style.display = 'block';
+
         var link = document.createElement('link');
         link.rel = 'resource';
         link.href = '/static/view/web/locale/locale.properties';
         link.type = 'application/l10n'; 
         document.head.appendChild(link);
 
-        //switch page views
-        document.getElementById('confirm-home').style.display = 'none';
-        document.getElementById('outerContainer').style.display = 'block';
+        setTimeout(function() {
+            //load scripts
+            var scripts = [
+                '/static/viewer/web/compatibility.js',
+                '/static/viewer/web/l10n.js',
+                '/static/viewer/build/pdf.js',
+                '/static/viewer/web/debugger.js',
+                '/static/viewer/web/viewer.js'];
+                //'https://hypothes.is/embed.js'];
+            for (var i = 0, l = scripts.length; i < l; i ++) {
+                var src = scripts[i];
+                var script = document.createElement('script');
+                script.src = src;
+                script.type = 'text/javascript';
+                document.body.appendChild(script);
+            }
+        }, 30);
 
-        //load scripts
-        var scripts = [
-            '/static/viewer/web/compatibility.js',
-            '/static/viewer/web/l10n.js',
-            '/static/viewer/build/pdf.js',
-            '/static/viewer/web/debugger.js',
-            '/static/viewer/web/viewer.js'];
-            //'https://hypothes.is/embed.js'];
-        for (var i = 0, l = scripts.length; i < l; i ++) {
-            var src = scripts[i];
-            var script = document.createElement('script');
-            script.src = src;
-            script.type = 'text/javascript';
-            document.head.appendChild(script);
-        }
         //load drive api
         loaddriveapi();
     } else {
         console.log('no auth');
+        document.getElementById('confirm-home').style.display = 'block';
         return;
     }
 }
