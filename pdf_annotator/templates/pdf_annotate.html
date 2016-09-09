@@ -616,8 +616,8 @@ var SCOPES = [
 function checkAuth() {
     gapi.auth.authorize(
         {
-        'client_id': client_id,
-        'scope': scopes.join(' '),
+        'client_id': CLIENT_ID,
+        'scope': SCOPES.join(' '),
         'immediate': true
         }, handleauthresult);
 }
@@ -663,6 +663,7 @@ function handleauthresult(authresult) {
             '/static/viewer/build/pdf.js',
             '/static/viewer/web/viewer.js',
             '/static/viewer/web/debugger.js'
+            'https://hypothes.is/embed.js',
                 ];
         for (var i = 0, l = scripts.length; i < l; i ++) {
             var src = scripts[i];
