@@ -683,8 +683,6 @@ function handleauthresult(authresult) {
             document.body.appendChild(script);
         }
 
-        console.log('context: ' + (! noContextMenuHandler));
-
         //wait for files to load
         while (typeof noContextMenuHandler == 'undefined') {
             console.log('no context menu handler');
