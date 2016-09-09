@@ -669,7 +669,7 @@ function handleauthresult(authresult) {
             '/static/viewer/web/l10n.js',
             '/static/viewer/build/pdf.js',
             '/static/viewer/web/debugger.js',
-            '/static/viewer/web/viewer.js',
+            '/static/viewer/web/viewer.js'];
             //'https://hypothes.is/embed.js'];
         for (var i = 0, l = scripts.length; i < l; i ++) {
             var src = scripts[i];
@@ -681,7 +681,7 @@ function handleauthresult(authresult) {
         //load drive api
         loaddriveapi();
     } else {
-        alert('no auth');
+        console.log('no auth');
         return;
     }
 }
