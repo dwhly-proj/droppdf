@@ -626,6 +626,8 @@ var SCOPES = [
 {% endfor %}
 ];
 
+var SHOW_PDF = false;
+
 //executed when google script loads
 function checkAuth() {
     console.log('checking auth');
@@ -662,29 +664,6 @@ function handleauthresult(authresult) {
         document.getElementById('confirm-home').style.display = 'none';
         document.getElementById('outerContainer').style.display = 'block';
 
-        var link = document.createElement('link');
-        link.rel = 'resource';
-        link.href = '/static/view/web/locale/locale.properties';
-        link.type = 'application/l10n'; 
-        document.head.appendChild(link);
-
-        //load scripts
-       // var scripts = [
-        //    '/static/viewer/web/compatibility.js',
-         //   '/static/viewer/web/l10n.js',
-          //  '/static/viewer/build/pdf.js',
-           // '/static/viewer/web/debugger.js',
-     //       '/static/viewer/web/viewer.js'];
-            //'https://hypothes.is/embed.js'];
-      //  for (var i = 0, l = scripts.length; i < l; i ++) {
-       //     var src = scripts[i];
-        //    var script = document.createElement('script');
-         //   script.src = src;
-          //  script.type = 'text/javascript';
-           // document.body.appendChild(script);
-     //   }
-
-
         //load drive api
         loaddriveapi();
     } else {
@@ -712,10 +691,7 @@ function handleAuthClick(event) {
  * load drive api client library.
  */
 function loaddriveapi() {
-    gapi.client.load('drive', 'v3', onGLoaded);
-};
-
-function onGLoaded() {
+    gapi.client.load('drive', 'v3', webViewerInitialized);
 };
 
 function getDocUri() {
@@ -730,6 +706,13 @@ function getDocUri() {
 };
 
 function webViewerInitialized() {
+
+    //this function tries to load when loading one
+    //of the pdf.js files
+    //we will run it manually instead
+    if (! SHOW_PDF) {
+        return;
+    }
 
     console.log('viewer initialized');
 
