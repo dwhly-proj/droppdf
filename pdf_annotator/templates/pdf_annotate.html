@@ -667,24 +667,24 @@ function handleauthresult(authresult) {
         link.type = 'application/l10n'; 
         document.head.appendChild(link);
 
-        setTimeout(function() {
-            //load scripts
-            var scripts = [
-                '/static/viewer/web/compatibility.js',
-                '/static/viewer/web/l10n.js',
-                '/static/viewer/build/pdf.js',
-                '/static/viewer/web/debugger.js',
-                '/static/viewer/web/viewer.js'];
-                //'https://hypothes.is/embed.js'];
-            for (var i = 0, l = scripts.length; i < l; i ++) {
-                var src = scripts[i];
-                var script = document.createElement('script');
-                script.src = src;
-                script.type = 'text/javascript';
-                document.body.appendChild(script);
-            }
+        //load scripts
+        var scripts = [
+            '/static/viewer/web/compatibility.js',
+            '/static/viewer/web/l10n.js',
+            '/static/viewer/build/pdf.js',
+            '/static/viewer/web/debugger.js',
+            '/static/viewer/web/viewer.js'];
+            //'https://hypothes.is/embed.js'];
+        for (var i = 0, l = scripts.length; i < l; i ++) {
+            var src = scripts[i];
+            var script = document.createElement('script');
+            script.src = src;
+            script.type = 'text/javascript';
+            document.body.appendChild(script);
+        }
 
-        }, 30);
+        console.log('context: ' + (! noContextMenuHandler));
+
         //wait for files to load
         while (! noContextMenuHandler) {
             console.log('no context menu handler');
