@@ -28,13 +28,6 @@ http://sourceforge.net/adobe/cmap/wiki/License/
 
 <link rel="stylesheet" href="/static/viewer/web/viewer.css"/>
 
-<script src="/static/viewer/web/compatibility.js"></script>
-<link rel="resource" type="application/l10n" href="/static/viewer/web/locale/locale.properties"/>
-<script src="/static/viewer/web/l10n.js"></script>
-<script src="/static/viewer/build/pdf.js"></script>
-<script src="/static/viewer/web/debugger.js"></script>
-<script src="/static/viewer/web/viewer.js"></script>
-
 <style>
     body, html {
         margin: 0;
@@ -743,6 +736,8 @@ function webViewerInitialized() {
     //we are requesting a remote resource rather than file
     var file = getDocUri();
 
+    console.log(file);
+
     var fileInput = document.createElement('input');
     fileInput.id = 'fileInput';
     fileInput.className = 'fileInput';
@@ -948,6 +943,13 @@ httpHeaders: {
 </script>
 
 <script src="https://apis.google.com/js/client.js?onload=checkAuth"></script>
+
+<script src="/static/viewer/web/compatibility.js"></script>
+<link rel="resource" type="application/l10n" href="/static/viewer/web/locale/locale.properties"/>
+<script src="/static/viewer/web/l10n.js"></script>
+<script src="/static/viewer/build/pdf.js"></script>
+<script src="/static/viewer/web/debugger.js"></script>
+<script src="/static/viewer/web/viewer.js"></script>
 
 </body>
 </html>
