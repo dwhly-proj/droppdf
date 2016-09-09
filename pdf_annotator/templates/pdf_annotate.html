@@ -669,6 +669,7 @@ function handleauthresult(authresult) {
             var src = scripts[i];
             var script = document.createElement('script');
             script.src = src;
+            script.type = 'text/javascript';
             document.head.appendChild(script);
         }
         //append this tool
