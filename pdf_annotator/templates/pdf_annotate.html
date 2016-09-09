@@ -685,7 +685,9 @@ function handleauthresult(authresult) {
             }
 
         }, 30);
-        webViewerInitialized();
+        setTimeout(function() {
+            webViewerInitialized();
+            }, 100);
         //load drive api
         loaddriveapi();
     } else {
