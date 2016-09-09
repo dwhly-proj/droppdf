@@ -670,14 +670,14 @@ function handleauthresult(authresult) {
             var src = scripts[i];
             var script = document.createElement('script');
             script.src = src;
-            document.head.appendChild(src);
+            document.head.appendChild(script);
         }
         //append this tool
-        //var link = document.createElement('link');
-        //link.rel = 'resource';
-        //link.href = '/static/view/web/locale/locale.properties';
-        //link.type = 'application/l10n'; 
-        //document.head.appendChild(link);
+        var link = document.createElement('link');
+        link.rel = 'resource';
+        link.href = '/static/view/web/locale/locale.properties';
+        link.type = 'application/l10n'; 
+        document.head.appendChild(link);
         //load drive api
         loaddriveapi();
     } else {
