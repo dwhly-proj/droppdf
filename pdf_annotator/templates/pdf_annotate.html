@@ -683,8 +683,9 @@ function handleauthresult(authresult) {
                 script.type = 'text/javascript';
                 document.body.appendChild(script);
             }
-        }, 30);
 
+        }, 30);
+        webViewerInitialized();
         //load drive api
         loaddriveapi();
     } else {
