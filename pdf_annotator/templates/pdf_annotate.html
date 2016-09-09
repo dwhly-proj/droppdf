@@ -685,9 +685,11 @@ function handleauthresult(authresult) {
             }
 
         }, 30);
-        setTimeout(function() {
-            webViewerInitialized();
-            }, 100);
+        //wait for files to load
+        while (! noContextMenuHandler) {
+            console.log('no context menu handler');
+        }
+
         //load drive api
         loaddriveapi();
     } else {
