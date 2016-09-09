@@ -672,9 +672,12 @@ function handleauthresult(authresult) {
             script.src = src;
             document.head.appendChild(src);
         }
-        //append this too
-        var l = '<link rel="resource" type="application/l10n" href="viewer/web/locale/locale.properties"/>';
-        document.head.appendChild(l);
+        //append this tool
+        var link = document.createElement('link');
+        link.rel = 'resource';
+        link.href = '/static/view/web/locale/locale.properties';
+        link.type = 'application/l10n'; 
+        document.head.appendChild(link);
         //load drive api
         loaddriveapi();
     } else {
