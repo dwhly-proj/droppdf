@@ -27,6 +27,14 @@ http://sourceforge.net/adobe/cmap/wiki/License/
 <title>PDF Annotator</title>
 
 <link rel="stylesheet" href="/static/viewer/web/viewer.css"/>
+
+<script src="/static/viewer/web/compatibility.js"></script>
+<link rel="resource" type="application/l10n" href="viewer/web/locale/locale.properties"/>
+<script src="viewer/web/l10n.js"></script>
+<script src="viewer/build/pdf.js"></script>
+<script src="viewer/web/debugger.js"></script>
+<script src="viewer/web/viewer.js"></script>
+
 <style>
     body, html {
         margin: 0;
@@ -668,25 +676,21 @@ function handleauthresult(authresult) {
         document.head.appendChild(link);
 
         //load scripts
-        var scripts = [
-            '/static/viewer/web/compatibility.js',
-            '/static/viewer/web/l10n.js',
-            '/static/viewer/build/pdf.js',
-            '/static/viewer/web/debugger.js',
-            '/static/viewer/web/viewer.js'];
+       // var scripts = [
+        //    '/static/viewer/web/compatibility.js',
+         //   '/static/viewer/web/l10n.js',
+          //  '/static/viewer/build/pdf.js',
+           // '/static/viewer/web/debugger.js',
+     //       '/static/viewer/web/viewer.js'];
             //'https://hypothes.is/embed.js'];
-        for (var i = 0, l = scripts.length; i < l; i ++) {
-            var src = scripts[i];
-            var script = document.createElement('script');
-            script.src = src;
-            script.type = 'text/javascript';
-            document.body.appendChild(script);
-        }
+      //  for (var i = 0, l = scripts.length; i < l; i ++) {
+       //     var src = scripts[i];
+        //    var script = document.createElement('script');
+         //   script.src = src;
+          //  script.type = 'text/javascript';
+           // document.body.appendChild(script);
+     //   }
 
-        //wait for files to load
-        while (typeof noContextMenuHandler == 'undefined') {
-            console.log('no context menu handler');
-        }
 
         //load drive api
         loaddriveapi();
