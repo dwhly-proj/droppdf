@@ -1,6 +1,8 @@
 #Uploaded files directory
 upload/static/drop-pdf/*
 
+/static/drop-pdf/*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
