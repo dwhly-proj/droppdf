@@ -19,21 +19,57 @@
 
 	<link rel="stylesheet" type="text/css" href="{% static "drag&dropfileupload/dropzon.css" %}" />
 	<link rel="stylesheet" type="text/css" href="{% static "drag&dropfileupload/jquery-ui.css" %}" />
+    <style>
+        #myId p {
+            font-size:15px;
+        }
+        #myId a {
+            color: #5bbc2e;
+        }
+        .label {
+            top: 20%;
+        }
+        img {
+            top: 20%;
+        }
+        @media (max-height: 540px) {
+            .label {
+                top: 50%;
+            }
+            img {
+                top: 50%;
+            }
+        }
+
+    </style>
 </head>
 <!-- Change /upload-target to your upload address -->
 <body style="background: #2c2c2c;">
 	<div id="progressbar"></div>
 	<div class="main" align="center">
 		
-
 	    <div id="myId" class="dropzone_new">
 			<div class="label">
 				Drag and drop a document to annotate it.<br/>
-			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>
-				<p style="font-size:15px;">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>
+                <p>Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv</p>
+                <p>You can also annotate PDFs inside Google Drive by <a href="javascript:void(0);" onClick="handleAuthClick();">authorizing Hypothesis within your Google account.</a></p>
+				<p>Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>
 				
-				<p style="font-size:15px">The OCR service uses <a href="https://github.com/tesseract-ocr" style="color: #5bbc2e;">Tesseract</a>, an open source library.<br/>
-				You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0" style="color: #5bbc2e;">tutorial</a>).</p>
+				<p>
+                    The OCR service uses <a href="https://github.com/tesseract-ocr">Tesseract</a>, an open source library.<br/>
+				You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0">tutorial</a>).
+                The annotation functionality is enabled by <a href="https://hypothes.is/">Hypothesis.is</a>
+                <br>
+                The code for this site is open source and available <a href="https://github.com/dwhly-proj/droppdf">Here</a>
+                </p>
+                <p>
+                This is a personal project to explore different ideas and is maintained by Dan Whaley. I’d be delighted to hear any feedback at <a href="https://twitter.com/dwhly">@dwhly</a>.
+                </p>
+                <p>
+                The intention is to keep the site up and running, but no guarantee around the preservation of documents is made. 
+                <br>
+                As an aside, annotations against PDFs with your Hypothesis account, are discoverable on that PDF regardless of its location <a href="https://hypothes.is/blog/annotating-pdfs-without-urls/">Background</a>.  As long as you have the original PDF somewhere, you'll always be able to see your annotations on it with Hypothesis
+                </p>
 				
 			</div>
 
@@ -55,6 +91,10 @@
 	var type = "";
 
 	$(document).ready(function(){
+
+        //store label text so we can put it back
+        //after upload without typing all that again
+        var label_text = $('.label').first().html();
 
 		$( "#progressbar" ).progressbar({
 			value: 0
@@ -86,6 +126,10 @@
 						}
 					}
 					else{
+                        setTimeout(function() { 
+                            alert('Upload Error: Document format not recognized.');
+                            $(".main .label").html(label_text);
+                            }, 700);
 						this.removeFile(file);
 					}
 
@@ -198,17 +242,13 @@
 
 	function dropUpload() {
 	    if(addedFile == 1){
-		myDropzone.removeFile(fileObj);
-		$(".main .label").html('Drag and drop a document to annotate it.<br/>\
-			<p style="font-size:15px;">Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv<p/>\
-				<p style="font-size:15px;">Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>\
-				<p style="font-size:15px">The OCR service uses <a href="https://github.com/tesseract-ocr" style="color: #5bbc2e;">Tesseract</a>, an open source library.<br/>\
-				You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0" style="color: #5bbc2e;">tutorial</a>).</p>')
-			addedFile = 0;
-			fileObj = null;
-	    	filename = "";
-			ocr_progress_status = 0;
-			estimated_time = 0;
+            myDropzone.removeFile(fileObj);
+            $(".main .label").html(label_text);
+            addedFile = 0;
+            fileObj = null;
+            filename = "";
+            ocr_progress_status = 0;
+            estimated_time = 0;
 	    }
 	}
 	</script>
