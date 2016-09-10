@@ -626,8 +626,6 @@ var SCOPES = [
 {% endfor %}
 ];
 
-var SHOW_PDF = false;
-
 //executed when google script loads
 function checkAuth() {
     console.log('checking auth');
@@ -706,13 +704,6 @@ function getDocUri() {
 };
 
 function webViewerInitialized() {
-
-    //this function tries to load when loading one
-    //of the pdf.js files
-    //we will run it manually instead
-    if (! SHOW_PDF) {
-        return;
-    }
 
     console.log('viewer initialized');
 
