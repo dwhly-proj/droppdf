@@ -692,7 +692,12 @@ function handleAuthClick(event) {
  */
 function loaddriveapi() {
     SHOW_PDF = true;
-    gapi.client.load('drive', 'v3', webViewerInitialized)
+    gapi.client.load('drive', 'v3', webViewerInitialized);
+
+    //load H here as well
+    var script = document.createElement('script');
+    script.src = '//hypothes.is/embed.js';
+    document.body.appendChild(script);
 };
 
 
@@ -935,7 +940,7 @@ httpHeaders: {
 <script src="/static/viewer/build/pdf.js"></script>
 <script src="/static/viewer/web/debugger.js"></script>
 <script src="/static/viewer/web/viewer.js"></script>
-<script src="//hypothes.is/embed.js"></script>
+<!--<script src="//hypothes.is/embed.js"></script>-->
 
 </body>
 </html>
