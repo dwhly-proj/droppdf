@@ -470,6 +470,12 @@ function getDocUri() {
     //get document id from browser location
     var l = decodeURIComponent(window.location);
     var s = l.split('=')[1];
+    //if no query string present don't try to load
+    if (! s) {
+        alert('No input file specified. This application only works through Google Drive');
+        window.location.href="/";
+        return;
+    }
     var o = JSON.parse(s);
     var id = o.ids[0]
     var uri = 'https://www.googleapis.com/drive/v2/files/' + id + '?alt=media';
