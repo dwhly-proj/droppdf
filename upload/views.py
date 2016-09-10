@@ -8,6 +8,15 @@ from django.http import HttpResponse
 from django.template import RequestContext
 from PDFUpload import settings
 
+#configs.py contains secrets that shouldn't be in the public repo
+#so handle it if the file isn't there... don't prevent the whole app from running
+try:
+    from pdf_annotator.configs import CLIENT_ID, API_KEY, SCOPES  
+except ImportError:
+    CLIENT_ID = ''
+    API_KEY = ''
+    SCOPES = []
+
 import sys
 import os
 import random, string
@@ -39,6 +48,11 @@ def randomword(length):
 # Create your views here.
 
 def index(request):
+    #for Google drive auth
+    client_id = CLIENT_ID
+    print CLIENT_ID, 'AAA'
+    api_key = API_KEY
+    scopes = SCOPES
     return render_to_response('index.html', locals())
 
 def pdf(request, filename):

@@ -443,37 +443,14 @@ function handleauthresult(authresult) {
         }
         catch(e) {
             //query string not present or else not correct
-            document.getElementById('confirm-home').style.display = 'block';
-            alert('Application successfully authorized. Now visit Google drive to start editing PDFs.');
-            return;
+            //redirect users to DocDrop home page so they can get authorized.
         }
-        //load resources and switch to pdf view;
-        //switch page views
-        document.getElementById('confirm-home').style.display = 'none';
-        document.getElementById('outerContainer').style.display = 'block';
-
-        //load drive api
         loaddriveapi();
     } else {
         console.log('no auth');
-        document.getElementById('confirm-home').style.display = 'block';
         return;
     }
 }
-
-/**
- * initiate auth flow in response to user clicking authorize button.
- *
- * @param {event} event button click event.
- */
-function handleAuthClick(event) {
-    gapi.auth.authorize(
-            {client_id: CLIENT_ID,
-            scope: SCOPES.join(' '),
-            immediate: false},
-            handleauthresult);
-    return false;
-};
 
 /**
  * load drive api client library.
@@ -503,7 +480,7 @@ function getDocUri() {
 function webViewerInitialized() {
 
     //this function attemps to load from one of the pdf.js files 
-    //we will prevent this behavior and run it manually instead
+    //we will prevent this behavior and run it manually instead after auth
     if (! SHOW_PDF) {
         return;
     }

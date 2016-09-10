@@ -52,7 +52,7 @@
 			<div class="label">
 				Drag and drop a document to annotate it.<br/>
                 <p>Works with .pdf, .doc, .docx, .xls, .xlsx, .epub and .csv files.<br/>.doc and .docx are converted to .pdf<br/>.xls and .xlsx are converted to .csv</p>
-                <p>You can also annotate PDFs inside Google Drive by <a href="javascript:void(0);" onClick="handleAuthClick();">authorizing Hypothesis within your Google account.</a></p>
+                <p>You can also annotate PDFs inside Google Drive by <a href="javascript:void(0);" onClick="handleAuthClick();">authorizing Hypothesis within your Google account.</a> <span style="font-weight: bold;">Hypothes.is PDF Annotator</span> will be listed under the "Open with" option for PDF files upon authorization.</p>
 				<p>Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal)</p>
 				
 				<p>
@@ -89,6 +89,48 @@
 	var estimated_time = 0;
 
 	var type = "";
+
+    var CLIENT_ID = '{{ client_id }}'; 
+    var API_KEY = '{{ api_key }}'; 
+
+    var SCOPES = [
+    {% for scope in scopes %}
+    "{{ scope }}",
+    {% endfor %}
+    ];
+
+    //Google Drive Authentication
+    function handleAuthClick(event) {
+        //give notice if auth keys not present
+        if (CLIENT_ID == '' ||  API_KEY == '' || SCOPES == []) {
+            alert('Google authorization keys not present. Check configs exist.');
+            return;
+        }
+        gapi.auth.authorize(
+                {client_id: CLIENT_ID,
+                scope: SCOPES.join(' '),
+                immediate: false},
+                handleauthresult);
+        return false;
+    };
+
+    function handleauthresult(authresult) {
+        if (authresult && !authresult.error) {
+            //auth was successful.
+            //open google drive in new tab
+            var d = document.createElement('a');
+            d.id = 'open-google-drive';
+            d.href = 'https://drive.google.com/drive/my-drive';
+            d.target = '_blank';
+            document.body.appendChild(d);
+            d.click();
+
+            //window.open('https://drive.google.com/drive/my-drive', '_blank');
+        } else {
+            //auth failed
+            return;
+        }
+    }
 
 	$(document).ready(function(){
 
@@ -253,5 +295,6 @@
 	}
 	</script>
 
+    <script src="https://apis.google.com/js/client.js"></script>
 </body>
 </html>
