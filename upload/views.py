@@ -50,7 +50,6 @@ def randomword(length):
 def index(request):
     #for Google drive auth
     client_id = CLIENT_ID
-    print CLIENT_ID, 'AAA'
     api_key = API_KEY
     scopes = SCOPES
     return render_to_response('index.html', locals())
@@ -174,6 +173,8 @@ def save_file(file, path='', extension='pdf'):
         txt_path = temp + "/" + file_text
 
         if not os.path.exists(txt_path):
+
+            print 'no text'
             return 'none-' + str(page_num) + "-" + filename
         with open(temp + "/" + file_text, 'rb') as f:
             str_data = f.read()
