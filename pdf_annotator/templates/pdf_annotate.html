@@ -457,7 +457,8 @@ function handleauthresult(authresult) {
  */
 function loaddriveapi() {
     SHOW_PDF = true;
-    gapi.client.load('drive', 'v3', webViewerInitialized);
+    //gapi.client.load('drive', 'v3', webViewerInitialized);
+    gapi.client.load('drive', 'v2', webViewerInitialized);
 
     //load H here as well
     var script = document.createElement('script');
