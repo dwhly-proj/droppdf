@@ -68,7 +68,7 @@ def epub(request, filename):
     else:
         page = None
 
-    basepath = 'upload/static/drop-pdf'
+    basepath = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf') 
 
     toc_path = find_resource('%s/%s' % (basepath, filename), 'toc.json')
 
@@ -103,7 +103,9 @@ def epub_resource(request):
     #read the resource and return it
     path = request.path.split('/')
     resource = path[-1]
-    root_dir = 'upload/static/drop-pdf/%s' % path[2]
+
+    root_dir = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf', path[2]) 
+    #root_dir = 'upload/static/drop-pdf/%s' % path[2]
 
     response = find_read_resource(root_dir, resource)
 
@@ -206,7 +208,8 @@ def save_file(file, path='', extension='pdf'):
             return False
 
         filename_w_key = '%s-%s' % (filename_noextension, rand_key)
-        full_path = 'upload/static/%s/%s' % (path, filename_w_key)
+        full_path = os.path.join(settings.BASE_DIR, 'static', path, filename_w_key) 
+        #full_path = 'upload/static/%s/%s' % (path, filename_w_key)
         template_data = process_epub_html(full_path, filename_w_key)
         #if file structure not as expected user will be alerted
         if not template_data:
