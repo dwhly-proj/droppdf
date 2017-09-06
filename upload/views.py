@@ -59,6 +59,10 @@ def pdf(request, filename):
     return render_to_response('redirect.html', locals())
 
 def epub(request, filename):
+    #return render_to_response('epub_js.html', locals())
+    return render_to_response('h.html', locals())
+
+
     
     #find html file if exists
     filepath = filename.split('/')
@@ -203,6 +207,9 @@ def save_file(file, path='', extension='pdf'):
         return filename_noextension + "-" + rand_key + '.csv'
 
     elif extension == 'epub':
+        return filename_noextension + "-" + rand_key + '.epub'
+
+
         #if epub extraction fails user will be alerted
         if not unzip_epub(temp, filename, filename_noextension, rand_key):
             return False
