@@ -6,23 +6,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!--<title>EPUB.js + Hypothes.is Example</title>-->
   <title>{{ filename }}</title>
-
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.1/jszip.min.js"></script>-->
-  <!--<script src="../dist/epub.js"></script>-->
 
   <script src="{% static 'epubjs/epub.min.js' %}"></script>
   <script src="{% static 'epubjs/libs/zip.min.js' %}"></script>
-
-  <!-- <script>
-  window.hypothesisConfig = function () {
-    return {
-      // constructor: this.Annotator.Sidebar,
-      app: 'https://hypothes.is/app.html',
-    };
-  };
-  </script> -->
 
   <script type="text/javascript">
     window.hypothesisConfig = function () {
@@ -41,7 +28,7 @@
   <script src="https://cdn.hypothes.is/hypothesis"></script>
 
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" type="text/css" href="examples.css">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/epub.css' %}">
   <style type="text/css">
     body {
       margin: 0;
@@ -265,18 +252,21 @@
       var hash = decodeURIComponent(href);
     }
 
-    rendition.display(hash || undefined);
+    //rendition.display(hash || undefined);
 
 
     var next = document.getElementById("next");
     next.addEventListener("click", function(e){
-      rendition.next();
+      book.nextPage();
+      //rendition.next();
       e.preventDefault();
     }, false);
 
     var prev = document.getElementById("prev");
     prev.addEventListener("click", function(e){
-      rendition.prev();
+      book.nextPage();
+      //console.log(rendition);
+      //rendition.prev();
       e.preventDefault();
     }, false);
 
