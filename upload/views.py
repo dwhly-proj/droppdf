@@ -59,48 +59,7 @@ def pdf(request, filename):
     return render_to_response('redirect.html', locals())
 
 def epub(request, filename):
-    #return render_to_response('epub_js.html', locals())
-    return render_to_response('h.html', locals())
-
-
-    
-    #find html file if exists
-    filepath = filename.split('/')
-    if len(filepath) > 1:
-        page = filepath[-1]
-        filename = filepath[0]
-    else:
-        page = None
-
-    basepath = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf') 
-
-    toc_path = find_resource('%s/%s' % (basepath, filename), 'toc.json')
-
-    with open(toc_path) as file_:
-        config = json.load(file_)
-
-    out = {
-            'filename': filename,
-            'pages': config['pages'],
-            'styles': config['styles']
-            }
-
-    out['page'] = 'Error fetching resource'
-
-    if page is None:
-        #don't have two paths to same page. otherwise annotations won't be consistant.
-        return redirect('/epub/%s/%s' % (filename, out['pages'][0]['short_ref']))
-        #get first page
-        #out['page'] = read_epub_page(out['pages'][0]['ref'])
-
-    else:
-        #get content for page specified in url
-        for p in config['pages']:
-            if p['short_ref'] == page:
-                out['page'] = read_epub_page(p['ref'])
-                break
-
-    return render_to_response('epub.html', out, context_instance=RequestContext(request))
+    return render_to_response('epub.html', locals())
 
 def epub_resource(request):
     #since real subdirectory is unknown, get file name and find where it is.

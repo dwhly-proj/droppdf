@@ -1,3 +1,4 @@
+
 {% load staticfiles %}
 
 <!DOCTYPE html>
@@ -7,84 +8,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
 
-    <script src="{% static 'js/jquery-2.2.3.min.js' %}"></script>
+  <script src="{% static 'epubjs/epub.min.js' %}"></script>
+  <script src="{% static 'epubjs/libs/zip.min.js' %}"></script>
 
-    <script src="https://use.fontawesome.com/6b7c851b6c.js"></script>
+  <script type="text/javascript">
+    window.hypothesisConfig = function () {
+      return {
+        openSidebar: false,
+        enableMultiFrameSupport: true,
+        onLayoutChange: function(state) {
+          var nav = document.getElementById("navigation");
+          if (state.expanded === true) {
+            nav.classList.remove("open");
+          }
+        }
+      };
+    };
+  </script>
+  <script src="https://cdn.hypothes.is/hypothesis"></script>
 
-
-	<!--[> Inject Hypothesis <]-->
-    <script>
-    (function () {
-    // Only run injection for top-level window!
-    if (window != window.top) {
-        return;
-    }
-
-    var embed_script = document.createElement("script");
-    embed_script.src = "https://hypothes.is/embed.js";
-    document.head.appendChild(embed_script);
-    window.hypothesisConfig = function() {
-        return {showHighlights: true};
-    }
-    })();
-    </script>
-
-  {% for s in styles %}
-  <link href="{{ s }} " rel="stylesheet" type="text/css">
-  {% endfor %}
-
-
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="{% static 'css/epub.css' %}">
   <style type="text/css">
     body {
       margin: 0;
-      /* background: #fafafa; */
-      background: #ffffff;
+      background: #fafafa;
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       color: #333;
     }
 
     #navigation {
-      background-color: #ffffff;
-      width: 230px;
+      width: 400px;
       position: fixed;
+      overflow: auto;
       top: 0;
-      bottom: 0;
+      left: -425px;
+
+      background: #ECECEC;
+      min-height: 100%;
+      height: 100%;
+      height: 100vh;
+
+      overflow: scroll;
+      -webkit-overflow-scrolling: touch;
+      padding: 9px;
+      padding-top: 10px;
+
+      transition: left .2s ease-out;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+    }
+
+    #navigation.open {
       left: 0;
-      padding-top: 0px;
-      overflow-y: auto;
-      z-index: 3;
     }
 
     #navigation.fixed {
       position: fixed;
-    }
-
-    #navigation-inner {
-      background-color: #f2f2f2;
-      overflow-y: auto;
-      height: 100%;
-      width: 95%;
-      overflow-y: auto;
-    }
-
-    #nav-slide {
-        color: #c2c2c2;
-        background-color: #ffffff;
-        border: 1px solid #c2c2c2;
-        padding: 6px;
-        padding-top: 12px;
-        padding-bottom: 12px;
-        position: absolute;
-        right: 0;
-        font-size: 8px; 
-        width: 20px;
-        text-align: center;
-        z-index: 4;
-    }
-
-    #nav-slide:hover {
-        cursor: pointer;
-        color: #000000;
     }
 
     #navigation h1 {
@@ -103,68 +82,50 @@
     }
 
     #navigation ul {
-      padding-left: 18px;
+      padding-left: 28px;
       margin-left: 0;
     }
 
     #navigation ul li {
       list-style: decimal;
       margin-bottom: 10px;
-      color: #cccddd;
+      color: #585858;
       font-size: 12px;
-      padding-left: 5px;
-      padding-right: 8px;
-      margin-left: 10px;
+      padding-left: 0;
+      margin-left: 0;
     }
 
-    #navigation ul li {
-      color: #ccc;
+    #navigation ul li a {
+      color: #585858;
       text-decoration: none;
     }
 
-    #navigation ul li:hover {
-      color: #777;
+    #navigation ul li a:hover {
+      color: #585858;
       text-decoration: underline;
-      cursor: pointer;
     }
 
-    #navigation ul li.active {
+    #navigation ul li a.active {
       color: #000;
-    }
-    #epub-inner-viewport {
-      overflow: show;
-      min-width: 320px;
-      margin: 0 20px;
+      font-weight: 400;
     }
 
-    #viewer .epub-view {
-        background: white;
-        box-shadow: 0 0 4px #ccc;
-        margin: 10px;
-        padding: 40px 80px;
+    #navigation #author {
+      text-align: center;
+    }
+
+    #cover {
+      display: inline;
     }
 
     #main {
-        padding-top: 2em;
-        padding-left: 240px;
-        padding-right: 420px;
-    }
-
-    #main.open {
-      left: 0;
+      margin-top: 60px;
     }
 
     #pagination {
       text-align: center;
-      margin-left: 80px;
-    }
-
-    .arrow {
-      margin: 14px;
-      display: inline-block;
-      text-align: center;
-      text-decoration: none;
-      color: #ccc;
+      margin: 20px;
+      /*padding: 0 50px;*/
     }
 
     .arrow:hover {
@@ -175,12 +136,14 @@
       color: #000;
     }
 
+    .arrow .material-icons {
+      font-size: 8vw;
+    }
+
     #prev {
-      float: left;
     }
 
     #next {
-      float: right;
     }
 
     #toc {
@@ -204,54 +167,252 @@
       height: 100%;
     }
 
-    @media (max-width: 1024px) {
-      #main {
-          padding-right: 45px;
+    #closer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #333;
+      cursor: pointer;
+    }
+
+    #closer .material-icons {
+      color: #333;
+    }
+
+    #opener {
+      position: absolute;
+      left: 0;
+      top: 0;
+      cursor: pointer;
+    }
+
+    #viewer.spreads {
+      width: 84vw;
+      height: 80vh;
+      padding: 0;
+      position: relative;
+      margin: 10vh auto;
+      background: white;
+      top: 0;
+    }
+
+    #hiddenTitle {
+      display: none;
+    }
+
+    @media (max-width: 1000px) {
+      #prev {
+        left: 0px;
+      }
+      #next {
+        right: 0px;
       }
     }
+
 
   </style>
 </head>
 <body>
-  <span class="fa fa-chevron-right fa-lg" style="display: none;"></span>
-  <div id="navigation">
-    <div id="nav-slide" onclick="toggleNav();">
-        <span class="fa fa-chevron-left fa-lg"></span>
-    </div>
-    <div id="navigation-inner">
-        <ul id="nav-list">
-        {% for p in pages %}
-        <li><a href="/epub/{{ filename }}/{{ p.short_ref }}">{{ p.text }}</a></li>
-        {% endfor %}
-        </ul>
-    </div>
-
-
-  </div>
   <div id="main">
-    <div id="epub-inner-viewport">
-        {{ page | safe }}
-    </div>
-    <div id="pagination">
-      <a id="prev" href="#prev" class="arrow">...</a>
-      <a id="next" href="#next" class="arrow">...</a>
-    </div>
+    <a id="opener">
+      <i class="material-icons">menu</i>
+    </a>
+    <div id="viewer" class="spreads"></div>
+    <span id="hiddenTitle"></span>
+    <a id="prev" href="javascript:void(0)" class="arrow">
+      <i class="material-icons">chevron_left</i>
+    </a>
+    <!--<a id="next" href="#next" class="arrow">-->
+    <a id="next" href="javascript:void(0)" class="arrow">
+      <i class="material-icons">chevron_right</i>
+    </a>
+  </div>
+  <div id="navigation">
+    <a id="closer">
+      <i class="material-icons">close</i>
+    </a>
+    <h1 id="title">...</h1>
+    <image id="cover" width="150px"/>
+    <h2 id="author">...</h2>
+    <ul id="toc"></ul>
   </div>
 
   <script>
-    function toggleNav() {
-        var ns = $('#nav-slide').find('span').first();
-        if ($(ns).hasClass('fa-chevron-left')) {
-            $(ns).removeClass('fa-chevron-left').addClass('fa-chevron-right');
-            $('#navigation').width('30px');
-            $('#main').css('padding-left', '32px');
+
+    // Load the opf
+    var book = ePub("/static/drop-pdf/{{ filename }}");
+    book.renderTo("viewer");
+
+    //var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
+    //var url = params && params.get("url") && decodeURIComponent(params.get("url"));
+
+    function get_current() {
+      var cur = book.spinePos;
+      var toc = book.toc;
+      return toc[cur - 1];
+    };
+
+    function update_title() {
+      var current = get_current();
+      if (current) {
+        document.title = current.label;
+      }
+
+    };
+
+    function update_history() {
+      // Add CFI fragment to the history.
+      var current = get_current();
+      var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(current.href);
+      window.history.pushState({}, current.label, newurl);
+      update_title();
+    }
+
+    function navigate_to_hash() {
+      //page to chapter/ page given by query string.
+      var hash = window.location.hash.slice(2);
+      var loc = window.location.href.indexOf("?loc=");
+   
+      if (loc > -1) {
+        var href =  window.location.href.slice(loc + 5);
+        var hash = decodeURIComponent(href);
+        var rendered = book.goto(hash);
+        return true;    
+      }
+      else {
+          return false;
+      }
+
+    }
+
+    function page_next() {
+      book.nextPage().then(function() {
+        update_history();
+      });
+    };
+    function page_prev() {
+      book.prevPage().then(function() {
+        update_history();
+      });
+    }
+    
+
+    var next = document.getElementById("next");
+    next.addEventListener("click", function(e){
+      page_next();
+      e.preventDefault();
+    }, false);
+
+    var prev = document.getElementById("prev");
+    prev.addEventListener("click", function(e){
+      page_prev();
+      e.preventDefault();
+    }, false);
+
+    var nav = document.getElementById("navigation");
+    var opener = document.getElementById("opener");
+    opener.addEventListener("click", function(e){
+      nav.classList.add("open");
+    }, false);
+
+    var closer = document.getElementById("closer");
+    closer.addEventListener("click", function(e){
+      nav.classList.remove("open");
+    }, false);
+
+
+    book.on('book:ready', function() {
+
+      //navigate to desired page or else set query string. 
+      if (! navigate_to_hash()) {
+        update_history();
+      }
+
+   });
+
+
+    var keyListener = function(e){
+
+      // Left Key
+      if ((e.keyCode || e.which) == 37) {
+        page_prev();  
+      }
+
+      // Right Key
+      if ((e.keyCode || e.which) == 39) {
+        page_next();  
+      }
+
+    };
+
+    document.addEventListener("keyup", keyListener, false);
+
+    book.getToc().then(function(toc) {
+
+      var $nav = document.getElementById("toc"),
+          docfrag = document.createDocumentFragment();
+
+      toc.forEach(function(chapter, index) {
+
+        var item = document.createElement("li");
+        var link = document.createElement("a");
+        link.id = "chap-" + chapter.id;
+        link.textContent = chapter.label;
+        link.href = chapter.href;
+        item.appendChild(link);
+        docfrag.appendChild(item);
+
+        link.onclick = function(){
+          var url = link.getAttribute("href");
+          var rendered = book.goto(url);
+          rendered.then(function() {
+            update_history();
+          });
+          return false;
+        };
+
+      });
+
+      $nav.appendChild(docfrag);
+
+    });
+
+    <!--book.loaded.metadata.then(function(meta){-->
+      <!--var $title = document.getElementById("title");-->
+      <!--var $author = document.getElementById("author");-->
+      <!--var $cover = document.getElementById("cover");-->
+      <!--var $nav = document.getElementById('navigation');-->
+
+      <!--$title.textContent = meta.title;-->
+      <!--$author.textContent = meta.creator;-->
+      <!--if (book.archive) {-->
+        <!--book.archive.createUrl(book.cover)-->
+          <!--.then(function (url) {-->
+            <!--$cover.src = url;-->
+          <!--})-->
+      <!--} else {-->
+        <!--$cover.src = book.cover;-->
+      <!--}-->
+
+      // if ($nav.offsetHeight + 60 < window.innerHeight) {
+      //   $nav.classList.add("fixed");
+      // }
+
+    <!--});-->
+
+    var tm;
+    function checkForAnnotator(cb, w) {
+     if (!w) {
+       w = window;
+     }
+     tm = setTimeout(function () {
+        if (w && w.annotator) {
+          clearTimeout(tm);
+          cb();
+        } else {
+          checkForAnnotator(cb, w);
         }
-        else {
-            $(ns).removeClass('fa-chevron-right').addClass('fa-chevron-left');
-            $('#navigation').width('230px');
-            $('#main').css('padding-left', '240px');
-        }
-        $('#nav-list').toggle();
+      }, 100);
     }
 
   </script>
