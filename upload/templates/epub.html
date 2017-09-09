@@ -209,6 +209,18 @@
       }
     }
 
+    @media (max-width: 400px) {
+      .arrow .material-icons {
+        font-size: 10vw;
+      }
+      #prev {
+        left: -7px;
+      }
+      #next {
+        right: -7px;
+      }
+    }
+
 
   </style>
 </head>
@@ -243,13 +255,38 @@
     var book = ePub("/static/drop-pdf/{{ filename }}");
     book.renderTo("viewer");
 
-    //var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
-    //var url = params && params.get("url") && decodeURIComponent(params.get("url"));
+    var spine_toc_map = (function() {
+      //map spine position to toc 
+      var out = {};
+      book.on('book:ready', function() {
+        book.toc.forEach(function(item, index) {
+          out[item.spinePos] = item;
+        });
+      });
+      return out;
+    }());
 
     function get_current() {
+     //console.log('AA', book); 
+      var label;
       var cur = book.spinePos;
-      var toc = book.toc;
-      return toc[cur - 1];
+      if (cur in spine_toc_map) {
+        label = spine_toc_map[cur].label;
+      }
+      else {
+        label = book.metadata.bookTitle;
+      }
+      if (typeof label === undefined) {
+        label = 'Epub'; 
+      }
+      var spine = book.spine[cur];
+      var href = spine.href; 
+
+      return {
+        label: label,
+        href: href
+      }
+
     };
 
     function update_title() {
@@ -322,13 +359,11 @@
 
 
     book.on('book:ready', function() {
-
       //navigate to desired page or else set query string. 
       if (! navigate_to_hash()) {
         update_history();
       }
-
-   });
+    });
 
 
     var keyListener = function(e){
@@ -377,28 +412,22 @@
 
     });
 
-    <!--book.loaded.metadata.then(function(meta){-->
-      <!--var $title = document.getElementById("title");-->
-      <!--var $author = document.getElementById("author");-->
-      <!--var $cover = document.getElementById("cover");-->
-      <!--var $nav = document.getElementById('navigation');-->
+    book.on('book:ready', function() {
+      var meta = book.metadata;
+      var cache = book.store.urlCache; 
 
-      <!--$title.textContent = meta.title;-->
-      <!--$author.textContent = meta.creator;-->
-      <!--if (book.archive) {-->
-        <!--book.archive.createUrl(book.cover)-->
-          <!--.then(function (url) {-->
-            <!--$cover.src = url;-->
-          <!--})-->
-      <!--} else {-->
-        <!--$cover.src = book.cover;-->
-      <!--}-->
+      var $title = document.getElementById("title");
+      var $author = document.getElementById("author");
+      var $cover = document.getElementById("cover");
+      var $nav = document.getElementById('navigation');
 
-      // if ($nav.offsetHeight + 60 < window.innerHeight) {
-      //   $nav.classList.add("fixed");
-      // }
+      var cover_url = cache[book.cover]; 
 
-    <!--});-->
+      $title.textContent = meta.bookTitle;
+      $author.textContent = meta.creator;
+      $cover.src = cover_url;
+
+    });
 
     var tm;
     function checkForAnnotator(cb, w) {
