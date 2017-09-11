@@ -11,21 +11,21 @@
   <script src="{% static 'epubjs/epub.min.js' %}"></script>
   <script src="{% static 'epubjs/libs/zip.min.js' %}"></script>
 
-  <script type="text/javascript">
-    window.hypothesisConfig = function () {
-      return {
-        openSidebar: false,
-        enableMultiFrameSupport: true,
-        onLayoutChange: function(state) {
-          var nav = document.getElementById("navigation");
-          if (state.expanded === true) {
-            nav.classList.remove("open");
-          }
-        }
-      };
-    };
-  </script>
-  <script src="https://cdn.hypothes.is/hypothesis"></script>
+  <!--<script type="text/javascript">-->
+    <!--window.hypothesisConfig = function () {-->
+      <!--return {-->
+        <!--openSidebar: false,-->
+        <!--enableMultiFrameSupport: true,-->
+        <!--onLayoutChange: function(state) {-->
+          <!--var nav = document.getElementById("navigation");-->
+          <!--if (state.expanded === true) {-->
+            <!--nav.classList.remove("open");-->
+          <!--}-->
+        <!--}-->
+      <!--};-->
+    <!--};-->
+  <!--</script>-->
+  <!--<script src="https://cdn.hypothes.is/hypothesis"></script>-->
 
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" type="text/css" href="{% static 'css/epub.css' %}">
@@ -253,7 +253,41 @@
 
     // Load the opf
     var book = ePub("/static/drop-pdf/{{ filename }}");
-    book.renderTo("viewer");
+    //var render = book.renderTo("viewer");
+    var render = book.renderTo("viewer").then(function() {
+
+      setTimeout(function() {
+        //for some reason even though iframe is found in doc and attributes set they don't appear
+        //to stick in iframe that appears in viewer without this short timeout. Hacky I know.
+        //TODO find when book is actually rendered and ready.
+
+        //add enable-annotations to iframe
+        var viewer = document.getElementById('viewer');
+        var viewer = document.getElementById('viewer');
+        var frame = viewer.getElementsByTagName('iframe');
+        
+        frame[0].setAttribute('enable-annotation', 'true');
+      }, 70);
+
+      window.hypothesisConfig = function () {
+          return {
+            openSidebar: false,
+            enableMultiFrameSupport: true,
+            onLayoutChange: function(state) {
+              var nav = document.getElementById("navigation");
+              if (state.expanded === true) {
+                nav.classList.remove("open");
+              }
+            }
+          };
+       };
+
+       var s = document.createElement('script');
+       s.src="https://cdn.hypothes.is/hypothesis"
+       document.body.appendChild(s);
+
+    });
+
 
     var spine_toc_map = (function() {
       //map spine position to toc 
@@ -267,7 +301,6 @@
     }());
 
     function get_current() {
-     //console.log('AA', book); 
       var label;
       var cur = book.spinePos;
       if (cur in spine_toc_map) {
@@ -298,9 +331,9 @@
     };
 
     function update_history() {
-      // Add CFI fragment to the history.
+      //add query string
       var current = get_current();
-      var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(current.href);
+      var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(current.href) ;
       window.history.pushState({}, current.label, newurl);
       update_title();
     }
@@ -314,7 +347,7 @@
         var href =  window.location.href.slice(loc + 5);
         var hash = decodeURIComponent(href);
         var rendered = book.goto(hash);
-        return true;    
+        return true;
       }
       else {
           return false;
@@ -365,6 +398,7 @@
       }
     });
 
+    //book.on('book:
 
     var keyListener = function(e){
 
