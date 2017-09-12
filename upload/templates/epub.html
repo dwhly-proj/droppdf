@@ -238,7 +238,6 @@
     <a id="prev" href="javascript:void(0)" class="arrow">
       <i class="material-icons">chevron_left</i>
     </a>
-    <!--<a id="next" href="#next" class="arrow">-->
     <a id="next" href="javascript:void(0)" class="arrow">
       <i class="material-icons">chevron_right</i>
     </a>
@@ -260,7 +259,6 @@
       this.iframe.id = "epubjs-iframe:" + this.id;
       this.iframe.scrolling = this.scrolling || "no";
       this.iframe.seamless = "seamless";
-      // Back up if seamless isn't supported
       this.iframe.style.border = "none";
 
       this.iframe.setAttribute('enable-annotation',"true");
@@ -283,7 +281,11 @@
           return;
         }
 
-        var href = book.spine[book.spinePos + 1].href;
+        console.log(book.spinePos);
+        console.log(book)
+        var next = +book.spinePos + 1;
+        console.log(next);
+        var href = book.spine[next].href;
         //hard reload
         var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(href) ;
         window.location.href = newurl; 
@@ -294,77 +296,30 @@
       }
     };
 
-    //EPUBJS.Render.page(1);
 
     EPUBJS.Renderer.prototype.prevPage = function() {
-     // console.log(this);
-
-      //console.log('RV', book.page);
-      //var pageback = EPUBJS.Renderer.page;
-      //book.pageTo(2);
-      //console.log(book);
-      //beginning of book
       if (this.chapterPos <= 1) {
         //beginning of book
         if (book.spinePos <= 0) {
           return true
         }
         //back one chapter
-
-        var href = book.spine[book.spinePos - 1].href;
-        var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(href) + '&page=last';
+        
+        var prev = book.spinePos - 1;
+        var href = book.spine[prev].href;
+        var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(href) + '&page=' + prev;
         window.location.href = newurl; 
         return true; 
-        //add page to query string
-        //var prev = book.prevChapter()._result._result.;
-        //console.log('RR', prev);
         
       }
-
-      //console.log(this.chapterPos, this.displayedPages);
       return this.page(this.chapterPos - 1);
     };
 
 
     var book = ePub("/static/drop-pdf/{{ filename }}");
-    var render = book.renderTo("viewer");
 
-
-    <!--var render = book.renderTo("viewer").then(function() {-->
-
-      <!--setTimeout(function() {-->
-        <!--//for some reason even though iframe is found in doc and attributes set they don't appear-->
-        <!--//to stick in iframe that appears in viewer without this short timeout. Hacky I know.-->
-        <!--//TODO find when book is actually rendered and ready.-->
-
-        <!--//add enable-annotations to iframe-->
-        <!--var viewer = document.getElementById('viewer');-->
-        <!--var viewer = document.getElementById('viewer');-->
-        <!--var frame = viewer.getElementsByTagName('iframe');-->
-        
-        <!--frame[0].setAttribute('enable-annotation', 'true');-->
-
-        <!--window.hypothesisConfig = function () {-->
-            <!--return {-->
-              <!--openSidebar: false,-->
-              <!--enableMultiFrameSupport: true,-->
-              <!--onLayoutChange: function(state) {-->
-                <!--var nav = document.getElementById("navigation");-->
-                <!--if (state.expanded === true) {-->
-                  <!--nav.classList.remove("open");-->
-                <!--}-->
-              <!--}-->
-            <!--};-->
-         <!--};-->
-
-         <!--var s = document.createElement('script');-->
-         <!--s.src="https://cdn.hypothes.is/hypothesis"-->
-         <!--document.body.appendChild(s);-->
-
-      <!--}, 100);-->
-
-    <!--});-->
-
+    //console.log(book);
+    //var render = book.renderTo("viewer");
 
     var spine_toc_map = (function() {
       //map spine position to toc 
@@ -421,7 +376,6 @@
       var loc = window.location.href.indexOf("?loc=");
 
       if (loc > -1) {
-
         var page = window.location.href.indexOf('&page=');
         if (page > -1) {
 
@@ -436,34 +390,25 @@
           var pg = false;
         }
         var hash = decodeURIComponent(href);
+        
+        console.log(pg);
 
-        var viewer = document.getElementById('viewer');
-        var frame = viewer.getElementsByTagName('iframe');
-
-        if (pg == 'last') {
-          var c = 0;
+        if (pg) {
           var rendered = book.goto(hash);
-          var check = setInterval(function() {
-            var last_page = book.renderer.displayedPages;
-            if (typeof last_page != 'undefined') {
-              if (c > 2) {
-                clearInterval(check);
-                book.renderer.page(last_page);
-                frame[0].style.opacity = '1';
-                update_history();
-              }
-              else {
-                c += 1;
-              }
-            }
-          }, 50);
+          //book.renderer.page(+pg)
+      
+          book.renderTo('viewer').then(function() {
+            book.displayChapter(+pg, true).then(function() {
+              update_title();
+              update_history();
+            });
+          });
         }
 
         else {
           var rendered = book.goto(hash);
-
+          book.renderTo('viewer');
         }
-
         update_title();
         return true;
       }
@@ -514,9 +459,18 @@
       if (! navigate_to_hash()) {
         update_history();
       }
+      //var render = book.renderTo("viewer");
+      //show book
+      <!--var intvl = setInterval(function() {-->
+        <!--var viewer = document.getElementById('viewer');-->
+        <!--var frames = document.getElementsByTagName('iframe');-->
+        <!--console.log(frames);-->
+        <!--if (frames.length > 0) {-->
+          <!--clearInterval(intvl);-->
+          <!--frames[0].style.opacity = '1';-->
+        <!--}-->
+      <!--}, 50);-->
     });
-
-    //book.on('book:
 
     var keyListener = function(e){
 
