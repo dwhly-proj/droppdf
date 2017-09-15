@@ -279,14 +279,17 @@
     var hiddenTitle = document.getElementById("hiddenTitle");
 
     rendition.on("rendered", function(section){
+
       var current = book.navigation && book.navigation.get(section.href);
 
       if (current) {
         document.title = current.label;
+      }
 
+      if (section) {
         // TODO: this is needed to trigger the hypothesis client
         // to inject into the iframe
-        hiddenTitle.textContent = current.label;
+       hiddenTitle.textContent = section.href;
       }
 
       var old = document.querySelectorAll('.active');
@@ -301,6 +304,7 @@
       // Add CFI fragment to the history
       history.pushState({}, '', "?loc=" + encodeURIComponent(section.href));
       // window.location.hash = "#/"+section.href
+
     });
 
     var keyListener = function(e){
