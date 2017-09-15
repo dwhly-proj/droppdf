@@ -1,5071 +1,351 @@
-/*!
- * @overview RSVP - a tiny implementation of Promises/A+.
- * @copyright Copyright (c) 2016 Yehuda Katz, Tom Dale, Stefan Penner and contributors
- * @license   Licensed under MIT license
- *            See https://raw.githubusercontent.com/tildeio/rsvp.js/master/LICENSE
- * @version   3.5.0
- */
-
-(function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.RSVP = global.RSVP || {})));
-}(this, (function (exports) { 'use strict';
-
-function indexOf(callbacks, callback) {
-  for (var i = 0, l = callbacks.length; i < l; i++) {
-    if (callbacks[i] === callback) {
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-function callbacksFor(object) {
-  var callbacks = object._promiseCallbacks;
-
-  if (!callbacks) {
-    callbacks = object._promiseCallbacks = {};
-  }
-
-  return callbacks;
-}
-
-/**
-  @class RSVP.EventTarget
-*/
-var EventTarget = {
-
-  /**
-    `RSVP.EventTarget.mixin` extends an object with EventTarget methods. For
-    Example:
-     ```javascript
-    let object = {};
-     RSVP.EventTarget.mixin(object);
-     object.on('finished', function(event) {
-      // handle event
-    });
-     object.trigger('finished', { detail: value });
-    ```
-     `EventTarget.mixin` also works with prototypes:
-     ```javascript
-    let Person = function() {};
-    RSVP.EventTarget.mixin(Person.prototype);
-     let yehuda = new Person();
-    let tom = new Person();
-     yehuda.on('poke', function(event) {
-      console.log('Yehuda says OW');
-    });
-     tom.on('poke', function(event) {
-      console.log('Tom says OW');
-    });
-     yehuda.trigger('poke');
-    tom.trigger('poke');
-    ```
-     @method mixin
-    @for RSVP.EventTarget
-    @private
-    @param {Object} object object to extend with EventTarget methods
-  */
-  mixin: function mixin(object) {
-    object['on'] = this['on'];
-    object['off'] = this['off'];
-    object['trigger'] = this['trigger'];
-    object._promiseCallbacks = undefined;
-    return object;
-  },
-
-  /**
-    Registers a callback to be executed when `eventName` is triggered
-     ```javascript
-    object.on('event', function(eventInfo){
-      // handle the event
-    });
-     object.trigger('event');
-    ```
-     @method on
-    @for RSVP.EventTarget
-    @private
-    @param {String} eventName name of the event to listen for
-    @param {Function} callback function to be called when the event is triggered.
-  */
-  on: function on(eventName, callback) {
-    if (typeof callback !== 'function') {
-      throw new TypeError('Callback must be a function');
-    }
-
-    var allCallbacks = callbacksFor(this),
-        callbacks = undefined;
-
-    callbacks = allCallbacks[eventName];
-
-    if (!callbacks) {
-      callbacks = allCallbacks[eventName] = [];
-    }
-
-    if (indexOf(callbacks, callback) === -1) {
-      callbacks.push(callback);
-    }
-  },
-
-  /**
-    You can use `off` to stop firing a particular callback for an event:
-     ```javascript
-    function doStuff() { // do stuff! }
-    object.on('stuff', doStuff);
-     object.trigger('stuff'); // doStuff will be called
-     // Unregister ONLY the doStuff callback
-    object.off('stuff', doStuff);
-    object.trigger('stuff'); // doStuff will NOT be called
-    ```
-     If you don't pass a `callback` argument to `off`, ALL callbacks for the
-    event will not be executed when the event fires. For example:
-     ```javascript
-    let callback1 = function(){};
-    let callback2 = function(){};
-     object.on('stuff', callback1);
-    object.on('stuff', callback2);
-     object.trigger('stuff'); // callback1 and callback2 will be executed.
-     object.off('stuff');
-    object.trigger('stuff'); // callback1 and callback2 will not be executed!
-    ```
-     @method off
-    @for RSVP.EventTarget
-    @private
-    @param {String} eventName event to stop listening to
-    @param {Function} callback optional argument. If given, only the function
-    given will be removed from the event's callback queue. If no `callback`
-    argument is given, all callbacks will be removed from the event's callback
-    queue.
-  */
-  off: function off(eventName, callback) {
-    var allCallbacks = callbacksFor(this),
-        callbacks = undefined,
-        index = undefined;
-
-    if (!callback) {
-      allCallbacks[eventName] = [];
-      return;
-    }
-
-    callbacks = allCallbacks[eventName];
-
-    index = indexOf(callbacks, callback);
-
-    if (index !== -1) {
-      callbacks.splice(index, 1);
-    }
-  },
-
-  /**
-    Use `trigger` to fire custom events. For example:
-     ```javascript
-    object.on('foo', function(){
-      console.log('foo event happened!');
-    });
-    object.trigger('foo');
-    // 'foo event happened!' logged to the console
-    ```
-     You can also pass a value as a second argument to `trigger` that will be
-    passed as an argument to all event listeners for the event:
-     ```javascript
-    object.on('foo', function(value){
-      console.log(value.name);
-    });
-     object.trigger('foo', { name: 'bar' });
-    // 'bar' logged to the console
-    ```
-     @method trigger
-    @for RSVP.EventTarget
-    @private
-    @param {String} eventName name of the event to be triggered
-    @param {*} options optional value to be passed to any event handlers for
-    the given `eventName`
-  */
-  trigger: function trigger(eventName, options, label) {
-    var allCallbacks = callbacksFor(this),
-        callbacks = undefined,
-        callback = undefined;
-
-    if (callbacks = allCallbacks[eventName]) {
-      // Don't cache the callbacks.length since it may grow
-      for (var i = 0; i < callbacks.length; i++) {
-        callback = callbacks[i];
-
-        callback(options, label);
-      }
-    }
-  }
-};
-
-var config = {
-  instrument: false
-};
-
-EventTarget['mixin'](config);
-
-function configure(name, value) {
-  if (name === 'onerror') {
-    // handle for legacy users that expect the actual
-    // error to be passed to their function added via
-    // `RSVP.configure('onerror', someFunctionHere);`
-    config['on']('error', value);
-    return;
-  }
-
-  if (arguments.length === 2) {
-    config[name] = value;
-  } else {
-    return config[name];
-  }
-}
-
-function objectOrFunction(x) {
-  return typeof x === 'function' || typeof x === 'object' && x !== null;
-}
-
-function isFunction(x) {
-  return typeof x === 'function';
-}
-
-function isMaybeThenable(x) {
-  return typeof x === 'object' && x !== null;
-}
-
-var _isArray = undefined;
-if (!Array.isArray) {
-  _isArray = function (x) {
-    return Object.prototype.toString.call(x) === '[object Array]';
-  };
-} else {
-  _isArray = Array.isArray;
-}
-
-var isArray = _isArray;
-
-// Date.now is not available in browsers < IE9
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/now#Compatibility
-var now = Date.now || function () {
-  return new Date().getTime();
-};
-
-function F() {}
-
-var o_create = Object.create || function (o) {
-  if (arguments.length > 1) {
-    throw new Error('Second argument not supported');
-  }
-  if (typeof o !== 'object') {
-    throw new TypeError('Argument must be an object');
-  }
-  F.prototype = o;
-  return new F();
-};
-
-var queue = [];
-
-function scheduleFlush() {
-  setTimeout(function () {
-    for (var i = 0; i < queue.length; i++) {
-      var entry = queue[i];
-
-      var payload = entry.payload;
-
-      payload.guid = payload.key + payload.id;
-      payload.childGuid = payload.key + payload.childId;
-      if (payload.error) {
-        payload.stack = payload.error.stack;
-      }
-
-      config['trigger'](entry.name, entry.payload);
-    }
-    queue.length = 0;
-  }, 50);
-}
-function instrument$1(eventName, promise, child) {
-  if (1 === queue.push({
-    name: eventName,
-    payload: {
-      key: promise._guidKey,
-      id: promise._id,
-      eventName: eventName,
-      detail: promise._result,
-      childId: child && child._id,
-      label: promise._label,
-      timeStamp: now(),
-      error: config["instrument-with-stack"] ? new Error(promise._label) : null
-    } })) {
-    scheduleFlush();
-  }
-}
-
-/**
-  `RSVP.Promise.resolve` returns a promise that will become resolved with the
-  passed `value`. It is shorthand for the following:
-
-  ```javascript
-  let promise = new RSVP.Promise(function(resolve, reject){
-    resolve(1);
-  });
-
-  promise.then(function(value){
-    // value === 1
-  });
-  ```
-
-  Instead of writing the above, your code now simply becomes the following:
-
-  ```javascript
-  let promise = RSVP.Promise.resolve(1);
-
-  promise.then(function(value){
-    // value === 1
-  });
-  ```
-
-  @method resolve
-  @static
-  @param {*} object value that the returned promise will be resolved with
-  @param {String} label optional string for identifying the returned promise.
-  Useful for tooling.
-  @return {Promise} a promise that will become fulfilled with the given
-  `value`
-*/
-function resolve$1(object, label) {
-  /*jshint validthis:true */
-  var Constructor = this;
-
-  if (object && typeof object === 'object' && object.constructor === Constructor) {
-    return object;
-  }
-
-  var promise = new Constructor(noop, label);
-  resolve(promise, object);
-  return promise;
-}
-
-function withOwnPromise() {
-  return new TypeError('A promises callback cannot return that same promise.');
-}
-
-function noop() {}
-
-var PENDING = void 0;
-var FULFILLED = 1;
-var REJECTED = 2;
-
-var GET_THEN_ERROR = new ErrorObject();
-
-function getThen(promise) {
-  try {
-    return promise.then;
-  } catch (error) {
-    GET_THEN_ERROR.error = error;
-    return GET_THEN_ERROR;
-  }
-}
-
-function tryThen(then$$1, value, fulfillmentHandler, rejectionHandler) {
-  try {
-    then$$1.call(value, fulfillmentHandler, rejectionHandler);
-  } catch (e) {
-    return e;
-  }
-}
-
-function handleForeignThenable(promise, thenable, then$$1) {
-  config.async(function (promise) {
-    var sealed = false;
-    var error = tryThen(then$$1, thenable, function (value) {
-      if (sealed) {
-        return;
-      }
-      sealed = true;
-      if (thenable !== value) {
-        resolve(promise, value, undefined);
-      } else {
-        fulfill(promise, value);
-      }
-    }, function (reason) {
-      if (sealed) {
-        return;
-      }
-      sealed = true;
-
-      reject(promise, reason);
-    }, 'Settle: ' + (promise._label || ' unknown promise'));
-
-    if (!sealed && error) {
-      sealed = true;
-      reject(promise, error);
-    }
-  }, promise);
-}
-
-function handleOwnThenable(promise, thenable) {
-  if (thenable._state === FULFILLED) {
-    fulfill(promise, thenable._result);
-  } else if (thenable._state === REJECTED) {
-    thenable._onError = null;
-    reject(promise, thenable._result);
-  } else {
-    subscribe(thenable, undefined, function (value) {
-      if (thenable !== value) {
-        resolve(promise, value, undefined);
-      } else {
-        fulfill(promise, value);
-      }
-    }, function (reason) {
-      return reject(promise, reason);
-    });
-  }
-}
-
-function handleMaybeThenable(promise, maybeThenable, then$$1) {
-  if (maybeThenable.constructor === promise.constructor && then$$1 === then && promise.constructor.resolve === resolve$1) {
-    handleOwnThenable(promise, maybeThenable);
-  } else {
-    if (then$$1 === GET_THEN_ERROR) {
-      reject(promise, GET_THEN_ERROR.error);
-      GET_THEN_ERROR.error = null;
-    } else if (then$$1 === undefined) {
-      fulfill(promise, maybeThenable);
-    } else if (isFunction(then$$1)) {
-      handleForeignThenable(promise, maybeThenable, then$$1);
-    } else {
-      fulfill(promise, maybeThenable);
-    }
-  }
-}
-
-function resolve(promise, value) {
-  if (promise === value) {
-    fulfill(promise, value);
-  } else if (objectOrFunction(value)) {
-    handleMaybeThenable(promise, value, getThen(value));
-  } else {
-    fulfill(promise, value);
-  }
-}
-
-function publishRejection(promise) {
-  if (promise._onError) {
-    promise._onError(promise._result);
-  }
-
-  publish(promise);
-}
-
-function fulfill(promise, value) {
-  if (promise._state !== PENDING) {
-    return;
-  }
-
-  promise._result = value;
-  promise._state = FULFILLED;
-
-  if (promise._subscribers.length === 0) {
-    if (config.instrument) {
-      instrument$1('fulfilled', promise);
-    }
-  } else {
-    config.async(publish, promise);
-  }
-}
-
-function reject(promise, reason) {
-  if (promise._state !== PENDING) {
-    return;
-  }
-  promise._state = REJECTED;
-  promise._result = reason;
-  config.async(publishRejection, promise);
-}
-
-function subscribe(parent, child, onFulfillment, onRejection) {
-  var subscribers = parent._subscribers;
-  var length = subscribers.length;
-
-  parent._onError = null;
-
-  subscribers[length] = child;
-  subscribers[length + FULFILLED] = onFulfillment;
-  subscribers[length + REJECTED] = onRejection;
-
-  if (length === 0 && parent._state) {
-    config.async(publish, parent);
-  }
-}
-
-function publish(promise) {
-  var subscribers = promise._subscribers;
-  var settled = promise._state;
-
-  if (config.instrument) {
-    instrument$1(settled === FULFILLED ? 'fulfilled' : 'rejected', promise);
-  }
-
-  if (subscribers.length === 0) {
-    return;
-  }
-
-  var child = undefined,
-      callback = undefined,
-      detail = promise._result;
-
-  for (var i = 0; i < subscribers.length; i += 3) {
-    child = subscribers[i];
-    callback = subscribers[i + settled];
-
-    if (child) {
-      invokeCallback(settled, child, callback, detail);
-    } else {
-      callback(detail);
-    }
-  }
-
-  promise._subscribers.length = 0;
-}
-
-function ErrorObject() {
-  this.error = null;
-}
-
-var TRY_CATCH_ERROR = new ErrorObject();
-
-function tryCatch(callback, detail) {
-  try {
-    return callback(detail);
-  } catch (e) {
-    TRY_CATCH_ERROR.error = e;
-    return TRY_CATCH_ERROR;
-  }
-}
-
-function invokeCallback(settled, promise, callback, detail) {
-  var hasCallback = isFunction(callback),
-      value = undefined,
-      error = undefined,
-      succeeded = undefined,
-      failed = undefined;
-
-  if (hasCallback) {
-    value = tryCatch(callback, detail);
-
-    if (value === TRY_CATCH_ERROR) {
-      failed = true;
-      error = value.error;
-      value.error = null; // release
-    } else {
-        succeeded = true;
-      }
-
-    if (promise === value) {
-      reject(promise, withOwnPromise());
-      return;
-    }
-  } else {
-    value = detail;
-    succeeded = true;
-  }
-
-  if (promise._state !== PENDING) {
-    // noop
-  } else if (hasCallback && succeeded) {
-      resolve(promise, value);
-    } else if (failed) {
-      reject(promise, error);
-    } else if (settled === FULFILLED) {
-      fulfill(promise, value);
-    } else if (settled === REJECTED) {
-      reject(promise, value);
-    }
-}
-
-function initializePromise(promise, resolver) {
-  var resolved = false;
-  try {
-    resolver(function (value) {
-      if (resolved) {
-        return;
-      }
-      resolved = true;
-      resolve(promise, value);
-    }, function (reason) {
-      if (resolved) {
-        return;
-      }
-      resolved = true;
-      reject(promise, reason);
-    });
-  } catch (e) {
-    reject(promise, e);
-  }
-}
-
-function then(onFulfillment, onRejection, label) {
-  var _arguments = arguments;
-
-  var parent = this;
-  var state = parent._state;
-
-  if (state === FULFILLED && !onFulfillment || state === REJECTED && !onRejection) {
-    config.instrument && instrument$1('chained', parent, parent);
-    return parent;
-  }
-
-  parent._onError = null;
-
-  var child = new parent.constructor(noop, label);
-  var result = parent._result;
-
-  config.instrument && instrument$1('chained', parent, child);
-
-  if (state) {
-    (function () {
-      var callback = _arguments[state - 1];
-      config.async(function () {
-        return invokeCallback(state, child, callback, result);
-      });
-    })();
-  } else {
-    subscribe(parent, child, onFulfillment, onRejection);
-  }
-
-  return child;
-}
-
-function makeSettledResult(state, position, value) {
-  if (state === FULFILLED) {
-    return {
-      state: 'fulfilled',
-      value: value
-    };
-  } else {
-    return {
-      state: 'rejected',
-      reason: value
-    };
-  }
-}
-
-function Enumerator(Constructor, input, abortOnReject, label) {
-  this._instanceConstructor = Constructor;
-  this.promise = new Constructor(noop, label);
-  this._abortOnReject = abortOnReject;
-
-  if (this._validateInput(input)) {
-    this._input = input;
-    this.length = input.length;
-    this._remaining = input.length;
-
-    this._init();
-
-    if (this.length === 0) {
-      fulfill(this.promise, this._result);
-    } else {
-      this.length = this.length || 0;
-      this._enumerate();
-      if (this._remaining === 0) {
-        fulfill(this.promise, this._result);
-      }
-    }
-  } else {
-    reject(this.promise, this._validationError());
-  }
-}
-
-Enumerator.prototype._validateInput = function (input) {
-  return isArray(input);
-};
-
-Enumerator.prototype._validationError = function () {
-  return new Error('Array Methods must be provided an Array');
-};
-
-Enumerator.prototype._init = function () {
-  this._result = new Array(this.length);
-};
-
-Enumerator.prototype._enumerate = function () {
-  var length = this.length;
-  var promise = this.promise;
-  var input = this._input;
-
-  for (var i = 0; promise._state === PENDING && i < length; i++) {
-    this._eachEntry(input[i], i);
-  }
-};
-
-Enumerator.prototype._settleMaybeThenable = function (entry, i) {
-  var c = this._instanceConstructor;
-  var resolve$$1 = c.resolve;
-
-  if (resolve$$1 === resolve$1) {
-    var then$$1 = getThen(entry);
-
-    if (then$$1 === then && entry._state !== PENDING) {
-      entry._onError = null;
-      this._settledAt(entry._state, i, entry._result);
-    } else if (typeof then$$1 !== 'function') {
-      this._remaining--;
-      this._result[i] = this._makeResult(FULFILLED, i, entry);
-    } else if (c === Promise$1) {
-      var promise = new c(noop);
-      handleMaybeThenable(promise, entry, then$$1);
-      this._willSettleAt(promise, i);
-    } else {
-      this._willSettleAt(new c(function (resolve$$1) {
-        return resolve$$1(entry);
-      }), i);
-    }
-  } else {
-    this._willSettleAt(resolve$$1(entry), i);
-  }
-};
-
-Enumerator.prototype._eachEntry = function (entry, i) {
-  if (isMaybeThenable(entry)) {
-    this._settleMaybeThenable(entry, i);
-  } else {
-    this._remaining--;
-    this._result[i] = this._makeResult(FULFILLED, i, entry);
-  }
-};
-
-Enumerator.prototype._settledAt = function (state, i, value) {
-  var promise = this.promise;
-
-  if (promise._state === PENDING) {
-    this._remaining--;
-
-    if (this._abortOnReject && state === REJECTED) {
-      reject(promise, value);
-    } else {
-      this._result[i] = this._makeResult(state, i, value);
-    }
-  }
-
-  if (this._remaining === 0) {
-    fulfill(promise, this._result);
-  }
-};
-
-Enumerator.prototype._makeResult = function (state, i, value) {
-  return value;
-};
-
-Enumerator.prototype._willSettleAt = function (promise, i) {
-  var enumerator = this;
-
-  subscribe(promise, undefined, function (value) {
-    return enumerator._settledAt(FULFILLED, i, value);
-  }, function (reason) {
-    return enumerator._settledAt(REJECTED, i, reason);
-  });
-};
-
-/**
-  `RSVP.Promise.all` accepts an array of promises, and returns a new promise which
-  is fulfilled with an array of fulfillment values for the passed promises, or
-  rejected with the reason of the first passed promise to be rejected. It casts all
-  elements of the passed iterable to promises as it runs this algorithm.
-
-  Example:
-
-  ```javascript
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.resolve(2);
-  let promise3 = RSVP.resolve(3);
-  let promises = [ promise1, promise2, promise3 ];
-
-  RSVP.Promise.all(promises).then(function(array){
-    // The array here would be [ 1, 2, 3 ];
-  });
-  ```
-
-  If any of the `promises` given to `RSVP.all` are rejected, the first promise
-  that is rejected will be given as an argument to the returned promises's
-  rejection handler. For example:
-
-  Example:
-
-  ```javascript
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.reject(new Error("2"));
-  let promise3 = RSVP.reject(new Error("3"));
-  let promises = [ promise1, promise2, promise3 ];
-
-  RSVP.Promise.all(promises).then(function(array){
-    // Code here never runs because there are rejected promises!
-  }, function(error) {
-    // error.message === "2"
-  });
-  ```
-
-  @method all
-  @static
-  @param {Array} entries array of promises
-  @param {String} label optional string for labeling the promise.
-  Useful for tooling.
-  @return {Promise} promise that is fulfilled when all `promises` have been
-  fulfilled, or rejected if any of them become rejected.
-  @static
-*/
-function all$1(entries, label) {
-  return new Enumerator(this, entries, true, /* abort on reject */label).promise;
-}
-
-/**
-  `RSVP.Promise.race` returns a new promise which is settled in the same way as the
-  first passed promise to settle.
-
-  Example:
-
-  ```javascript
-  let promise1 = new RSVP.Promise(function(resolve, reject){
-    setTimeout(function(){
-      resolve('promise 1');
-    }, 200);
-  });
-
-  let promise2 = new RSVP.Promise(function(resolve, reject){
-    setTimeout(function(){
-      resolve('promise 2');
-    }, 100);
-  });
-
-  RSVP.Promise.race([promise1, promise2]).then(function(result){
-    // result === 'promise 2' because it was resolved before promise1
-    // was resolved.
-  });
-  ```
-
-  `RSVP.Promise.race` is deterministic in that only the state of the first
-  settled promise matters. For example, even if other promises given to the
-  `promises` array argument are resolved, but the first settled promise has
-  become rejected before the other promises became fulfilled, the returned
-  promise will become rejected:
-
-  ```javascript
-  let promise1 = new RSVP.Promise(function(resolve, reject){
-    setTimeout(function(){
-      resolve('promise 1');
-    }, 200);
-  });
-
-  let promise2 = new RSVP.Promise(function(resolve, reject){
-    setTimeout(function(){
-      reject(new Error('promise 2'));
-    }, 100);
-  });
-
-  RSVP.Promise.race([promise1, promise2]).then(function(result){
-    // Code here never runs
-  }, function(reason){
-    // reason.message === 'promise 2' because promise 2 became rejected before
-    // promise 1 became fulfilled
-  });
-  ```
-
-  An example real-world use case is implementing timeouts:
-
-  ```javascript
-  RSVP.Promise.race([ajax('foo.json'), timeout(5000)])
-  ```
-
-  @method race
-  @static
-  @param {Array} entries array of promises to observe
-  @param {String} label optional string for describing the promise returned.
-  Useful for tooling.
-  @return {Promise} a promise which settles in the same way as the first passed
-  promise to settle.
-*/
-function race$1(entries, label) {
-  /*jshint validthis:true */
-  var Constructor = this;
-
-  var promise = new Constructor(noop, label);
-
-  if (!isArray(entries)) {
-    reject(promise, new TypeError('You must pass an array to race.'));
-    return promise;
-  }
-
-  for (var i = 0; promise._state === PENDING && i < entries.length; i++) {
-    subscribe(Constructor.resolve(entries[i]), undefined, function (value) {
-      return resolve(promise, value);
-    }, function (reason) {
-      return reject(promise, reason);
-    });
-  }
-
-  return promise;
-}
-
-/**
-  `RSVP.Promise.reject` returns a promise rejected with the passed `reason`.
-  It is shorthand for the following:
-
-  ```javascript
-  let promise = new RSVP.Promise(function(resolve, reject){
-    reject(new Error('WHOOPS'));
-  });
-
-  promise.then(function(value){
-    // Code here doesn't run because the promise is rejected!
-  }, function(reason){
-    // reason.message === 'WHOOPS'
-  });
-  ```
-
-  Instead of writing the above, your code now simply becomes the following:
-
-  ```javascript
-  let promise = RSVP.Promise.reject(new Error('WHOOPS'));
-
-  promise.then(function(value){
-    // Code here doesn't run because the promise is rejected!
-  }, function(reason){
-    // reason.message === 'WHOOPS'
-  });
-  ```
-
-  @method reject
-  @static
-  @param {*} reason value that the returned promise will be rejected with.
-  @param {String} label optional string for identifying the returned promise.
-  Useful for tooling.
-  @return {Promise} a promise rejected with the given `reason`.
-*/
-function reject$1(reason, label) {
-  /*jshint validthis:true */
-  var Constructor = this;
-  var promise = new Constructor(noop, label);
-  reject(promise, reason);
-  return promise;
-}
-
-var guidKey = 'rsvp_' + now() + '-';
-var counter = 0;
-
-function needsResolver() {
-  throw new TypeError('You must pass a resolver function as the first argument to the promise constructor');
-}
-
-function needsNew() {
-  throw new TypeError("Failed to construct 'Promise': Please use the 'new' operator, this object constructor cannot be called as a function.");
-}
-
-/**
-  Promise objects represent the eventual result of an asynchronous operation. The
-  primary way of interacting with a promise is through its `then` method, which
-  registers callbacks to receive either a promise’s eventual value or the reason
-  why the promise cannot be fulfilled.
-
-  Terminology
-  -----------
-
-  - `promise` is an object or function with a `then` method whose behavior conforms to this specification.
-  - `thenable` is an object or function that defines a `then` method.
-  - `value` is any legal JavaScript value (including undefined, a thenable, or a promise).
-  - `exception` is a value that is thrown using the throw statement.
-  - `reason` is a value that indicates why a promise was rejected.
-  - `settled` the final resting state of a promise, fulfilled or rejected.
-
-  A promise can be in one of three states: pending, fulfilled, or rejected.
-
-  Promises that are fulfilled have a fulfillment value and are in the fulfilled
-  state.  Promises that are rejected have a rejection reason and are in the
-  rejected state.  A fulfillment value is never a thenable.
-
-  Promises can also be said to *resolve* a value.  If this value is also a
-  promise, then the original promise's settled state will match the value's
-  settled state.  So a promise that *resolves* a promise that rejects will
-  itself reject, and a promise that *resolves* a promise that fulfills will
-  itself fulfill.
-
-
-  Basic Usage:
-  ------------
-
-  ```js
-  let promise = new Promise(function(resolve, reject) {
-    // on success
-    resolve(value);
-
-    // on failure
-    reject(reason);
-  });
-
-  promise.then(function(value) {
-    // on fulfillment
-  }, function(reason) {
-    // on rejection
-  });
-  ```
-
-  Advanced Usage:
-  ---------------
-
-  Promises shine when abstracting away asynchronous interactions such as
-  `XMLHttpRequest`s.
-
-  ```js
-  function getJSON(url) {
-    return new Promise(function(resolve, reject){
-      let xhr = new XMLHttpRequest();
-
-      xhr.open('GET', url);
-      xhr.onreadystatechange = handler;
-      xhr.responseType = 'json';
-      xhr.setRequestHeader('Accept', 'application/json');
-      xhr.send();
-
-      function handler() {
-        if (this.readyState === this.DONE) {
-          if (this.status === 200) {
-            resolve(this.response);
-          } else {
-            reject(new Error('getJSON: `' + url + '` failed with status: [' + this.status + ']'));
-          }
-        }
-      };
-    });
-  }
-
-  getJSON('/posts.json').then(function(json) {
-    // on fulfillment
-  }, function(reason) {
-    // on rejection
-  });
-  ```
-
-  Unlike callbacks, promises are great composable primitives.
-
-  ```js
-  Promise.all([
-    getJSON('/posts'),
-    getJSON('/comments')
-  ]).then(function(values){
-    values[0] // => postsJSON
-    values[1] // => commentsJSON
-
-    return values;
-  });
-  ```
-
-  @class RSVP.Promise
-  @param {function} resolver
-  @param {String} label optional string for labeling the promise.
-  Useful for tooling.
-  @constructor
-*/
-function Promise$1(resolver, label) {
-  this._id = counter++;
-  this._label = label;
-  this._state = undefined;
-  this._result = undefined;
-  this._subscribers = [];
-
-  config.instrument && instrument$1('created', this);
-
-  if (noop !== resolver) {
-    typeof resolver !== 'function' && needsResolver();
-    this instanceof Promise$1 ? initializePromise(this, resolver) : needsNew();
-  }
-}
-
-Promise$1.cast = resolve$1; // deprecated
-Promise$1.all = all$1;
-Promise$1.race = race$1;
-Promise$1.resolve = resolve$1;
-Promise$1.reject = reject$1;
-
-Promise$1.prototype = {
-  constructor: Promise$1,
-
-  _guidKey: guidKey,
-
-  _onError: function _onError(reason) {
-    var promise = this;
-    config.after(function () {
-      if (promise._onError) {
-        config['trigger']('error', reason, promise._label);
-      }
-    });
-  },
-
-  /**
-    The primary way of interacting with a promise is through its `then` method,
-    which registers callbacks to receive either a promise's eventual value or the
-    reason why the promise cannot be fulfilled.
-  
-    ```js
-    findUser().then(function(user){
-      // user is available
-    }, function(reason){
-      // user is unavailable, and you are given the reason why
-    });
-    ```
-  
-    Chaining
-    --------
-  
-    The return value of `then` is itself a promise.  This second, 'downstream'
-    promise is resolved with the return value of the first promise's fulfillment
-    or rejection handler, or rejected if the handler throws an exception.
-  
-    ```js
-    findUser().then(function (user) {
-      return user.name;
-    }, function (reason) {
-      return 'default name';
-    }).then(function (userName) {
-      // If `findUser` fulfilled, `userName` will be the user's name, otherwise it
-      // will be `'default name'`
-    });
-  
-    findUser().then(function (user) {
-      throw new Error('Found user, but still unhappy');
-    }, function (reason) {
-      throw new Error('`findUser` rejected and we\'re unhappy');
-    }).then(function (value) {
-      // never reached
-    }, function (reason) {
-      // if `findUser` fulfilled, `reason` will be 'Found user, but still unhappy'.
-      // If `findUser` rejected, `reason` will be '`findUser` rejected and we\'re unhappy'.
-    });
-    ```
-    If the downstream promise does not specify a rejection handler, rejection reasons will be propagated further downstream.
-  
-    ```js
-    findUser().then(function (user) {
-      throw new PedagogicalException('Upstream error');
-    }).then(function (value) {
-      // never reached
-    }).then(function (value) {
-      // never reached
-    }, function (reason) {
-      // The `PedgagocialException` is propagated all the way down to here
-    });
-    ```
-  
-    Assimilation
-    ------------
-  
-    Sometimes the value you want to propagate to a downstream promise can only be
-    retrieved asynchronously. This can be achieved by returning a promise in the
-    fulfillment or rejection handler. The downstream promise will then be pending
-    until the returned promise is settled. This is called *assimilation*.
-  
-    ```js
-    findUser().then(function (user) {
-      return findCommentsByAuthor(user);
-    }).then(function (comments) {
-      // The user's comments are now available
-    });
-    ```
-  
-    If the assimliated promise rejects, then the downstream promise will also reject.
-  
-    ```js
-    findUser().then(function (user) {
-      return findCommentsByAuthor(user);
-    }).then(function (comments) {
-      // If `findCommentsByAuthor` fulfills, we'll have the value here
-    }, function (reason) {
-      // If `findCommentsByAuthor` rejects, we'll have the reason here
-    });
-    ```
-  
-    Simple Example
-    --------------
-  
-    Synchronous Example
-  
-    ```javascript
-    let result;
-  
-    try {
-      result = findResult();
-      // success
-    } catch(reason) {
-      // failure
-    }
-    ```
-  
-    Errback Example
-  
-    ```js
-    findResult(function(result, err){
-      if (err) {
-        // failure
-      } else {
-        // success
-      }
-    });
-    ```
-  
-    Promise Example;
-  
-    ```javascript
-    findResult().then(function(result){
-      // success
-    }, function(reason){
-      // failure
-    });
-    ```
-  
-    Advanced Example
-    --------------
-  
-    Synchronous Example
-  
-    ```javascript
-    let author, books;
-  
-    try {
-      author = findAuthor();
-      books  = findBooksByAuthor(author);
-      // success
-    } catch(reason) {
-      // failure
-    }
-    ```
-  
-    Errback Example
-  
-    ```js
-  
-    function foundBooks(books) {
-  
-    }
-  
-    function failure(reason) {
-  
-    }
-  
-    findAuthor(function(author, err){
-      if (err) {
-        failure(err);
-        // failure
-      } else {
-        try {
-          findBoooksByAuthor(author, function(books, err) {
-            if (err) {
-              failure(err);
-            } else {
-              try {
-                foundBooks(books);
-              } catch(reason) {
-                failure(reason);
-              }
-            }
-          });
-        } catch(error) {
-          failure(err);
-        }
-        // success
-      }
-    });
-    ```
-  
-    Promise Example;
-  
-    ```javascript
-    findAuthor().
-      then(findBooksByAuthor).
-      then(function(books){
-        // found books
-    }).catch(function(reason){
-      // something went wrong
-    });
-    ```
-  
-    @method then
-    @param {Function} onFulfillment
-    @param {Function} onRejection
-    @param {String} label optional string for labeling the promise.
-    Useful for tooling.
-    @return {Promise}
-  */
-  then: then,
-
-  /**
-    `catch` is simply sugar for `then(undefined, onRejection)` which makes it the same
-    as the catch block of a try/catch statement.
-  
-    ```js
-    function findAuthor(){
-      throw new Error('couldn\'t find that author');
-    }
-  
-    // synchronous
-    try {
-      findAuthor();
-    } catch(reason) {
-      // something went wrong
-    }
-  
-    // async with promises
-    findAuthor().catch(function(reason){
-      // something went wrong
-    });
-    ```
-  
-    @method catch
-    @param {Function} onRejection
-    @param {String} label optional string for labeling the promise.
-    Useful for tooling.
-    @return {Promise}
-  */
-  'catch': function _catch(onRejection, label) {
-    return this.then(undefined, onRejection, label);
-  },
-
-  /**
-    `finally` will be invoked regardless of the promise's fate just as native
-    try/catch/finally behaves
-  
-    Synchronous example:
-  
-    ```js
-    findAuthor() {
-      if (Math.random() > 0.5) {
-        throw new Error();
-      }
-      return new Author();
-    }
-  
-    try {
-      return findAuthor(); // succeed or fail
-    } catch(error) {
-      return findOtherAuthor();
-    } finally {
-      // always runs
-      // doesn't affect the return value
-    }
-    ```
-  
-    Asynchronous example:
-  
-    ```js
-    findAuthor().catch(function(reason){
-      return findOtherAuthor();
-    }).finally(function(){
-      // author was either found, or not
-    });
-    ```
-  
-    @method finally
-    @param {Function} callback
-    @param {String} label optional string for labeling the promise.
-    Useful for tooling.
-    @return {Promise}
-  */
-  'finally': function _finally(callback, label) {
-    var promise = this;
-    var constructor = promise.constructor;
-
-    return promise.then(function (value) {
-      return constructor.resolve(callback()).then(function () {
-        return value;
-      });
-    }, function (reason) {
-      return constructor.resolve(callback()).then(function () {
-        throw reason;
-      });
-    }, label);
-  }
-};
-
-function Result() {
-  this.value = undefined;
-}
-
-var ERROR = new Result();
-var GET_THEN_ERROR$1 = new Result();
-
-function getThen$1(obj) {
-  try {
-    return obj.then;
-  } catch (error) {
-    ERROR.value = error;
-    return ERROR;
-  }
-}
-
-function tryApply(f, s, a) {
-  try {
-    f.apply(s, a);
-  } catch (error) {
-    ERROR.value = error;
-    return ERROR;
-  }
-}
-
-function makeObject(_, argumentNames) {
-  var obj = {};
-  var length = _.length;
-  var args = new Array(length);
-
-  for (var x = 0; x < length; x++) {
-    args[x] = _[x];
-  }
-
-  for (var i = 0; i < argumentNames.length; i++) {
-    var _name = argumentNames[i];
-    obj[_name] = args[i + 1];
-  }
-
-  return obj;
-}
-
-function arrayResult(_) {
-  var length = _.length;
-  var args = new Array(length - 1);
-
-  for (var i = 1; i < length; i++) {
-    args[i - 1] = _[i];
-  }
-
-  return args;
-}
-
-function wrapThenable(_then, promise) {
-  return {
-    then: function then(onFulFillment, onRejection) {
-      return _then.call(promise, onFulFillment, onRejection);
-    }
-  };
-}
-
-/**
-  `RSVP.denodeify` takes a 'node-style' function and returns a function that
-  will return an `RSVP.Promise`. You can use `denodeify` in Node.js or the
-  browser when you'd prefer to use promises over using callbacks. For example,
-  `denodeify` transforms the following:
-
-  ```javascript
-  let fs = require('fs');
-
-  fs.readFile('myfile.txt', function(err, data){
-    if (err) return handleError(err);
-    handleData(data);
-  });
-  ```
-
-  into:
-
-  ```javascript
-  let fs = require('fs');
-  let readFile = RSVP.denodeify(fs.readFile);
-
-  readFile('myfile.txt').then(handleData, handleError);
-  ```
-
-  If the node function has multiple success parameters, then `denodeify`
-  just returns the first one:
-
-  ```javascript
-  let request = RSVP.denodeify(require('request'));
-
-  request('http://example.com').then(function(res) {
-    // ...
-  });
-  ```
-
-  However, if you need all success parameters, setting `denodeify`'s
-  second parameter to `true` causes it to return all success parameters
-  as an array:
-
-  ```javascript
-  let request = RSVP.denodeify(require('request'), true);
-
-  request('http://example.com').then(function(result) {
-    // result[0] -> res
-    // result[1] -> body
-  });
-  ```
-
-  Or if you pass it an array with names it returns the parameters as a hash:
-
-  ```javascript
-  let request = RSVP.denodeify(require('request'), ['res', 'body']);
-
-  request('http://example.com').then(function(result) {
-    // result.res
-    // result.body
-  });
-  ```
-
-  Sometimes you need to retain the `this`:
-
-  ```javascript
-  let app = require('express')();
-  let render = RSVP.denodeify(app.render.bind(app));
-  ```
-
-  The denodified function inherits from the original function. It works in all
-  environments, except IE 10 and below. Consequently all properties of the original
-  function are available to you. However, any properties you change on the
-  denodeified function won't be changed on the original function. Example:
-
-  ```javascript
-  let request = RSVP.denodeify(require('request')),
-      cookieJar = request.jar(); // <- Inheritance is used here
-
-  request('http://example.com', {jar: cookieJar}).then(function(res) {
-    // cookieJar.cookies holds now the cookies returned by example.com
-  });
-  ```
-
-  Using `denodeify` makes it easier to compose asynchronous operations instead
-  of using callbacks. For example, instead of:
-
-  ```javascript
-  let fs = require('fs');
-
-  fs.readFile('myfile.txt', function(err, data){
-    if (err) { ... } // Handle error
-    fs.writeFile('myfile2.txt', data, function(err){
-      if (err) { ... } // Handle error
-      console.log('done')
-    });
-  });
-  ```
-
-  you can chain the operations together using `then` from the returned promise:
-
-  ```javascript
-  let fs = require('fs');
-  let readFile = RSVP.denodeify(fs.readFile);
-  let writeFile = RSVP.denodeify(fs.writeFile);
-
-  readFile('myfile.txt').then(function(data){
-    return writeFile('myfile2.txt', data);
-  }).then(function(){
-    console.log('done')
-  }).catch(function(error){
-    // Handle error
-  });
-  ```
-
-  @method denodeify
-  @static
-  @for RSVP
-  @param {Function} nodeFunc a 'node-style' function that takes a callback as
-  its last argument. The callback expects an error to be passed as its first
-  argument (if an error occurred, otherwise null), and the value from the
-  operation as its second argument ('function(err, value){ }').
-  @param {Boolean|Array} [options] An optional paramter that if set
-  to `true` causes the promise to fulfill with the callback's success arguments
-  as an array. This is useful if the node function has multiple success
-  paramters. If you set this paramter to an array with names, the promise will
-  fulfill with a hash with these names as keys and the success parameters as
-  values.
-  @return {Function} a function that wraps `nodeFunc` to return an
-  `RSVP.Promise`
-  @static
-*/
-function denodeify$1(nodeFunc, options) {
-  var fn = function fn() {
-    var self = this;
-    var l = arguments.length;
-    var args = new Array(l + 1);
-    var promiseInput = false;
-
-    for (var i = 0; i < l; ++i) {
-      var arg = arguments[i];
-
-      if (!promiseInput) {
-        // TODO: clean this up
-        promiseInput = needsPromiseInput(arg);
-        if (promiseInput === GET_THEN_ERROR$1) {
-          var p = new Promise$1(noop);
-          reject(p, GET_THEN_ERROR$1.value);
-          return p;
-        } else if (promiseInput && promiseInput !== true) {
-          arg = wrapThenable(promiseInput, arg);
-        }
-      }
-      args[i] = arg;
-    }
-
-    var promise = new Promise$1(noop);
-
-    args[l] = function (err, val) {
-      if (err) reject(promise, err);else if (options === undefined) resolve(promise, val);else if (options === true) resolve(promise, arrayResult(arguments));else if (isArray(options)) resolve(promise, makeObject(arguments, options));else resolve(promise, val);
-    };
-
-    if (promiseInput) {
-      return handlePromiseInput(promise, args, nodeFunc, self);
-    } else {
-      return handleValueInput(promise, args, nodeFunc, self);
-    }
-  };
-
-  fn.__proto__ = nodeFunc;
-
-  return fn;
-}
-
-function handleValueInput(promise, args, nodeFunc, self) {
-  var result = tryApply(nodeFunc, self, args);
-  if (result === ERROR) {
-    reject(promise, result.value);
-  }
-  return promise;
-}
-
-function handlePromiseInput(promise, args, nodeFunc, self) {
-  return Promise$1.all(args).then(function (args) {
-    var result = tryApply(nodeFunc, self, args);
-    if (result === ERROR) {
-      reject(promise, result.value);
-    }
-    return promise;
-  });
-}
-
-function needsPromiseInput(arg) {
-  if (arg && typeof arg === 'object') {
-    if (arg.constructor === Promise$1) {
-      return true;
-    } else {
-      return getThen$1(arg);
-    }
-  } else {
-    return false;
-  }
-}
-
-/**
-  This is a convenient alias for `RSVP.Promise.all`.
-
-  @method all
-  @static
-  @for RSVP
-  @param {Array} array Array of promises.
-  @param {String} label An optional label. This is useful
-  for tooling.
-*/
-function all$3(array, label) {
-  return Promise$1.all(array, label);
-}
-
-function AllSettled(Constructor, entries, label) {
-  this._superConstructor(Constructor, entries, false, /* don't abort on reject */label);
-}
-
-AllSettled.prototype = o_create(Enumerator.prototype);
-AllSettled.prototype._superConstructor = Enumerator;
-AllSettled.prototype._makeResult = makeSettledResult;
-AllSettled.prototype._validationError = function () {
-  return new Error('allSettled must be called with an array');
-};
-
-/**
-  `RSVP.allSettled` is similar to `RSVP.all`, but instead of implementing
-  a fail-fast method, it waits until all the promises have returned and
-  shows you all the results. This is useful if you want to handle multiple
-  promises' failure states together as a set.
-
-  Returns a promise that is fulfilled when all the given promises have been
-  settled. The return promise is fulfilled with an array of the states of
-  the promises passed into the `promises` array argument.
-
-  Each state object will either indicate fulfillment or rejection, and
-  provide the corresponding value or reason. The states will take one of
-  the following formats:
-
-  ```javascript
-  { state: 'fulfilled', value: value }
-    or
-  { state: 'rejected', reason: reason }
-  ```
-
-  Example:
-
-  ```javascript
-  let promise1 = RSVP.Promise.resolve(1);
-  let promise2 = RSVP.Promise.reject(new Error('2'));
-  let promise3 = RSVP.Promise.reject(new Error('3'));
-  let promises = [ promise1, promise2, promise3 ];
-
-  RSVP.allSettled(promises).then(function(array){
-    // array == [
-    //   { state: 'fulfilled', value: 1 },
-    //   { state: 'rejected', reason: Error },
-    //   { state: 'rejected', reason: Error }
-    // ]
-    // Note that for the second item, reason.message will be '2', and for the
-    // third item, reason.message will be '3'.
-  }, function(error) {
-    // Not run. (This block would only be called if allSettled had failed,
-    // for instance if passed an incorrect argument type.)
-  });
-  ```
-
-  @method allSettled
-  @static
-  @for RSVP
-  @param {Array} entries
-  @param {String} label - optional string that describes the promise.
-  Useful for tooling.
-  @return {Promise} promise that is fulfilled with an array of the settled
-  states of the constituent promises.
-*/
-function allSettled$1(entries, label) {
-  return new AllSettled(Promise$1, entries, label).promise;
-}
-
-/**
-  This is a convenient alias for `RSVP.Promise.race`.
-
-  @method race
-  @static
-  @for RSVP
-  @param {Array} array Array of promises.
-  @param {String} label An optional label. This is useful
-  for tooling.
- */
-function race$3(array, label) {
-  return Promise$1.race(array, label);
-}
-
-function PromiseHash(Constructor, object, label) {
-  this._superConstructor(Constructor, object, true, label);
-}
-
-PromiseHash.prototype = o_create(Enumerator.prototype);
-PromiseHash.prototype._superConstructor = Enumerator;
-PromiseHash.prototype._init = function () {
-  this._result = {};
-};
-
-PromiseHash.prototype._validateInput = function (input) {
-  return input && typeof input === 'object';
-};
-
-PromiseHash.prototype._validationError = function () {
-  return new Error('Promise.hash must be called with an object');
-};
-
-PromiseHash.prototype._enumerate = function () {
-  var enumerator = this;
-  var promise = enumerator.promise;
-  var input = enumerator._input;
-  var results = [];
-
-  for (var key in input) {
-    if (promise._state === PENDING && Object.prototype.hasOwnProperty.call(input, key)) {
-      results.push({
-        position: key,
-        entry: input[key]
-      });
-    }
-  }
-
-  var length = results.length;
-  enumerator._remaining = length;
-  var result = undefined;
-
-  for (var i = 0; promise._state === PENDING && i < length; i++) {
-    result = results[i];
-    enumerator._eachEntry(result.entry, result.position);
-  }
-};
-
-/**
-  `RSVP.hash` is similar to `RSVP.all`, but takes an object instead of an array
-  for its `promises` argument.
-
-  Returns a promise that is fulfilled when all the given promises have been
-  fulfilled, or rejected if any of them become rejected. The returned promise
-  is fulfilled with a hash that has the same key names as the `promises` object
-  argument. If any of the values in the object are not promises, they will
-  simply be copied over to the fulfilled object.
-
-  Example:
-
-  ```javascript
-  let promises = {
-    myPromise: RSVP.resolve(1),
-    yourPromise: RSVP.resolve(2),
-    theirPromise: RSVP.resolve(3),
-    notAPromise: 4
-  };
-
-  RSVP.hash(promises).then(function(hash){
-    // hash here is an object that looks like:
-    // {
-    //   myPromise: 1,
-    //   yourPromise: 2,
-    //   theirPromise: 3,
-    //   notAPromise: 4
-    // }
-  });
-  ````
-
-  If any of the `promises` given to `RSVP.hash` are rejected, the first promise
-  that is rejected will be given as the reason to the rejection handler.
-
-  Example:
-
-  ```javascript
-  let promises = {
-    myPromise: RSVP.resolve(1),
-    rejectedPromise: RSVP.reject(new Error('rejectedPromise')),
-    anotherRejectedPromise: RSVP.reject(new Error('anotherRejectedPromise')),
-  };
-
-  RSVP.hash(promises).then(function(hash){
-    // Code here never runs because there are rejected promises!
-  }, function(reason) {
-    // reason.message === 'rejectedPromise'
-  });
-  ```
-
-  An important note: `RSVP.hash` is intended for plain JavaScript objects that
-  are just a set of keys and values. `RSVP.hash` will NOT preserve prototype
-  chains.
-
-  Example:
-
-  ```javascript
-  function MyConstructor(){
-    this.example = RSVP.resolve('Example');
-  }
-
-  MyConstructor.prototype = {
-    protoProperty: RSVP.resolve('Proto Property')
-  };
-
-  let myObject = new MyConstructor();
-
-  RSVP.hash(myObject).then(function(hash){
-    // protoProperty will not be present, instead you will just have an
-    // object that looks like:
-    // {
-    //   example: 'Example'
-    // }
-    //
-    // hash.hasOwnProperty('protoProperty'); // false
-    // 'undefined' === typeof hash.protoProperty
-  });
-  ```
-
-  @method hash
-  @static
-  @for RSVP
-  @param {Object} object
-  @param {String} label optional string that describes the promise.
-  Useful for tooling.
-  @return {Promise} promise that is fulfilled when all properties of `promises`
-  have been fulfilled, or rejected if any of them become rejected.
-*/
-function hash$1(object, label) {
-  return new PromiseHash(Promise$1, object, label).promise;
-}
-
-function HashSettled(Constructor, object, label) {
-  this._superConstructor(Constructor, object, false, label);
-}
-
-HashSettled.prototype = o_create(PromiseHash.prototype);
-HashSettled.prototype._superConstructor = Enumerator;
-HashSettled.prototype._makeResult = makeSettledResult;
-
-HashSettled.prototype._validationError = function () {
-  return new Error('hashSettled must be called with an object');
-};
-
-/**
-  `RSVP.hashSettled` is similar to `RSVP.allSettled`, but takes an object
-  instead of an array for its `promises` argument.
-
-  Unlike `RSVP.all` or `RSVP.hash`, which implement a fail-fast method,
-  but like `RSVP.allSettled`, `hashSettled` waits until all the
-  constituent promises have returned and then shows you all the results
-  with their states and values/reasons. This is useful if you want to
-  handle multiple promises' failure states together as a set.
-
-  Returns a promise that is fulfilled when all the given promises have been
-  settled, or rejected if the passed parameters are invalid.
-
-  The returned promise is fulfilled with a hash that has the same key names as
-  the `promises` object argument. If any of the values in the object are not
-  promises, they will be copied over to the fulfilled object and marked with state
-  'fulfilled'.
-
-  Example:
-
-  ```javascript
-  let promises = {
-    myPromise: RSVP.Promise.resolve(1),
-    yourPromise: RSVP.Promise.resolve(2),
-    theirPromise: RSVP.Promise.resolve(3),
-    notAPromise: 4
-  };
-
-  RSVP.hashSettled(promises).then(function(hash){
-    // hash here is an object that looks like:
-    // {
-    //   myPromise: { state: 'fulfilled', value: 1 },
-    //   yourPromise: { state: 'fulfilled', value: 2 },
-    //   theirPromise: { state: 'fulfilled', value: 3 },
-    //   notAPromise: { state: 'fulfilled', value: 4 }
-    // }
-  });
-  ```
-
-  If any of the `promises` given to `RSVP.hash` are rejected, the state will
-  be set to 'rejected' and the reason for rejection provided.
-
-  Example:
-
-  ```javascript
-  let promises = {
-    myPromise: RSVP.Promise.resolve(1),
-    rejectedPromise: RSVP.Promise.reject(new Error('rejection')),
-    anotherRejectedPromise: RSVP.Promise.reject(new Error('more rejection')),
-  };
-
-  RSVP.hashSettled(promises).then(function(hash){
-    // hash here is an object that looks like:
-    // {
-    //   myPromise:              { state: 'fulfilled', value: 1 },
-    //   rejectedPromise:        { state: 'rejected', reason: Error },
-    //   anotherRejectedPromise: { state: 'rejected', reason: Error },
-    // }
-    // Note that for rejectedPromise, reason.message == 'rejection',
-    // and for anotherRejectedPromise, reason.message == 'more rejection'.
-  });
-  ```
-
-  An important note: `RSVP.hashSettled` is intended for plain JavaScript objects that
-  are just a set of keys and values. `RSVP.hashSettled` will NOT preserve prototype
-  chains.
-
-  Example:
-
-  ```javascript
-  function MyConstructor(){
-    this.example = RSVP.Promise.resolve('Example');
-  }
-
-  MyConstructor.prototype = {
-    protoProperty: RSVP.Promise.resolve('Proto Property')
-  };
-
-  let myObject = new MyConstructor();
-
-  RSVP.hashSettled(myObject).then(function(hash){
-    // protoProperty will not be present, instead you will just have an
-    // object that looks like:
-    // {
-    //   example: { state: 'fulfilled', value: 'Example' }
-    // }
-    //
-    // hash.hasOwnProperty('protoProperty'); // false
-    // 'undefined' === typeof hash.protoProperty
-  });
-  ```
-
-  @method hashSettled
-  @for RSVP
-  @param {Object} object
-  @param {String} label optional string that describes the promise.
-  Useful for tooling.
-  @return {Promise} promise that is fulfilled when when all properties of `promises`
-  have been settled.
-  @static
-*/
-function hashSettled$1(object, label) {
-  return new HashSettled(Promise$1, object, label).promise;
-}
-
-/**
-  `RSVP.rethrow` will rethrow an error on the next turn of the JavaScript event
-  loop in order to aid debugging.
-
-  Promises A+ specifies that any exceptions that occur with a promise must be
-  caught by the promises implementation and bubbled to the last handler. For
-  this reason, it is recommended that you always specify a second rejection
-  handler function to `then`. However, `RSVP.rethrow` will throw the exception
-  outside of the promise, so it bubbles up to your console if in the browser,
-  or domain/cause uncaught exception in Node. `rethrow` will also throw the
-  error again so the error can be handled by the promise per the spec.
-
-  ```javascript
-  function throws(){
-    throw new Error('Whoops!');
-  }
-
-  let promise = new RSVP.Promise(function(resolve, reject){
-    throws();
-  });
-
-  promise.catch(RSVP.rethrow).then(function(){
-    // Code here doesn't run because the promise became rejected due to an
-    // error!
-  }, function (err){
-    // handle the error here
-  });
-  ```
-
-  The 'Whoops' error will be thrown on the next turn of the event loop
-  and you can watch for it in your console. You can also handle it using a
-  rejection handler given to `.then` or `.catch` on the returned promise.
-
-  @method rethrow
-  @static
-  @for RSVP
-  @param {Error} reason reason the promise became rejected.
-  @throws Error
-  @static
-*/
-function rethrow$1(reason) {
-  setTimeout(function () {
-    throw reason;
-  });
-  throw reason;
-}
-
-/**
-  `RSVP.defer` returns an object similar to jQuery's `$.Deferred`.
-  `RSVP.defer` should be used when porting over code reliant on `$.Deferred`'s
-  interface. New code should use the `RSVP.Promise` constructor instead.
-
-  The object returned from `RSVP.defer` is a plain object with three properties:
-
-  * promise - an `RSVP.Promise`.
-  * reject - a function that causes the `promise` property on this object to
-    become rejected
-  * resolve - a function that causes the `promise` property on this object to
-    become fulfilled.
-
-  Example:
-
-   ```javascript
-   let deferred = RSVP.defer();
-
-   deferred.resolve("Success!");
-
-   deferred.promise.then(function(value){
-     // value here is "Success!"
-   });
-   ```
-
-  @method defer
-  @static
-  @for RSVP
-  @param {String} label optional string for labeling the promise.
-  Useful for tooling.
-  @return {Object}
- */
-function defer$1(label) {
-  var deferred = { resolve: undefined, reject: undefined };
-
-  deferred.promise = new Promise$1(function (resolve, reject) {
-    deferred.resolve = resolve;
-    deferred.reject = reject;
-  }, label);
-
-  return deferred;
-}
-
-/**
- `RSVP.map` is similar to JavaScript's native `map` method, except that it
-  waits for all promises to become fulfilled before running the `mapFn` on
-  each item in given to `promises`. `RSVP.map` returns a promise that will
-  become fulfilled with the result of running `mapFn` on the values the promises
-  become fulfilled with.
-
-  For example:
-
-  ```javascript
-
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.resolve(2);
-  let promise3 = RSVP.resolve(3);
-  let promises = [ promise1, promise2, promise3 ];
-
-  let mapFn = function(item){
-    return item + 1;
-  };
-
-  RSVP.map(promises, mapFn).then(function(result){
-    // result is [ 2, 3, 4 ]
-  });
-  ```
-
-  If any of the `promises` given to `RSVP.map` are rejected, the first promise
-  that is rejected will be given as an argument to the returned promise's
-  rejection handler. For example:
-
-  ```javascript
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.reject(new Error('2'));
-  let promise3 = RSVP.reject(new Error('3'));
-  let promises = [ promise1, promise2, promise3 ];
-
-  let mapFn = function(item){
-    return item + 1;
-  };
-
-  RSVP.map(promises, mapFn).then(function(array){
-    // Code here never runs because there are rejected promises!
-  }, function(reason) {
-    // reason.message === '2'
-  });
-  ```
-
-  `RSVP.map` will also wait if a promise is returned from `mapFn`. For example,
-  say you want to get all comments from a set of blog posts, but you need
-  the blog posts first because they contain a url to those comments.
-
-  ```javscript
-
-  let mapFn = function(blogPost){
-    // getComments does some ajax and returns an RSVP.Promise that is fulfilled
-    // with some comments data
-    return getComments(blogPost.comments_url);
-  };
-
-  // getBlogPosts does some ajax and returns an RSVP.Promise that is fulfilled
-  // with some blog post data
-  RSVP.map(getBlogPosts(), mapFn).then(function(comments){
-    // comments is the result of asking the server for the comments
-    // of all blog posts returned from getBlogPosts()
-  });
-  ```
-
-  @method map
-  @static
-  @for RSVP
-  @param {Array} promises
-  @param {Function} mapFn function to be called on each fulfilled promise.
-  @param {String} label optional string for labeling the promise.
-  Useful for tooling.
-  @return {Promise} promise that is fulfilled with the result of calling
-  `mapFn` on each fulfilled promise or value when they become fulfilled.
-   The promise will be rejected if any of the given `promises` become rejected.
-  @static
-*/
-function map$1(promises, mapFn, label) {
-  return Promise$1.all(promises, label).then(function (values) {
-    if (!isFunction(mapFn)) {
-      throw new TypeError("You must pass a function as map's second argument.");
-    }
-
-    var length = values.length;
-    var results = new Array(length);
-
-    for (var i = 0; i < length; i++) {
-      results[i] = mapFn(values[i]);
-    }
-
-    return Promise$1.all(results, label);
-  });
-}
-
-/**
-  This is a convenient alias for `RSVP.Promise.resolve`.
-
-  @method resolve
-  @static
-  @for RSVP
-  @param {*} value value that the returned promise will be resolved with
-  @param {String} label optional string for identifying the returned promise.
-  Useful for tooling.
-  @return {Promise} a promise that will become fulfilled with the given
-  `value`
-*/
-function resolve$3(value, label) {
-  return Promise$1.resolve(value, label);
-}
-
-/**
-  This is a convenient alias for `RSVP.Promise.reject`.
-
-  @method reject
-  @static
-  @for RSVP
-  @param {*} reason value that the returned promise will be rejected with.
-  @param {String} label optional string for identifying the returned promise.
-  Useful for tooling.
-  @return {Promise} a promise rejected with the given `reason`.
-*/
-function reject$3(reason, label) {
-  return Promise$1.reject(reason, label);
-}
-
-/**
- `RSVP.filter` is similar to JavaScript's native `filter` method, except that it
-  waits for all promises to become fulfilled before running the `filterFn` on
-  each item in given to `promises`. `RSVP.filter` returns a promise that will
-  become fulfilled with the result of running `filterFn` on the values the
-  promises become fulfilled with.
-
-  For example:
-
-  ```javascript
-
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.resolve(2);
-  let promise3 = RSVP.resolve(3);
-
-  let promises = [promise1, promise2, promise3];
-
-  let filterFn = function(item){
-    return item > 1;
-  };
-
-  RSVP.filter(promises, filterFn).then(function(result){
-    // result is [ 2, 3 ]
-  });
-  ```
-
-  If any of the `promises` given to `RSVP.filter` are rejected, the first promise
-  that is rejected will be given as an argument to the returned promise's
-  rejection handler. For example:
-
-  ```javascript
-  let promise1 = RSVP.resolve(1);
-  let promise2 = RSVP.reject(new Error('2'));
-  let promise3 = RSVP.reject(new Error('3'));
-  let promises = [ promise1, promise2, promise3 ];
-
-  let filterFn = function(item){
-    return item > 1;
-  };
-
-  RSVP.filter(promises, filterFn).then(function(array){
-    // Code here never runs because there are rejected promises!
-  }, function(reason) {
-    // reason.message === '2'
-  });
-  ```
-
-  `RSVP.filter` will also wait for any promises returned from `filterFn`.
-  For instance, you may want to fetch a list of users then return a subset
-  of those users based on some asynchronous operation:
-
-  ```javascript
-
-  let alice = { name: 'alice' };
-  let bob   = { name: 'bob' };
-  let users = [ alice, bob ];
-
-  let promises = users.map(function(user){
-    return RSVP.resolve(user);
-  });
-
-  let filterFn = function(user){
-    // Here, Alice has permissions to create a blog post, but Bob does not.
-    return getPrivilegesForUser(user).then(function(privs){
-      return privs.can_create_blog_post === true;
-    });
-  };
-  RSVP.filter(promises, filterFn).then(function(users){
-    // true, because the server told us only Alice can create a blog post.
-    users.length === 1;
-    // false, because Alice is the only user present in `users`
-    users[0] === bob;
-  });
-  ```
-
-  @method filter
-  @static
-  @for RSVP
-  @param {Array} promises
-  @param {Function} filterFn - function to be called on each resolved value to
-  filter the final results.
-  @param {String} label optional string describing the promise. Useful for
-  tooling.
-  @return {Promise}
-*/
-
-function resolveAll(promises, label) {
-  return Promise$1.all(promises, label);
-}
-
-function resolveSingle(promise, label) {
-  return Promise$1.resolve(promise, label).then(function (promises) {
-    return resolveAll(promises, label);
-  });
-}
-function filter$1(promises, filterFn, label) {
-  var promise = isArray(promises) ? resolveAll(promises, label) : resolveSingle(promises, label);
-  return promise.then(function (values) {
-    if (!isFunction(filterFn)) {
-      throw new TypeError("You must pass a function as filter's second argument.");
-    }
-
-    var length = values.length;
-    var filtered = new Array(length);
-
-    for (var i = 0; i < length; i++) {
-      filtered[i] = filterFn(values[i]);
-    }
-
-    return resolveAll(filtered, label).then(function (filtered) {
-      var results = new Array(length);
-      var newLength = 0;
-
-      for (var i = 0; i < length; i++) {
-        if (filtered[i]) {
-          results[newLength] = values[i];
-          newLength++;
-        }
-      }
-
-      results.length = newLength;
-
-      return results;
-    });
-  });
-}
-
-var len = 0;
-var vertxNext = undefined;
-function asap$1(callback, arg) {
-  queue$1[len] = callback;
-  queue$1[len + 1] = arg;
-  len += 2;
-  if (len === 2) {
-    // If len is 1, that means that we need to schedule an async flush.
-    // If additional callbacks are queued before the queue is flushed, they
-    // will be processed by this flush that we are scheduling.
-    scheduleFlush$1();
-  }
-}
-
-var browserWindow = typeof window !== 'undefined' ? window : undefined;
-var browserGlobal = browserWindow || {};
-var BrowserMutationObserver = browserGlobal.MutationObserver || browserGlobal.WebKitMutationObserver;
-var isNode = typeof self === 'undefined' && typeof process !== 'undefined' && ({}).toString.call(process) === '[object process]';
-
-// test for web worker but not in IE10
-var isWorker = typeof Uint8ClampedArray !== 'undefined' && typeof importScripts !== 'undefined' && typeof MessageChannel !== 'undefined';
-
-// node
-function useNextTick() {
-  var nextTick = process.nextTick;
-  // node version 0.10.x displays a deprecation warning when nextTick is used recursively
-  // setImmediate should be used instead instead
-  var version = process.versions.node.match(/^(?:(\d+)\.)?(?:(\d+)\.)?(\*|\d+)$/);
-  if (Array.isArray(version) && version[1] === '0' && version[2] === '10') {
-    nextTick = setImmediate;
-  }
-  return function () {
-    return nextTick(flush);
-  };
-}
-
-// vertx
-function useVertxTimer() {
-  if (typeof vertxNext !== 'undefined') {
-    return function () {
-      vertxNext(flush);
-    };
-  }
-  return useSetTimeout();
-}
-
-function useMutationObserver() {
-  var iterations = 0;
-  var observer = new BrowserMutationObserver(flush);
-  var node = document.createTextNode('');
-  observer.observe(node, { characterData: true });
-
-  return function () {
-    return node.data = iterations = ++iterations % 2;
-  };
-}
-
-// web worker
-function useMessageChannel() {
-  var channel = new MessageChannel();
-  channel.port1.onmessage = flush;
-  return function () {
-    return channel.port2.postMessage(0);
-  };
-}
-
-function useSetTimeout() {
-  return function () {
-    return setTimeout(flush, 1);
-  };
-}
-
-var queue$1 = new Array(1000);
-
-function flush() {
-  for (var i = 0; i < len; i += 2) {
-    var callback = queue$1[i];
-    var arg = queue$1[i + 1];
-
-    callback(arg);
-
-    queue$1[i] = undefined;
-    queue$1[i + 1] = undefined;
-  }
-
-  len = 0;
-}
-
-function attemptVertex() {
-  try {
-    var r = require;
-    var vertx = r('vertx');
-    vertxNext = vertx.runOnLoop || vertx.runOnContext;
-    return useVertxTimer();
-  } catch (e) {
-    return useSetTimeout();
-  }
-}
-
-var scheduleFlush$1 = undefined;
-// Decide what async method to use to triggering processing of queued callbacks:
-if (isNode) {
-  scheduleFlush$1 = useNextTick();
-} else if (BrowserMutationObserver) {
-  scheduleFlush$1 = useMutationObserver();
-} else if (isWorker) {
-  scheduleFlush$1 = useMessageChannel();
-} else if (browserWindow === undefined && typeof require === 'function') {
-  scheduleFlush$1 = attemptVertex();
-} else {
-  scheduleFlush$1 = useSetTimeout();
-}
-
-var platform = undefined;
-
-/* global self */
-if (typeof self === 'object') {
-  platform = self;
-
-  /* global global */
-} else if (typeof global === 'object') {
-    platform = global;
-  } else {
-    throw new Error('no global: `self` or `global` found');
-  }
-
-var _async$filter;
-
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
-// defaults
-
-// the default export here is for backwards compat:
-//   https://github.com/tildeio/rsvp.js/issues/434
-config.async = asap$1;
-config.after = function (cb) {
-  return setTimeout(cb, 0);
-};
-var cast = resolve$3;
-
-var async = function async(callback, arg) {
-  return config.async(callback, arg);
-};
-
-function on() {
-  config['on'].apply(config, arguments);
-}
-
-function off() {
-  config['off'].apply(config, arguments);
-}
-
-// Set up instrumentation through `window.__PROMISE_INTRUMENTATION__`
-if (typeof window !== 'undefined' && typeof window['__PROMISE_INSTRUMENTATION__'] === 'object') {
-  var callbacks = window['__PROMISE_INSTRUMENTATION__'];
-  configure('instrument', true);
-  for (var eventName in callbacks) {
-    if (callbacks.hasOwnProperty(eventName)) {
-      on(eventName, callbacks[eventName]);
-    }
-  }
-}var rsvp = (_async$filter = {
-  asap: asap$1,
-  cast: cast,
-  Promise: Promise$1,
-  EventTarget: EventTarget,
-  all: all$3,
-  allSettled: allSettled$1,
-  race: race$3,
-  hash: hash$1,
-  hashSettled: hashSettled$1,
-  rethrow: rethrow$1,
-  defer: defer$1,
-  denodeify: denodeify$1,
-  configure: configure,
-  on: on,
-  off: off,
-  resolve: resolve$3,
-  reject: reject$3,
-  map: map$1
-}, _defineProperty(_async$filter, 'async', async), _defineProperty(_async$filter, 'filter', // babel seems to error if async isn't a computed prop here...
-filter$1), _async$filter);
-
-exports['default'] = rsvp;
-exports.asap = asap$1;
-exports.cast = cast;
-exports.Promise = Promise$1;
-exports.EventTarget = EventTarget;
-exports.all = all$3;
-exports.allSettled = allSettled$1;
-exports.race = race$3;
-exports.hash = hash$1;
-exports.hashSettled = hashSettled$1;
-exports.rethrow = rethrow$1;
-exports.defer = defer$1;
-exports.denodeify = denodeify$1;
-exports.configure = configure;
-exports.on = on;
-exports.off = off;
-exports.resolve = resolve$3;
-exports.reject = reject$3;
-exports.map = map$1;
-exports.async = async;
-exports.filter = filter$1;
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-})));
-
-//
-
-'use strict';
-
-var EPUBJS = EPUBJS || {};
-EPUBJS.VERSION = "0.2.19";
-
-EPUBJS.plugins = EPUBJS.plugins || {};
-
-EPUBJS.filePath = EPUBJS.filePath || "/epubjs/";
-
-EPUBJS.Render = {};
-
-(function(root) {
-
-	var previousEpub = root.ePub || {};
-
-	var ePub = root.ePub = function() {
-		var bookPath, options;
-
-		//-- var book = ePub("path/to/book.epub", { restore: true })
-		if(typeof(arguments[0]) != 'undefined' &&
-			(typeof arguments[0] === 'string' || arguments[0] instanceof ArrayBuffer)) {
-
-			bookPath = arguments[0];
-
-			if( arguments[1] && typeof arguments[1] === 'object' ) {
-				options = arguments[1];
-				options.bookPath = bookPath;
-			} else {
-				options = { 'bookPath' : bookPath };
-			}
-
-		}
-
-		/*
-		*   var book = ePub({ bookPath: "path/to/book.epub", restore: true });
-		*
-		*   - OR -
-		*
-		*   var book = ePub({ restore: true });
-		*   book.open("path/to/book.epub");
-		*/
-
-		if( arguments[0] && typeof arguments[0] === 'object' && !(arguments[0] instanceof ArrayBuffer)) {
-			options = arguments[0];
-		}
-
-
-		return new EPUBJS.Book(options);
-	};
-
-	//exports to multiple environments
-	if (typeof define === 'function' && define.amd) {
-		//AMD
-		define(['rsvp', 'jszip', 'localforage'], function(RSVP, JSZip, localForage){ return ePub; });
-	} else if (typeof module != "undefined" && module.exports) {
-		//Node
-		global.RSVP = require('rsvp');
-		global.JSZip = require('jszip');
-		global.localForage = require('localforage');
-		module.exports = ePub;
-	}
-
-})(window);
-
-EPUBJS.Book = function(options){
-
-	var book = this;
-
-	this.settings = EPUBJS.core.defaults(options || {}, {
-		bookPath : undefined,
-		bookKey : undefined,
-		packageUrl : undefined,
-		storage: false, //-- true (auto) or false (none) | override: 'ram', 'websqldatabase', 'indexeddb', 'filesystem'
-		fromStorage : false,
-		saved : false,
-		online : true,
-		contained : false,
-		width : undefined,
-		height: undefined,
-		layoutOveride : undefined, // Default: { spread: 'reflowable', layout: 'auto', orientation: 'auto'}
-		orientation : undefined,
-		minSpreadWidth: 768, //-- overridden by spread: none (never) / both (always)
-		gap: "auto", //-- "auto" or int
-		version: 1,
-		restore: false,
-		reload : false,
-		goto : false,
-		styles : {},
-		classes : [],
-		headTags : {},
-		withCredentials: false,
-		render_method: "Iframe",
-		displayLastPage: false
-	});
-
-	this.settings.EPUBJSVERSION = EPUBJS.VERSION;
-
-	this.spinePos = 0;
-	this.stored = false;
-
-	//-- All Book events for listening
-	/*
-		book:ready
-		book:stored
-		book:online
-		book:offline
-		book:pageChanged
-		book:loadFailed
-		book:loadChapterFailed
-	*/
-
-	//-- Adds Hook methods to the Book prototype
-	//   Hooks will all return before triggering the callback.
-	// EPUBJS.Hooks.mixin(this);
-	//-- Get pre-registered hooks for events
-	// this.getHooks("beforeChapterDisplay");
-
-	this.online = this.settings.online || navigator.onLine;
-	this.networkListeners();
-
-	this.ready = {
-		manifest: new RSVP.defer(),
-		spine: new RSVP.defer(),
-		metadata: new RSVP.defer(),
-		cover: new RSVP.defer(),
-		toc: new RSVP.defer(),
-		pageList: new RSVP.defer()
-	};
-
-	this.readyPromises = [
-		this.ready.manifest.promise,
-		this.ready.spine.promise,
-		this.ready.metadata.promise,
-		this.ready.cover.promise,
-		this.ready.toc.promise
-	];
-
-	this.pageList = [];
-	this.pagination = new EPUBJS.Pagination();
-	this.pageListReady = this.ready.pageList.promise;
-
-	this.ready.all = RSVP.all(this.readyPromises);
-
-	this.ready.all.then(this._ready.bind(this));
-
-	// Queue for methods used before rendering
-	this.isRendered = false;
-	this._q = EPUBJS.core.queue(this);
-	// Queue for rendering
-	this._rendering = false;
-	this._displayQ = EPUBJS.core.queue(this);
-	// Queue for going to another location
-	this._moving = false;
-	this._gotoQ = EPUBJS.core.queue(this);
-
-	/**
-	* Creates a new renderer.
-	* The renderer will handle displaying the content using the method provided in the settings
-	*/
-	this.renderer = new EPUBJS.Renderer(this.settings.render_method);
-	//-- Set the width at which to switch from spreads to single pages
-	this.renderer.setMinSpreadWidth(this.settings.minSpreadWidth);
-	this.renderer.setGap(this.settings.gap);
-	//-- Pass through the renderer events
-	this.listenToRenderer(this.renderer);
-
-	this.defer_opened = new RSVP.defer();
-	this.opened = this.defer_opened.promise;
-
-	this.store = false; //-- False if not using storage;
-
-	//-- Determine storage method
-	//-- Override options: none | ram | websqldatabase | indexeddb | filesystem
-	if(this.settings.storage !== false){
-		// this.storage = new fileStorage.storage(this.settings.storage);
-		this.fromStorage(true);
-	}
-
-	// BookUrl is optional, but if present start loading process
-	if(typeof this.settings.bookPath === 'string' || this.settings.bookPath instanceof ArrayBuffer) {
-		this.open(this.settings.bookPath, this.settings.reload);
-	}
-
-	window.addEventListener("beforeunload", this.unload.bind(this), false);
-
-	//-- Listen for these promises:
-	//-- book.opened.then()
-	//-- book.rendered.then()
-};
-
-//-- Check bookUrl and start parsing book Assets or load them from storage
-EPUBJS.Book.prototype.open = function(bookPath, forceReload){
-	var book = this,
-			epubpackage,
-			opened = new RSVP.defer();
-
-	this.settings.bookPath = bookPath;
-
-	if(this.settings.contained || this.isContained(bookPath)){
-
-		this.settings.contained = this.contained = true;
-
-		this.bookUrl = '';
-
-		epubpackage = this.unarchive(bookPath).
-			then(function(){
-				return book.loadPackage();
-			});
-
-	}	else {
-		//-- Get a absolute URL from the book path
-		this.bookUrl = this.urlFrom(bookPath);
-
-		epubpackage = this.loadPackage();
-	}
-
-	if(this.settings.restore && !forceReload && localStorage){
-		//-- Will load previous package json, or re-unpack if error
-		epubpackage.then(function(packageXml) {
-			var identifier = book.packageIdentifier(packageXml);
-			var restored = book.restore(identifier);
-
-			if(!restored) {
-				book.unpack(packageXml);
-			}
-			opened.resolve();
-			book.defer_opened.resolve();
-		});
-
-	}else{
-
-		//-- Get package information from epub opf
-		epubpackage.then(function(packageXml) {
-			book.unpack(packageXml);
-			opened.resolve();
-			book.defer_opened.resolve();
-		});
-	}
-
-	this._registerReplacements(this.renderer);
-
-	return opened.promise;
-
-};
-
-EPUBJS.Book.prototype.loadPackage = function(_containerPath){
-	var book = this,
-			parse = new EPUBJS.Parser(),
-			containerPath = _containerPath || "META-INF/container.xml",
-			containerXml,
-			packageXml;
-
-	if(!this.settings.packageUrl) { //-- provide the packageUrl to skip this step
-		packageXml = book.loadXml(book.bookUrl + containerPath).
-			then(function(containerXml){
-				return parse.container(containerXml); // Container has path to content
-			}).
-			then(function(paths){
-				book.settings.contentsPath = book.bookUrl + paths.basePath;
-				book.settings.packageUrl = book.bookUrl + paths.packagePath;
-				book.settings.encoding = paths.encoding;
-				return book.loadXml(book.settings.packageUrl); // Containes manifest, spine and metadata
-			});
-	} else {
-		packageXml = book.loadXml(book.settings.packageUrl);
-	}
-
-	packageXml.catch(function(error) {
-		// handle errors in either of the two requests
-		console.error("Could not load book at: "+ containerPath);
-		book.trigger("book:loadFailed", containerPath);
-	});
-	return packageXml;
-};
-
-EPUBJS.Book.prototype.packageIdentifier = function(packageXml){
-	var book = this,
-			parse = new EPUBJS.Parser();
-
-	return parse.identifier(packageXml);
-};
-
-EPUBJS.Book.prototype.unpack = function(packageXml){
-	var book = this,
-			parse = new EPUBJS.Parser();
-
-	book.contents = parse.packageContents(packageXml, book.settings.contentsPath); // Extract info from contents
-
-	book.manifest = book.contents.manifest;
-	book.spine = book.contents.spine;
-	book.spineIndexByURL = book.contents.spineIndexByURL;
-	book.metadata = book.contents.metadata;
-	if(!book.settings.bookKey) {
-		book.settings.bookKey = book.generateBookKey(book.metadata.identifier);
-	}
-
-	//-- Set Globbal Layout setting based on metadata
-	book.globalLayoutProperties = book.parseLayoutProperties(book.metadata);
-
-	if(book.contents.coverPath) {
-		book.cover = book.contents.cover = book.settings.contentsPath + book.contents.coverPath;
-	}
-
-	book.spineNodeIndex = book.contents.spineNodeIndex;
-
-	book.ready.manifest.resolve(book.contents.manifest);
-	book.ready.spine.resolve(book.contents.spine);
-	book.ready.metadata.resolve(book.contents.metadata);
-	book.ready.cover.resolve(book.contents.cover);
-
-	book.locations = new EPUBJS.Locations(book.spine, book.store, book.settings.withCredentials);
-
-	//-- Load the TOC, optional; either the EPUB3 XHTML Navigation file or the EPUB2 NCX file
-	if(book.contents.navPath) {
-		book.settings.navUrl = book.settings.contentsPath + book.contents.navPath;
-
-		book.loadXml(book.settings.navUrl).
-			then(function(navHtml){
-				return parse.nav(navHtml, book.spineIndexByURL, book.spine); // Grab Table of Contents
-			}).then(function(toc){
-				book.toc = book.contents.toc = toc;
-				book.ready.toc.resolve(book.contents.toc);
-			}, function(error) {
-				book.ready.toc.resolve(false);
-			});
-
-		// Load the optional pageList
-		book.loadXml(book.settings.navUrl).
-			then(function(navHtml){
-				return parse.pageList(navHtml, book.spineIndexByURL, book.spine);
-			}).then(function(pageList){
-				var epubcfi = new EPUBJS.EpubCFI();
-				var wait = 0; // need to generate a cfi
-
-				// No pageList found
-				if(pageList.length === 0) {
-					return;
-				}
-
-				book.pageList = book.contents.pageList = pageList;
-
-				// Replace HREFs with CFI
-				book.pageList.forEach(function(pg){
-					if(!pg.cfi) {
-						wait += 1;
-						epubcfi.generateCfiFromHref(pg.href, book).then(function(cfi){
-							pg.cfi = cfi;
-							pg.packageUrl = book.settings.packageUrl;
-
-							wait -= 1;
-							if(wait === 0) {
-								book.pagination.process(book.pageList);
-								book.ready.pageList.resolve(book.pageList);
-							}
-						});
-					}
-				});
-
-				if(!wait) {
-					book.pagination.process(book.pageList);
-					book.ready.pageList.resolve(book.pageList);
-				}
-
-			}, function(error) {
-				book.ready.pageList.resolve([]);
-			});
-	} else if(book.contents.tocPath) {
-		book.settings.tocUrl = book.settings.contentsPath + book.contents.tocPath;
-
-		book.loadXml(book.settings.tocUrl).
-			then(function(tocXml){
-					return parse.toc(tocXml, book.spineIndexByURL, book.spine); // Grab Table of Contents
-			}, function(err) {
-				console.error(err);
-			}).then(function(toc){
-				book.toc = book.contents.toc = toc;
-				book.ready.toc.resolve(book.contents.toc);
-			}, function(error) {
-				book.ready.toc.resolve(false);
-			});
-
-	} else {
-		book.ready.toc.resolve(false);
-	}
-
-};
-
-EPUBJS.Book.prototype.createHiddenRender = function(renderer, _width, _height) {
-	var box = this.element.getBoundingClientRect();
-	var width = _width || this.settings.width || box.width;
-	var height = _height || this.settings.height || box.height;
-	var hiddenContainer;
-	var hiddenEl;
-	renderer.setMinSpreadWidth(this.settings.minSpreadWidth);
-	renderer.setGap(this.settings.gap);
-
-	this._registerReplacements(renderer);
-	if(this.settings.forceSingle) {
-		renderer.forceSingle(true);
-	}
-
-	hiddenContainer = document.createElement("div");
-	hiddenContainer.style.visibility = "hidden";
-	hiddenContainer.style.overflow = "hidden";
-	hiddenContainer.style.width = "0";
-	hiddenContainer.style.height = "0";
-	this.element.appendChild(hiddenContainer);
-
-	hiddenEl = document.createElement("div");
-	hiddenEl.style.visibility = "hidden";
-	hiddenEl.style.overflow = "hidden";
-	hiddenEl.style.width = width + "px";//"0";
-	hiddenEl.style.height = height +"px"; //"0";
-	hiddenContainer.appendChild(hiddenEl);
-
-	renderer.initialize(hiddenEl, this.settings.width, this.settings.height);
-	return hiddenContainer;
-};
-
-// Generates the pageList array by loading every chapter and paging through them
-EPUBJS.Book.prototype.generatePageList = function(width, height, flag){
-	var pageList = [];
-	var pager = new EPUBJS.Renderer(this.settings.render_method, false); //hidden
-	var hiddenContainer = this.createHiddenRender(pager, width, height);
-	var deferred = new RSVP.defer();
-	var spinePos = -1;
-	var spineLength = this.spine.length;
-	var totalPages = 0;
-	var currentPage = 0;
-	var nextChapter = function(deferred){
-		var chapter;
-		var next = spinePos + 1;
-		var done = deferred || new RSVP.defer();
-		var loaded;
-		if(next >= spineLength) {
-			done.resolve();
-		} else {
-            if (flag && flag.cancelled) {
-                pager.remove();
-                this.element.removeChild(hiddenContainer);
-                done.reject(new Error("User cancelled"));
-                return;
-            }
-
-			spinePos = next;
-			chapter = new EPUBJS.Chapter(this.spine[spinePos], this.store);
-			pager.displayChapter(chapter, this.globalLayoutProperties).then(function(chap){
-				pager.pageMap.forEach(function(item){
-					currentPage += 1;
-					pageList.push({
-						"cfi" : item.start,
-						"page" : currentPage
-					});
-
-				});
-
-				if(pager.pageMap.length % 2 > 0 &&
-					 pager.spreads) {
-					currentPage += 1; // Handle Spreads
-					pageList.push({
-						"cfi" : pager.pageMap[pager.pageMap.length - 1].end,
-						"page" : currentPage
-					});
-				}
-
-				// Load up the next chapter
-				setTimeout(function(){
-					nextChapter(done);
-				}, 1);
-			});
-		}
-		return done.promise;
-	}.bind(this);
-
-	var finished = nextChapter().then(function(){
-		pager.remove();
-		this.element.removeChild(hiddenContainer);
-		deferred.resolve(pageList);
-	}.bind(this), function(reason) {
-        deferred.reject(reason);
-    });
-
-	return deferred.promise;
-};
-
-// Render out entire book and generate the pagination
-// Width and Height are optional and will default to the current dimensions
-EPUBJS.Book.prototype.generatePagination = function(width, height, flag) {
-	var book = this;
-	var defered = new RSVP.defer();
-
-	this.ready.spine.promise.then(function(){
-		book.generatePageList(width, height, flag).then(function(pageList){
-			book.pageList = book.contents.pageList = pageList;
-			book.pagination.process(pageList);
-			book.ready.pageList.resolve(book.pageList);
-			defered.resolve(book.pageList);
-		}, function(reason) {
-            defered.reject(reason);
-		});
-	});
-
-	return defered.promise;
-};
-
-// Process the pagination from a JSON array containing the pagelist
-EPUBJS.Book.prototype.loadPagination = function(pagelistJSON) {
-	var pageList;
-
-	if (typeof(pagelistJSON) === "string") {
-		pageList = JSON.parse(pagelistJSON);
-	} else {
-		pageList = pagelistJSON;
-	}
-
-	if(pageList && pageList.length) {
-		this.pageList = pageList;
-		this.pagination.process(this.pageList);
-		this.ready.pageList.resolve(this.pageList);
-	}
-	return this.pageList;
-};
-
-EPUBJS.Book.prototype.getPageList = function() {
-	return this.ready.pageList.promise;
-};
-
-EPUBJS.Book.prototype.getMetadata = function() {
-	return this.ready.metadata.promise;
-};
-
-EPUBJS.Book.prototype.getToc = function() {
-	return this.ready.toc.promise;
-};
-
-/* Private Helpers */
-
-//-- Listeners for browser events
-EPUBJS.Book.prototype.networkListeners = function(){
-	var book = this;
-	window.addEventListener("offline", function(e) {
-		book.online = false;
-		if (book.settings.storage) {
-			book.fromStorage(true);
-		}
-		book.trigger("book:offline");
-	}, false);
-
-	window.addEventListener("online", function(e) {
-		book.online = true;
-		if (book.settings.storage) {
-			book.fromStorage(false);
-		}
-		book.trigger("book:online");
-	}, false);
-
-};
-
-// Listen to all events the renderer triggers and pass them as book events
-EPUBJS.Book.prototype.listenToRenderer = function(renderer){
-	var book = this;
-	renderer.Events.forEach(function(eventName){
-		renderer.on(eventName, function(e){
-			book.trigger(eventName, e);
-		});
-	});
-
-	renderer.on("renderer:visibleRangeChanged", function(range) {
-		var startPage, endPage, percent;
-		var pageRange = [];
-
-		if(this.pageList.length > 0) {
-			startPage = this.pagination.pageFromCfi(range.start);
-			percent = this.pagination.percentageFromPage(startPage);
-			pageRange.push(startPage);
-
-			if(range.end) {
-				endPage = this.pagination.pageFromCfi(range.end);
-				//if(startPage != endPage) {
-					pageRange.push(endPage);
-				//}
-			}
-			this.trigger("book:pageChanged", {
-				"anchorPage": startPage,
-				"percentage": percent,
-				"pageRange" : pageRange
-			});
-
-			// TODO: Add event for first and last page.
-			// (though last is going to be hard, since it could be several reflowed pages long)
-		}
-	}.bind(this));
-
-	renderer.on("render:loaded", this.loadChange.bind(this));
-};
-
-// Listens for load events from the Renderer and checks against the current chapter
-// Prevents the Render from loading a different chapter when back button is pressed
-EPUBJS.Book.prototype.loadChange = function(url){
-	var uri = EPUBJS.core.uri(url);
-	var chapterUri = EPUBJS.core.uri(this.currentChapter.absolute);
-	var spinePos, chapter;
-
-	if(uri.path != chapterUri.path){
-		console.warn("Miss Match", uri.path, this.currentChapter.absolute);
-		// this.goto(uri.filename);
-
-		// Set the current chapter to what is being displayed
-		spinePos = this.spineIndexByURL[uri.filename];
-		chapter = new EPUBJS.Chapter(this.spine[spinePos], this.store);
-		this.currentChapter = chapter;
-
-		// setup the renderer with the displayed chapter
-		this.renderer.currentChapter = chapter;
-		this.renderer.afterLoad(this.renderer.render.docEl);
-		this.renderer.beforeDisplay(function () {
-			this.renderer.afterDisplay();
-		}.bind(this));
-
-	} else if(!this._rendering) {
-		this.renderer.reformat();
-	}
-};
-
-EPUBJS.Book.prototype.unlistenToRenderer = function(renderer){
-	renderer.Events.forEach(function(eventName){
-		renderer.off(eventName);
-	});
-};
-
-//-- Returns the cover
-EPUBJS.Book.prototype.coverUrl = function(){
-	var retrieved = this.ready.cover.promise
-		.then(function(url) {
-			if(this.settings.fromStorage) {
-				return this.store.getUrl(this.contents.cover);
-			} else if(this.settings.contained) {
-				return this.zip.getUrl(this.contents.cover);
-			}else{
-				return this.contents.cover;
-			}
-		}.bind(this));
-
-	retrieved.then(function(url) {
-			this.cover = url;
-		}.bind(this));
-
-	return retrieved;
-};
-
-//-- Choose between a request from store or a request from network
-EPUBJS.Book.prototype.loadXml = function(url){
-	if(this.settings.fromStorage) {
-		return this.store.getXml(url, this.settings.encoding);
-	} else if(this.settings.contained) {
-		return this.zip.getXml(url, this.settings.encoding);
-	}else{
-		return EPUBJS.core.request(url, 'xml', this.settings.withCredentials);
-	}
-};
-
-//-- Turns a url into a absolute url
-EPUBJS.Book.prototype.urlFrom = function(bookPath){
-	var uri = EPUBJS.core.uri(bookPath),
-		absolute = uri.protocol,
-		fromRoot = uri.path[0] == "/",
-		location = window.location,
-		//-- Get URL orgin, try for native or combine
-		origin = location.origin || location.protocol + "//" + location.host,
-		baseTag = document.getElementsByTagName('base'),
-		base;
-
-
-	//-- Check is Base tag is set
-
-	if(baseTag.length) {
-		base = baseTag[0].href;
-	}
-
-	//-- 1. Check if url is absolute
-	if(uri.protocol){
-		return uri.origin + uri.path;
-	}
-
-	//-- 2. Check if url starts with /, add base url
-	if(!absolute && fromRoot){
-		return (base || origin) + uri.path;
-	}
-
-	//-- 3. Or find full path to url and add that
-	if(!absolute && !fromRoot){
-		return EPUBJS.core.resolveUrl(base || location.pathname, uri.path);
-	}
-
-};
-
-
-EPUBJS.Book.prototype.unarchive = function(bookPath){
-	var book = this,
-		unarchived;
-
-	//-- Must use storage
-	// if(this.settings.storage == false ){
-		// this.settings.storage = true;
-		// this.storage = new fileStorage.storage();
-	// }
-
-	this.zip = new EPUBJS.Unarchiver();
-	this.store = this.zip; // Use zip storaged in ram
-	return this.zip.open(bookPath);
-};
-
-//-- Checks if url has a .epub or .zip extension, or is ArrayBuffer (of zip/epub)
-EPUBJS.Book.prototype.isContained = function(bookUrl){
-	if (bookUrl instanceof ArrayBuffer) {
-		return true;
-	}
-	var uri = EPUBJS.core.uri(bookUrl);
-
-	if(uri.extension && (uri.extension == "epub" || uri.extension == "zip")){
-		return true;
-	}
-
-	return false;
-};
-
-//-- Checks if the book can be retrieved from localStorage
-EPUBJS.Book.prototype.isSaved = function(bookKey) {
-	var storedSettings;
-
-	if(!localStorage) {
-		return false;
-	}
-
-	storedSettings = localStorage.getItem(bookKey);
-
-	if( !localStorage ||
-		storedSettings === null) {
-		return false;
-	} else {
-		return true;
-	}
-};
-
-// Generates the Book Key using the identifer in the manifest or other string provided
-EPUBJS.Book.prototype.generateBookKey = function(identifier){
-	return "epubjs:" + EPUBJS.VERSION + ":" + window.location.host + ":" + identifier;
-};
-
-EPUBJS.Book.prototype.saveContents = function(){
-	if(!localStorage) {
-		return false;
-	}
-	localStorage.setItem(this.settings.bookKey, JSON.stringify(this.contents));
-};
-
-EPUBJS.Book.prototype.removeSavedContents = function() {
-	if(!localStorage) {
-		return false;
-	}
-	localStorage.removeItem(this.settings.bookKey);
-};
-
-
-
-//-- Takes a string or a element
-EPUBJS.Book.prototype.renderTo = function(elem){
-	var book = this,
-		rendered;
-
-	if(EPUBJS.core.isElement(elem)) {
-		this.element = elem;
-	} else if (typeof elem == "string") {
-		this.element = EPUBJS.core.getEl(elem);
-	} else {
-		console.error("Not an Element");
-		return;
-	}
-
-	rendered = this.opened.
-				then(function(){
-					// book.render = new EPUBJS.Renderer[this.settings.renderer](book);
-					book.renderer.initialize(book.element, book.settings.width, book.settings.height);
-
-					if(book.metadata.direction) {
-						book.renderer.setDirection(book.metadata.direction);
-					}
-
-					book._rendered();
-					return book.startDisplay();
-				});
-
-	// rendered.then(null, function(error) { console.error(error); });
-
-	return rendered;
-};
-
-EPUBJS.Book.prototype.startDisplay = function(){
-	var display;
-
-	if(this.settings.goto) {
-		display = this.goto(this.settings.goto);
-	}else if(this.settings.previousLocationCfi) {
-		display = this.gotoCfi(this.settings.previousLocationCfi);
-	}else{
-		display = this.displayChapter(this.spinePos, this.settings.displayLastPage);
-	}
-
-	return display;
-};
-
-EPUBJS.Book.prototype.restore = function(identifier){
-
-	var book = this,
-			fetch = ['manifest', 'spine', 'metadata', 'cover', 'toc', 'spineNodeIndex', 'spineIndexByURL', 'globalLayoutProperties'],
-			reject = false,
-			bookKey = this.generateBookKey(identifier),
-			fromStore = localStorage.getItem(bookKey),
-			len = fetch.length,
-			i;
-
-	if(this.settings.clearSaved) reject = true;
-
-	if(!reject && fromStore != 'undefined' && fromStore !== null){
-		book.contents = JSON.parse(fromStore);
-
-		for(i = 0; i < len; i++) {
-			var item = fetch[i];
-
-			if(!book.contents[item]) {
-				reject = true;
-				break;
-			}
-			book[item] = book.contents[item];
-		}
-	}
-
-	if(reject || !fromStore || !this.contents || !this.settings.contentsPath){
-		return false;
-	}else{
-		this.settings.bookKey = bookKey;
-		this.ready.manifest.resolve(this.manifest);
-		this.ready.spine.resolve(this.spine);
-		this.ready.metadata.resolve(this.metadata);
-		this.ready.cover.resolve(this.cover);
-		this.ready.toc.resolve(this.toc);
-		return true;
-	}
-
-};
-
-EPUBJS.Book.prototype.displayChapter = function(chap, end, deferred){
-	var book = this,
-		render,
-		cfi,
-		pos,
-		store,
-		defer = deferred || new RSVP.defer();
-
-	var chapter;
-
-	if(!this.isRendered) {
-		this._q.enqueue("displayChapter", arguments);
-		// Reject for now. TODO: pass promise to queue
-		defer.reject({
-				message : "Rendering",
-				stack : new Error().stack
-			});
-		return defer.promise;
-	}
-
-
-	if(this._rendering || this.renderer._moving) {
-		// Pass along the current defer
-		this._displayQ.enqueue("displayChapter", [chap, end, defer]);
-		return defer.promise;
-	}
-
-	if(EPUBJS.core.isNumber(chap)){
-		pos = chap;
-	}else{
-		cfi = new EPUBJS.EpubCFI(chap);
-		pos = cfi.spinePos;
-	}
-
-	if(pos < 0 || pos >= this.spine.length){
-		console.warn("Not A Valid Location");
-		pos = 0;
-		end = false;
-		cfi = false;
-	}
-
-	//-- Create a new chapter
-	chapter = new EPUBJS.Chapter(this.spine[pos], this.store);
-
-	this._rendering = true;
-
-	if(this._needsAssetReplacement()) {
-
-		chapter.registerHook("beforeChapterRender", [
-			EPUBJS.replace.head,
-			EPUBJS.replace.resources,
-			EPUBJS.replace.posters,
-			EPUBJS.replace.svg
-		], true);
-
-	}
-
-	book.currentChapter = chapter;
-
-	render = book.renderer.displayChapter(chapter, this.globalLayoutProperties);
-	if(cfi) {
-		book.renderer.gotoCfi(cfi);
-	} else if(end) {
-		book.renderer.lastPage();
-	}
-	//-- Success, Clear render queue
-	render.then(function(rendered){
-		// var inwait;
-		//-- Set the book's spine position
-		book.spinePos = pos;
-
-		defer.resolve(book.renderer);
-
-		if(book.settings.fromStorage === false &&
-			book.settings.contained === false) {
-			book.preloadNextChapter();
-		}
-
-		book._rendering = false;
-		book._displayQ.dequeue();
-		if(book._displayQ.length() === 0) {
-			book._gotoQ.dequeue();
-		}
-
-	}, function(error) {
-		// handle errors in either of the two requests
-		console.error("Could not load Chapter: "+ chapter.absolute, error);
-		book.trigger("book:chapterLoadFailed", chapter.absolute);
-		book._rendering = false;
-		defer.reject(error);
-	});
-
-	return defer.promise;
-};
-
-EPUBJS.Book.prototype.nextPage = function(defer){
-    var defer = defer || new RSVP.defer();
-
-	if (!this.isRendered) {
-        this._q.enqueue("nextPage", [defer]);
-        return defer.promise;
-    }
-
-	var next = this.renderer.nextPage();
-	if (!next){
-		return this.nextChapter(defer);
-	}
-
-    defer.resolve(true);
-    return defer.promise;
-};
-
-EPUBJS.Book.prototype.prevPage = function(defer) {
-    var defer = defer || new RSVP.defer();
-
-	if (!this.isRendered) {
-        this._q.enqueue("prevPage", [defer]);
-        return defer.promise;
-    }
-
-	var prev = this.renderer.prevPage();
-	if (!prev){
-		return this.prevChapter(defer);
-	}
-
-    defer.resolve(true);
-    return defer.promise;
-};
-
-EPUBJS.Book.prototype.nextChapter = function(defer) {
-    var defer = defer || new RSVP.defer();
-
-    if (this.spinePos < this.spine.length - 1) {
-		var next = this.spinePos + 1;
-		// Skip non linear chapters
-		while (this.spine[next] && this.spine[next].linear && this.spine[next].linear == 'no') {
-			next++;
-		}
-		if (next < this.spine.length) {
-			return this.displayChapter(next, false, defer);
-		}
-	}
-
-    this.trigger("book:atEnd");
-    defer.resolve(true);
-    return defer.promise;
-};
-
-EPUBJS.Book.prototype.prevChapter = function(defer) {
-    var defer = defer || new RSVP.defer();
-
-    if (this.spinePos > 0) {
-		var prev = this.spinePos - 1;
-		while (this.spine[prev] && this.spine[prev].linear && this.spine[prev].linear == 'no') {
-			prev--;
-		}
-		if (prev >= 0) {
-			return this.displayChapter(prev, true, defer);
-		}
-    }
-
-    this.trigger("book:atStart");
-    defer.resolve(true);
-    return defer.promise;
-};
-
-EPUBJS.Book.prototype.getCurrentLocationCfi = function() {
-	if(!this.isRendered) return false;
-	return this.renderer.currentLocationCfi;
-};
-
-EPUBJS.Book.prototype.goto = function(target){
-
-	if(target.indexOf("epubcfi(") === 0) {
-		return this.gotoCfi(target);
-	} else if(target.indexOf("%") === target.length-1) {
-		return this.gotoPercentage(parseInt(target.substring(0, target.length-1))/100);
-	} else if(typeof target === "number" || isNaN(target) === false){
-		return this.gotoPage(target);
-	} else {
-		return this.gotoHref(target);
-	}
-
-};
-
-EPUBJS.Book.prototype.gotoCfi = function(cfiString, defer){
-	var cfi,
-			spinePos,
-			spineItem,
-			rendered,
-			promise,
-			render,
-			deferred = defer || new RSVP.defer();
-
-	if(!this.isRendered) {
-		console.warn("Not yet Rendered");
-		this.settings.previousLocationCfi = cfiString;
-		return false;
-	}
-
-	// Currently going to a chapter
-	if(this._moving || this._rendering) {
-		console.warn("Renderer is moving");
-		this._gotoQ.enqueue("gotoCfi", [cfiString, deferred]);
-		return false;
-	}
-
-	cfi = new EPUBJS.EpubCFI(cfiString);
-	spinePos = cfi.spinePos;
-
-	if(spinePos == -1) {
-		return false;
-	}
-
-	spineItem = this.spine[spinePos];
-	promise = deferred.promise;
-	this._moving = true;
-	//-- If same chapter only stay on current chapter
-	if(this.currentChapter && this.spinePos === spinePos){
-		this.renderer.gotoCfi(cfi);
-		this._moving = false;
-		deferred.resolve(this.renderer.currentLocationCfi);
-	} else {
-
-		if(!spineItem || spinePos == -1) {
-			spinePos = 0;
-			spineItem = this.spine[spinePos];
-		}
-
-		render = this.displayChapter(cfiString);
-
-		render.then(function(rendered){
-			this._moving = false;
-			deferred.resolve(rendered.currentLocationCfi);
-		}.bind(this), function() {
-			this._moving = false;
-        }.bind(this));
-
-	}
-
-	promise.then(function(){
-		this._gotoQ.dequeue();
-	}.bind(this));
-
-	return promise;
-};
-
-EPUBJS.Book.prototype.gotoHref = function(url, defer){
-	var split, chapter, section, relativeURL, spinePos;
-	var deferred = defer || new RSVP.defer();
-
-	if(!this.isRendered) {
-		this.settings.goto = url;
-		return false;
-	}
-
-	// Currently going to a chapter
-	if(this._moving || this._rendering) {
-		this._gotoQ.enqueue("gotoHref", [url, deferred]);
-		return false;
-	}
-
-	split = url.split("#");
-	chapter = split[0];
-	section = split[1] || false;
-	if (chapter.search("://") == -1) {
-		relativeURL = chapter.replace(EPUBJS.core.uri(this.settings.contentsPath).path, '');
-	} else {
-		relativeURL = chapter.replace(this.settings.contentsPath, '');
-	}
-	spinePos = this.spineIndexByURL[relativeURL];
-
-	//-- If link fragment only stay on current chapter
-	if(!chapter){
-		spinePos = this.currentChapter ? this.currentChapter.spinePos : 0;
-	}
-
-	//-- Check that URL is present in the index, or stop
-	if(typeof(spinePos) != "number") return false;
-
-	if(!this.currentChapter || spinePos != this.currentChapter.spinePos){
-		//-- Load new chapter if different than current
-		return this.displayChapter(spinePos).then(function(){
-				if(section){
-					this.renderer.section(section);
-				}
-				deferred.resolve(this.renderer.currentLocationCfi);
-			}.bind(this));
-	}else{
-		//--  Goto section
-		if(section) {
-			this.renderer.section(section);
-		} else {
-			// Or jump to the start
-			this.renderer.firstPage();
-		}
-		deferred.resolve(this.renderer.currentLocationCfi);
-	}
-
-	deferred.promise.then(function(){
-		this._gotoQ.dequeue();
-	}.bind(this));
-
-	return deferred.promise;
-};
-
-EPUBJS.Book.prototype.gotoPage = function(pg){
-	var cfi = this.pagination.cfiFromPage(pg);
-	return this.gotoCfi(cfi);
-};
-
-EPUBJS.Book.prototype.gotoPercentage = function(percent){
-	var pg = this.pagination.pageFromPercentage(percent);
-	return this.gotoPage(pg);
-};
-
-EPUBJS.Book.prototype.preloadNextChapter = function() {
-	var next;
-	var chap = this.spinePos + 1;
-
-	if(chap >= this.spine.length){
-		return false;
-	}
-
-	next = new EPUBJS.Chapter(this.spine[chap]);
-	if(next) {
-		EPUBJS.core.request(next.absolute);
-	}
-};
-
-EPUBJS.Book.prototype.storeOffline = function() {
-	var book = this,
-		assets = EPUBJS.core.values(this.manifest);
-
-	//-- Creates a queue of all items to load
-	return this.store.put(assets).
-			then(function(){
-				book.settings.stored = true;
-				book.trigger("book:stored");
-			});
-};
-
-EPUBJS.Book.prototype.availableOffline = function() {
-	return this.settings.stored > 0 ? true : false;
-};
-
-EPUBJS.Book.prototype.toStorage = function () {
-	var key = this.settings.bookKey;
-	this.store.isStored(key).then(function(stored) {
-
-		if (stored === true) {
-			this.settings.stored = true;
-			return true;
-		}
-
-		return this.storeOffline()
-			.then(function() {
-				this.store.token(key, true);
-			}.bind(this));
-
-	}.bind(this));
-
-};
-EPUBJS.Book.prototype.fromStorage = function(stored) {
-	var hooks = [
-		EPUBJS.replace.head,
-		EPUBJS.replace.resources,
-		EPUBJS.replace.posters,
-		EPUBJS.replace.svg
-	];
-
-	if(this.contained || this.settings.contained) return;
-
-	//-- If there is network connection, store the books contents
-	if(this.online){
-		this.opened.then(this.toStorage.bind(this));
-	}
-
-	if(this.store && this.settings.fromStorage && stored === false){
-		this.settings.fromStorage = false;
-		this.store.off("offline");
-		// this.renderer.removeHook("beforeChapterRender", hooks, true);
-		this.store = false;
-	}else if(!this.settings.fromStorage){
-
-		this.store = new EPUBJS.Storage(this.settings.credentials);
-		this.store.on("offline", function (offline) {
-			if (!offline) {
-				// Online
-				this.offline = false;
-				this.settings.fromStorage = false;
-				// this.renderer.removeHook("beforeChapterRender", hooks, true);
-				this.trigger("book:online");
-			} else {
-				// Offline
-				this.offline = true;
-				this.settings.fromStorage = true;
-				// this.renderer.registerHook("beforeChapterRender", hooks, true);
-				this.trigger("book:offline");
-			}
-		}.bind(this));
-
-	}
-
-};
-
-EPUBJS.Book.prototype.setStyle = function(style, val, prefixed) {
-	var noreflow = ["color", "background", "background-color"];
-
-	if(!this.isRendered) return this._q.enqueue("setStyle", arguments);
-
-	this.settings.styles[style] = val;
-
-	this.renderer.setStyle(style, val, prefixed);
-
-	if(noreflow.indexOf(style) === -1) {
-		// clearTimeout(this.reformatTimeout);
-		// this.reformatTimeout = setTimeout(function(){
-		this.renderer.reformat();
-		// }.bind(this), 10);
-	}
-};
-
-EPUBJS.Book.prototype.removeStyle = function(style) {
-	if(!this.isRendered) return this._q.enqueue("removeStyle", arguments);
-	this.renderer.removeStyle(style);
-	this.renderer.reformat();
-	delete this.settings.styles[style];
-};
-
-EPUBJS.Book.prototype.resetClasses = function(classes) {
-
-	if(!this.isRendered) return this._q.enqueue("setClasses", arguments);
-
-  if(classes.constructor === String) classes = [ classes ];
-
-  this.settings.classes = classes;
-
-	this.renderer.setClasses(this.settings.classes);
-  this.renderer.reformat();
-};
-
-EPUBJS.Book.prototype.addClass = function(aClass) {
-
-	if(!this.isRendered) return this._q.enqueue("addClass", arguments);
-
-  if(this.settings.classes.indexOf(aClass) == -1) {
-    this.settings.classes.push(aClass);
-  }
-
-	this.renderer.setClasses(this.settings.classes);
-  this.renderer.reformat();
-};
-
-EPUBJS.Book.prototype.removeClass = function(aClass) {
-
-	if(!this.isRendered) return this._q.enqueue("removeClass", arguments);
-
-  var idx = this.settings.classes.indexOf(aClass);
-
-  if(idx != -1) {
-
-    delete this.settings.classes[idx];
-
-    this.renderer.setClasses(this.settings.classes);
-    this.renderer.reformat();
-
-  }
-
-};
-
-EPUBJS.Book.prototype.addHeadTag = function(tag, attrs) {
-	if(!this.isRendered) return this._q.enqueue("addHeadTag", arguments);
-	this.settings.headTags[tag] = attrs;
-};
-
-EPUBJS.Book.prototype.useSpreads = function(use) {
-	console.warn("useSpreads is deprecated, use forceSingle or set a layoutOveride instead");
-	if(use === false) {
-		this.forceSingle(true);
-	} else {
-		this.forceSingle(false);
-	}
-};
-
-EPUBJS.Book.prototype.forceSingle = function(_use) {
-	var force = typeof _use === "undefined" ? true : _use;
-
-	this.renderer.forceSingle(force);
-	this.settings.forceSingle = force;
-	if(this.isRendered) {
-		this.renderer.reformat();
-	}
-};
-
-EPUBJS.Book.prototype.setMinSpreadWidth = function(width) {
-	this.settings.minSpreadWidth = width;
-	if(this.isRendered) {
-		this.renderer.setMinSpreadWidth(this.settings.minSpreadWidth);
-		this.renderer.reformat();
-	}
-};
-
-EPUBJS.Book.prototype.setGap = function(gap) {
-	this.settings.gap = gap;
-	if(this.isRendered) {
-		this.renderer.setGap(this.settings.gap);
-		this.renderer.reformat();
-	}
-};
-
-EPUBJS.Book.prototype.chapter = function(path) {
-	var spinePos = this.spineIndexByURL[path];
-	var spineItem;
-	var chapter;
-
-	if(spinePos){
-		spineItem = this.spine[spinePos];
-		chapter = new EPUBJS.Chapter(spineItem, this.store, this.settings.withCredentials);
-		chapter.load();
-	}
-	return chapter;
-};
-
-EPUBJS.Book.prototype.unload = function(){
-
-	if(this.settings.restore && localStorage) {
-		this.saveContents();
-	}
-
-	this.unlistenToRenderer(this.renderer);
-
-	this.trigger("book:unload");
-};
-
-EPUBJS.Book.prototype.destroy = function() {
-
-	window.removeEventListener("beforeunload", this.unload);
-
-	if(this.currentChapter) this.currentChapter.unload();
-
-	this.unload();
-
-	if(this.renderer) this.renderer.remove();
-
-};
-
-EPUBJS.Book.prototype._ready = function() {
-
-	this.trigger("book:ready");
-
-};
-
-EPUBJS.Book.prototype._rendered = function(err) {
-	var book = this;
-
-	this.isRendered = true;
-	this.trigger("book:rendered");
-
-	this._q.flush();
-};
-
-
-EPUBJS.Book.prototype.applyStyles = function(renderer, callback){
-	// if(!this.isRendered) return this._q.enqueue("applyStyles", arguments);
-	renderer.applyStyles(this.settings.styles);
-	callback();
-};
-
-EPUBJS.Book.prototype.applyClasses = function(renderer, callback){
-	// if(!this.isRendered) return this._q.enqueue("applyClasses", arguments);
-	renderer.setClasses(this.settings.classes);
-	callback();
-};
-
-EPUBJS.Book.prototype.applyHeadTags = function(renderer, callback){
-	// if(!this.isRendered) return this._q.enqueue("applyHeadTags", arguments);
-	renderer.applyHeadTags(this.settings.headTags);
-	callback();
-};
-
-EPUBJS.Book.prototype._registerReplacements = function(renderer){
-	renderer.registerHook("beforeChapterDisplay", this.applyStyles.bind(this, renderer), true);
-	renderer.registerHook("beforeChapterDisplay", this.applyHeadTags.bind(this, renderer), true);
-	renderer.registerHook("beforeChapterDisplay", this.applyClasses.bind(this, renderer), true);
-	renderer.registerHook("beforeChapterDisplay", EPUBJS.replace.hrefs.bind(this), true);
-};
-
-EPUBJS.Book.prototype._needsAssetReplacement = function(){
-	if(this.settings.fromStorage) {
-
-		//-- Filesystem api links are relative, so no need to replace them
-		// if(this.storage.getStorageType() == "filesystem") {
-		// 	return false;
-		// }
-
-		return true;
-
-	} else if(this.settings.contained) {
-
-		return true;
-
-	} else {
-
-		return false;
-
-	}
-};
-
-
-//-- http://www.idpf.org/epub/fxl/
-EPUBJS.Book.prototype.parseLayoutProperties = function(metadata){
-	var layout = (this.settings.layoutOveride && this.settings.layoutOveride.layout) || metadata.layout || "reflowable";
-	var spread = (this.settings.layoutOveride && this.settings.layoutOveride.spread) || metadata.spread || "auto";
-	var orientation = (this.settings.layoutOveride && this.settings.layoutOveride.orientation) || metadata.orientation || "auto";
-	return {
-		layout : layout,
-		spread : spread,
-		orientation : orientation
-	};
-};
-
-//-- Enable binding events to book
-RSVP.EventTarget.mixin(EPUBJS.Book.prototype);
-
-//-- Handle RSVP Errors
-RSVP.on('error', function(event) {
-	console.error(event);
+(function webpackUniversalModuleDefinition(root, factory) {
+	if(typeof exports === 'object' && typeof module === 'object')
+		module.exports = factory(require("xmldom"), (function webpackLoadOptionalExternalModule() { try { return require("JSZip"); } catch(e) {} }()));
+	else if(typeof define === 'function' && define.amd)
+		define(["xmldom", "JSZip"], factory);
+	else if(typeof exports === 'object')
+		exports["ePub"] = factory(require("xmldom"), (function webpackLoadOptionalExternalModule() { try { return require("JSZip"); } catch(e) {} }()));
+	else
+		root["ePub"] = factory(root["xmldom"], root["JSZip"]);
+})(this, function(__WEBPACK_EXTERNAL_MODULE_13__, __WEBPACK_EXTERNAL_MODULE_51__) {
+return /******/ (function(modules) { // webpackBootstrap
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/******/
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, {
+/******/ 				configurable: false,
+/******/ 				enumerable: true,
+/******/ 				get: getter
+/******/ 			});
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "/dist/";
+/******/
+/******/ 	// Load entry module and return exports
+/******/ 	return __webpack_require__(__webpack_require__.s = 20);
+/******/ })
+/************************************************************************/
+/******/ ([
+/* 0 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
 });
 
-RSVP.configure('instrument', true); //-- true | will logging out all RSVP rejections
-// RSVP.on('created', listener);
-// RSVP.on('chained', listener);
-// RSVP.on('fulfilled', listener);
-// RSVP.on('rejected', function(event){
-// 	console.error(event.detail.message, event.detail.stack);
-// });
-
-EPUBJS.Chapter = function(spineObject, store, credentials){
-	this.href = spineObject.href;
-	this.absolute = spineObject.url;
-	this.id = spineObject.id;
-	this.spinePos = spineObject.index;
-	this.cfiBase = spineObject.cfiBase;
-	this.properties = spineObject.properties;
-	this.manifestProperties = spineObject.manifestProperties;
-	this.linear = spineObject.linear;
-	this.pages = 1;
-	this.store = store;
-	this.credentials = credentials;
-	this.epubcfi = new EPUBJS.EpubCFI();
-	this.deferred = new RSVP.defer();
-	this.loaded = this.deferred.promise;
-
-	EPUBJS.Hooks.mixin(this);
-	//-- Get pre-registered hooks for events
-	this.getHooks("beforeChapterRender");
-
-	// Cached for replacement urls from storage
-	this.caches = {};
-};
-
-
-EPUBJS.Chapter.prototype.load = function(_store, _credentials){
-	var store = _store || this.store;
-	var credentials = _credentials || this.credentials;
-	var promise;
-	// if(this.store && (!this.book.online || this.book.contained))
-	if(store){
-		promise = store.getXml(this.absolute);
-	}else{
-		promise = EPUBJS.core.request(this.absolute, false, credentials);
-	}
-
-	promise.then(function(xml){
-        try {
-            this.setDocument(xml);
-            this.deferred.resolve(this);
-        } catch (error) {
-            this.deferred.reject({
-                message : this.absolute + " -> " + error.message,
-                stack : new Error().stack
-            });
-        }
-	}.bind(this));
-
-	return promise;
-};
-
-EPUBJS.Chapter.prototype.render = function(_store){
-
-	return this.load().then(function(doc){
-
-		var head = doc.querySelector('head');
-		var base = doc.createElement("base");
-
-		base.setAttribute("href", this.absolute);
-		head.insertBefore(base, head.firstChild);
-
-		this.contents = doc;
-
-		return new RSVP.Promise(function (resolve, reject) {
-			this.triggerHooks("beforeChapterRender", function () {
-				resolve(doc);
-			}.bind(this), this);
-		}.bind(this));
-
-	}.bind(this))
-	.then(function(doc) {
-		var serializer = new XMLSerializer();
-		var contents = serializer.serializeToString(doc);
-		return contents;
-	}.bind(this));
-};
-
-EPUBJS.Chapter.prototype.url = function(_store){
-	var deferred = new RSVP.defer();
-	var store = _store || this.store;
-	var loaded;
-	var chapter = this;
-	var url;
-
-	if(store){
-		if(!this.tempUrl) {
-			store.getUrl(this.absolute).then(function(url){
-				chapter.tempUrl = url;
-				deferred.resolve(url);
-			});
-		} else {
-			url = this.tempUrl;
-			deferred.resolve(url);
-		}
-	}else{
-		url = this.absolute;
-		deferred.resolve(url);
-	}
-
-	return deferred.promise;
-};
-
-EPUBJS.Chapter.prototype.setPages = function(num){
-	this.pages = num;
-};
-
-EPUBJS.Chapter.prototype.getPages = function(num){
-	return this.pages;
-};
-
-EPUBJS.Chapter.prototype.getID = function(){
-	return this.ID;
-};
-
-EPUBJS.Chapter.prototype.unload = function(store){
-	this.document = null;
-	if(this.tempUrl && store) {
-		store.revokeUrl(this.tempUrl);
-		this.tempUrl = false;
-	}
-};
-
-EPUBJS.Chapter.prototype.setDocument = function(_document){
-	// var uri = _document.namespaceURI;
-	// var doctype = _document.doctype;
-	//
-	// // Creates an empty document
-	// this.document = _document.implementation.createDocument(
-	// 		uri,
-	// 		null,
-	// 		null
-	// );
-	// this.contents = this.document.importNode(
-	// 		_document.documentElement, //node to import
-	// 		true                         //clone its descendants
-	// );
-	//
-	// this.document.appendChild(this.contents);
-	this.document = _document;
-	this.contents = _document.documentElement;
-
-	// Fix to apply wgxpath to new document in IE
-	if(!this.document.evaluate && document.evaluate) {
-		this.document.evaluate = document.evaluate;
-	}
-
-	// this.deferred.resolve(this.contents);
-};
-
-EPUBJS.Chapter.prototype.cfiFromRange = function(_range) {
-	var range;
-	var startXpath, endXpath;
-	var startContainer, endContainer;
-	var cleanTextContent, cleanStartTextContent, cleanEndTextContent;
-
-	// Check for Contents
-	if(!this.document) return;
-
-	if(typeof document.evaluate != 'undefined') {
-
-		startXpath = EPUBJS.core.getElementXPath(_range.startContainer);
-		// console.log(startContainer)
-		endXpath = EPUBJS.core.getElementXPath(_range.endContainer);
-
-		startContainer = this.document.evaluate(startXpath, this.document, EPUBJS.core.nsResolver, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-
-		if(!_range.collapsed) {
-			endContainer = this.document.evaluate(endXpath, this.document, EPUBJS.core.nsResolver, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-		}
-
-		range = this.document.createRange();
-		// Find Exact Range in original document
-		if(startContainer) {
-			try {
-				range.setStart(startContainer, _range.startOffset);
-				if(!_range.collapsed && endContainer) {
-					range.setEnd(endContainer, _range.endOffset);
-				}
-			} catch (e) {
-				console.log("missed");
-				startContainer = false;
-			}
-
-		}
-
-		// Fuzzy Match
-		if(!startContainer) {
-			console.log("not found, try fuzzy match");
-			cleanStartTextContent = EPUBJS.core.cleanStringForXpath(_range.startContainer.textContent);
-			startXpath = "//text()[contains(.," + cleanStartTextContent + ")]";
-
-			startContainer = this.document.evaluate(startXpath, this.document, EPUBJS.core.nsResolver, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-
-			if(startContainer){
-				// console.log("Found with Fuzzy");
-				range.setStart(startContainer, _range.startOffset);
-
-				if(!_range.collapsed) {
-					cleanEndTextContent = EPUBJS.core.cleanStringForXpath(_range.endContainer.textContent);
-					endXpath = "//text()[contains(.," + cleanEndTextContent + ")]";
-					endContainer = this.document.evaluate(endXpath, this.document, EPUBJS.core.nsResolver, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-					if(endContainer) {
-						range.setEnd(endContainer, _range.endOffset);
-					}
-				}
-
-			}
-		}
-	} else {
-		range = _range; // Just evaluate the current documents range
-	}
-
-	// Generate the Cfi
-	return this.epubcfi.generateCfiFromRange(range, this.cfiBase);
-};
-
-EPUBJS.Chapter.prototype.find = function(_query){
-	var chapter = this;
-	var matches = [];
-	var query = _query.toLowerCase();
-	//var xpath = this.document.evaluate(".//text()[contains(translate(., '"+query.toUpperCase()+"', '"+query+"'),'"+query+"')]", this.document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-	var find = function(node){
-		// Search String
-		var text = node.textContent.toLowerCase();
-		var range = chapter.document.createRange();
-		var cfi;
-		var pos;
-		var last = -1;
-		var excerpt;
-		var limit = 150;
-
-		while (pos != -1) {
-			pos = text.indexOf(query, last + 1);
-
-			if(pos != -1) {
-				// If Found, Create Range
-				range = chapter.document.createRange();
-				range.setStart(node, pos);
-				range.setEnd(node, pos + query.length);
-
-				//Generate CFI
-				cfi = chapter.cfiFromRange(range);
-
-				// Generate Excerpt
-				if(node.textContent.length < limit) {
-					excerpt = node.textContent;
-				} else {
-					excerpt = node.textContent.substring(pos-limit/2,pos+limit/2);
-					excerpt = "..." + excerpt + "...";
-				}
-
-				//Add CFI to list
-				matches.push({
-					cfi: cfi,
-					excerpt: excerpt
-				});
-			}
-
-			last = pos;
-		}
-
-	};
-
-	// Grab text nodes
-
-	/*
-	for ( var i=0 ; i < xpath.snapshotLength; i++ ) {
-		find(xpath.snapshotItem(i));
-	}
-	*/
-
-	this.textSprint(this.document, function(node){
-		find(node);
-	});
-
-
-	// Return List of CFIs
-	return matches;
-};
-
-
-EPUBJS.Chapter.prototype.textSprint = function(root, func) {
-	var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-			acceptNode: function (node) {
-					if (node.data && ! /^\s*$/.test(node.data) ) {
-						return NodeFilter.FILTER_ACCEPT;
-					} else {
-						return NodeFilter.FILTER_REJECT;
-					}
-			}
-	}, false);
-	var node;
-	while ((node = treeWalker.nextNode())) {
-		func(node);
-	}
-
-};
-
-EPUBJS.Chapter.prototype.replace = function(query, func, finished, progress){
-	var items = this.contents.querySelectorAll(query),
-		resources = Array.prototype.slice.call(items),
-		count = resources.length;
-
-
-	if(count === 0) {
-		finished(false);
-		return;
-	}
-	resources.forEach(function(item){
-		var called = false;
-		var after = function(result, full){
-			if(called === false) {
-				count--;
-				if(progress) progress(result, full, count);
-				if(count <= 0 && finished) finished(true);
-				called = true;
-			}
-		};
-
-		func(item, after);
-
-	}.bind(this));
-
-};
-
-EPUBJS.Chapter.prototype.replaceWithStored = function(query, attr, func, callback) {
-	var _oldUrls,
-			_newUrls = {},
-			_store = this.store,
-			_cache = this.caches[query],
-			_uri = EPUBJS.core.uri(this.absolute),
-			_chapterBase = _uri.base,
-			_attr = attr,
-			_wait = 5,
-			progress = function(url, full, count) {
-				_newUrls[full] = url;
-			},
-			finished = function(notempty) {
-				if(callback) callback();
-				EPUBJS.core.values(_oldUrls).forEach(function(url){
-					_store.revokeUrl(url);
-				});
-
-				_cache = _newUrls;
-			};
-
-	if(!_store) return;
-
-	if(!_cache) _cache = {};
-	_oldUrls = EPUBJS.core.clone(_cache);
-
-	this.replace(query, function(link, done){
-		var src = link.getAttribute(_attr),
-				full = EPUBJS.core.resolveUrl(_chapterBase, src);
-
-		var replaceUrl = function(url) {
-				var timeout;
-				link.onload = function(){
-					clearTimeout(timeout);
-					done(url, full);
-				};
-
-				/*
-				link.onerror = function(e){
-					clearTimeout(timeout);
-					done(url, full);
-					console.error(e);
-				};
-				*/
-
-				if(query == "svg image") {
-					//-- SVG needs this to trigger a load event
-					link.setAttribute("externalResourcesRequired", "true");
-				}
-
-				if(query == "link[href]" && link.getAttribute("rel") !== "stylesheet") {
-					//-- Only Stylesheet links seem to have a load events, just continue others
-					done(url, full);
-				} else {
-					timeout = setTimeout(function(){
-						done(url, full);
-					}, _wait);
-				}
-
-				if (url) {
-					link.setAttribute(_attr, url);
-				}
-
-			};
-
-		if(full in _oldUrls){
-			replaceUrl(_oldUrls[full]);
-			_newUrls[full] = _oldUrls[full];
-			delete _oldUrls[full];
-		}else{
-			func(_store, full, replaceUrl, link);
-		}
-
-	}, finished, progress);
-};
-
-var EPUBJS = EPUBJS || {};
-EPUBJS.core = {};
-
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+exports.isElement = isElement;
+exports.uuid = uuid;
+exports.documentHeight = documentHeight;
+exports.isNumber = isNumber;
+exports.isFloat = isFloat;
+exports.prefixed = prefixed;
+exports.defaults = defaults;
+exports.extend = extend;
+exports.insert = insert;
+exports.locationOf = locationOf;
+exports.indexOfSorted = indexOfSorted;
+exports.bounds = bounds;
+exports.borders = borders;
+exports.windowBounds = windowBounds;
+exports.cleanStringForXpath = cleanStringForXpath;
+exports.indexOfNode = indexOfNode;
+exports.indexOfTextNode = indexOfTextNode;
+exports.indexOfElementNode = indexOfElementNode;
+exports.isXml = isXml;
+exports.createBlob = createBlob;
+exports.createBlobUrl = createBlobUrl;
+exports.createBase64Url = createBase64Url;
+exports.type = type;
+exports.parse = parse;
+exports.qs = qs;
+exports.qsa = qsa;
+exports.qsp = qsp;
+exports.sprint = sprint;
+exports.treeWalker = treeWalker;
+exports.walk = walk;
+exports.blob2base64 = blob2base64;
+exports.defer = defer;
+exports.querySelectorByType = querySelectorByType;
+exports.findChildren = findChildren;
+exports.parents = parents;
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var requestAnimationFrame = exports.requestAnimationFrame = typeof window != "undefined" ? window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame : false;
 var ELEMENT_NODE = 1;
 var TEXT_NODE = 3;
 var COMMENT_NODE = 8;
 var DOCUMENT_NODE = 9;
 
-//-- Get a element for an id
-EPUBJS.core.getEl = function(elem) {
-	return document.getElementById(elem);
-};
+function isElement(obj) {
+	return !!(obj && obj.nodeType == 1);
+}
 
-//-- Get all elements for a class
-EPUBJS.core.getEls = function(classes) {
-	return document.getElementsByClassName(classes);
-};
+// http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
+function uuid() {
+	var d = new Date().getTime();
+	var uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+		var r = (d + Math.random() * 16) % 16 | 0;
+		d = Math.floor(d / 16);
+		return (c == "x" ? r : r & 0x7 | 0x8).toString(16);
+	});
+	return uuid;
+}
 
-EPUBJS.core.request = function(url, type, withCredentials) {
-	var supportsURL = window.URL;
-	var BLOB_RESPONSE = supportsURL ? "blob" : "arraybuffer";
-	var deferred = new RSVP.defer();
-	var xhr = new XMLHttpRequest();
-	var uri;
+function documentHeight() {
+	return Math.max(document.documentElement.clientHeight, document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);
+}
 
-	//-- Check from PDF.js:
-	//   https://github.com/mozilla/pdf.js/blob/master/web/compatibility.js
-	var xhrPrototype = XMLHttpRequest.prototype;
+function isNumber(n) {
+	return !isNaN(parseFloat(n)) && isFinite(n);
+}
 
-	var handler = function() {
-		var r;
+function isFloat(n) {
+	return isNumber(n) && Math.floor(n) !== n;
+}
 
-		if (this.readyState != this.DONE) return;
+function prefixed(unprefixed) {
+	var vendors = ["Webkit", "webkit", "Moz", "O", "ms"];
+	var prefixes = ["-webkit-", "-webkit-", "-moz-", "-o-", "-ms-"];
+	var upper = unprefixed[0].toUpperCase() + unprefixed.slice(1);
+	var length = vendors.length;
 
-		if ((this.status === 200 || this.status === 0) && this.response) { // Android & Firefox reporting 0 for local & blob urls
-			if (type == 'xml'){
-                // If this.responseXML wasn't set, try to parse using a DOMParser from text
-                if(!this.responseXML) {
-                    r = new DOMParser().parseFromString(this.response, "application/xml");
-                } else {
-                    r = this.responseXML;
-                }
-			} else if (type == 'xhtml') {
-                if (!this.responseXML){
-                    r = new DOMParser().parseFromString(this.response, "application/xhtml+xml");
-                } else {
-                    r = this.responseXML;
-                }
-			} else if (type == 'html') {
-				if (!this.responseXML){
-                    r = new DOMParser().parseFromString(this.response, "text/html");
-                } else {
-                    r = this.responseXML;
-                }
-			} else if (type == 'json') {
-				r = JSON.parse(this.response);
-			} else if (type == 'blob') {
-				if (supportsURL) {
-					r = this.response;
-				} else {
-					//-- Safari doesn't support responseType blob, so create a blob from arraybuffer
-					r = new Blob([this.response]);
-				}
-			} else {
-				r = this.response;
-			}
-
-			deferred.resolve(r);
-		} else {
-			deferred.reject({
-				message : this.response,
-				stack : new Error().stack
-			});
-		}
-	};
-
-	if (!('overrideMimeType' in xhrPrototype)) {
-		// IE10 might have response, but not overrideMimeType
-		Object.defineProperty(xhrPrototype, 'overrideMimeType', {
-			value: function xmlHttpRequestOverrideMimeType(mimeType) {}
-		});
-	}
-
-	xhr.onreadystatechange = handler;
-	xhr.open("GET", url, true);
-
-	if(withCredentials) {
-		xhr.withCredentials = true;
-	}
-
-	// If type isn't set, determine it from the file extension
-	if(!type) {
-		uri = EPUBJS.core.uri(url);
-		type = uri.extension;
-		type = {
-			'htm': 'html'
-		}[type] || type;
-	}
-
-	if(type == 'blob'){
-		xhr.responseType = BLOB_RESPONSE;
-	}
-
-	if(type == "json") {
-		xhr.setRequestHeader("Accept", "application/json");
-	}
-
-	if(type == 'xml') {
-		xhr.responseType = "document";
-		xhr.overrideMimeType('text/xml'); // for OPF parsing
-	}
-
-	if(type == 'xhtml') {
-		xhr.responseType = "document";
-	}
-
-	if(type == 'html') {
-		xhr.responseType = "document";
- 	}
-
-	if(type == "binary") {
-		xhr.responseType = "arraybuffer";
-	}
-
-	xhr.send();
-
-	return deferred.promise;
-};
-
-EPUBJS.core.toArray = function(obj) {
-	var arr = [];
-
-	for (var member in obj) {
-		var newitm;
-		if ( obj.hasOwnProperty(member) ) {
-			newitm = obj[member];
-			newitm.ident = member;
-			arr.push(newitm);
-		}
-	}
-
-	return arr;
-};
-
-//-- Parse the different parts of a url, returning a object
-EPUBJS.core.uri = function(url){
-	var uri = {
-				protocol : '',
-				host : '',
-				path : '',
-				origin : '',
-				directory : '',
-				base : '',
-				filename : '',
-				extension : '',
-				fragment : '',
-				href : url
-			},
-			blob = url.indexOf('blob:'),
-			doubleSlash = url.indexOf('://'),
-			search = url.indexOf('?'),
-			fragment = url.indexOf("#"),
-			withoutProtocol,
-			dot,
-			firstSlash;
-
-	if(blob === 0) {
-		uri.protocol = "blob";
-		uri.base = url.indexOf(0, fragment);
-		return uri;
-	}
-
-	if(fragment != -1) {
-		uri.fragment = url.slice(fragment + 1);
-		url = url.slice(0, fragment);
-	}
-
-	if(search != -1) {
-		uri.search = url.slice(search + 1);
-		url = url.slice(0, search);
-		href = uri.href;
-	}
-
-	if(doubleSlash != -1) {
-		uri.protocol = url.slice(0, doubleSlash);
-		withoutProtocol = url.slice(doubleSlash+3);
-		firstSlash = withoutProtocol.indexOf('/');
-
-		if(firstSlash === -1) {
-			uri.host = uri.path;
-			uri.path = "";
-		} else {
-			uri.host = withoutProtocol.slice(0, firstSlash);
-			uri.path = withoutProtocol.slice(firstSlash);
-		}
-
-
-		uri.origin = uri.protocol + "://" + uri.host;
-
-		uri.directory = EPUBJS.core.folder(uri.path);
-
-		uri.base = uri.origin + uri.directory;
-		// return origin;
-	} else {
-		uri.path = url;
-		uri.directory = EPUBJS.core.folder(url);
-		uri.base = uri.directory;
-	}
-
-	//-- Filename
-	uri.filename = url.replace(uri.base, '');
-	dot = uri.filename.lastIndexOf('.');
-	if(dot != -1) {
-		uri.extension = uri.filename.slice(dot+1);
-	}
-	return uri;
-};
-
-//-- Parse out the folder, will return everything before the last slash
-
-EPUBJS.core.folder = function(url){
-
-	var lastSlash = url.lastIndexOf('/');
-
-	if(lastSlash == -1) var folder = '';
-
-	folder = url.slice(0, lastSlash + 1);
-
-	return folder;
-
-};
-
-//-- https://github.com/ebidel/filer.js/blob/master/src/filer.js#L128
-EPUBJS.core.dataURLToBlob = function(dataURL) {
-	var BASE64_MARKER = ';base64,',
-		parts, contentType, raw, rawLength, uInt8Array;
-
-	if (dataURL.indexOf(BASE64_MARKER) == -1) {
-		parts = dataURL.split(',');
-		contentType = parts[0].split(':')[1];
-		raw = parts[1];
-
-		return new Blob([raw], {type: contentType});
-	}
-
-	parts = dataURL.split(BASE64_MARKER);
-	contentType = parts[0].split(':')[1];
-	raw = window.atob(parts[1]);
-	rawLength = raw.length;
-
-	uInt8Array = new Uint8Array(rawLength);
-
-	for (var i = 0; i < rawLength; ++i) {
-		uInt8Array[i] = raw.charCodeAt(i);
-	}
-
-	return new Blob([uInt8Array], {type: contentType});
-};
-
-//-- Load scripts async: http://stackoverflow.com/questions/7718935/load-scripts-asynchronously
-EPUBJS.core.addScript = function(src, callback, target) {
-	var s, r;
-	r = false;
-	s = document.createElement('script');
-	s.type = 'text/javascript';
-	s.async = false;
-	s.src = src;
-	s.onload = s.onreadystatechange = function() {
-		if ( !r && (!this.readyState || this.readyState == 'complete') ) {
-			r = true;
-			if(callback) callback();
-		}
-	};
-	target = target || document.body;
-	target.appendChild(s);
-};
-
-EPUBJS.core.addScripts = function(srcArr, callback, target) {
-	var total = srcArr.length,
-		curr = 0,
-		cb = function(){
-			curr++;
-			if(total == curr){
-				if(callback) callback();
-			}else{
-				EPUBJS.core.addScript(srcArr[curr], cb, target);
-			}
-		};
-
-	EPUBJS.core.addScript(srcArr[curr], cb, target);
-};
-
-EPUBJS.core.addCss = function(src, callback, target) {
-	var s, r;
-	r = false;
-	s = document.createElement('link');
-	s.type = 'text/css';
-	s.rel = "stylesheet";
-	s.href = src;
-	s.onload = s.onreadystatechange = function() {
-		if ( !r && (!this.readyState || this.readyState == 'complete') ) {
-			r = true;
-			if(callback) callback();
-		}
-	};
-	target = target || document.body;
-	target.appendChild(s);
-};
-
-EPUBJS.core.prefixed = function(unprefixed) {
-	var vendors = ["Webkit", "Moz", "O", "ms" ],
-		prefixes = ['-Webkit-', '-moz-', '-o-', '-ms-'],
-		upper = unprefixed[0].toUpperCase() + unprefixed.slice(1),
-		length = vendors.length;
-
-	if (typeof(document.documentElement.style[unprefixed]) != 'undefined') {
+	if (typeof document === "undefined" || typeof document.body.style[unprefixed] != "undefined") {
 		return unprefixed;
 	}
 
-	for ( var i=0; i < length; i++ ) {
-		if (typeof(document.documentElement.style[vendors[i] + upper]) != 'undefined') {
-			return vendors[i] + upper;
+	for (var i = 0; i < length; i++) {
+		if (typeof document.body.style[vendors[i] + upper] != "undefined") {
+			return prefixes[i] + unprefixed;
 		}
 	}
 
 	return unprefixed;
-};
+}
 
-EPUBJS.core.resolveUrl = function(base, path) {
-	var url,
-		segments = [],
-		uri = EPUBJS.core.uri(path),
-		folders = base.split("/"),
-		paths;
-
-	if(uri.host) {
-		return path;
-	}
-
-	folders.pop();
-
-	paths = path.split("/");
-	paths.forEach(function(p){
-		if(p === ".."){
-			folders.pop();
-		}else{
-			segments.push(p);
+function defaults(obj) {
+	for (var i = 1, length = arguments.length; i < length; i++) {
+		var source = arguments[i];
+		for (var prop in source) {
+			if (obj[prop] === void 0) obj[prop] = source[prop];
 		}
+	}
+	return obj;
+}
+
+function extend(target) {
+	var sources = [].slice.call(arguments, 1);
+	sources.forEach(function (source) {
+		if (!source) return;
+		Object.getOwnPropertyNames(source).forEach(function (propName) {
+			Object.defineProperty(target, propName, Object.getOwnPropertyDescriptor(source, propName));
+		});
 	});
-
-	url = folders.concat(segments);
-
-	return url.join("/");
-};
-
-// http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
-EPUBJS.core.uuid = function() {
-	var d = new Date().getTime();
-	var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-			var r = (d + Math.random()*16)%16 | 0;
-			d = Math.floor(d/16);
-			return (c=='x' ? r : (r&0x7|0x8)).toString(16);
-	});
-	return uuid;
-};
+	return target;
+}
 
 // Fast quicksort insert for sorted array -- based on:
 // http://stackoverflow.com/questions/1344500/efficient-way-to-insert-a-number-into-a-sorted-array-of-numbers
-EPUBJS.core.insert = function(item, array, compareFunction) {
-	var location = EPUBJS.core.locationOf(item, array, compareFunction);
+function insert(item, array, compareFunction) {
+	var location = locationOf(item, array, compareFunction);
 	array.splice(location, 0, item);
 
 	return location;
-};
+}
 
-EPUBJS.core.locationOf = function(item, array, compareFunction, _start, _end) {
+// Returns where something would fit in
+function locationOf(item, array, compareFunction, _start, _end) {
 	var start = _start || 0;
 	var end = _end || array.length;
 	var pivot = parseInt(start + (end - start) / 2);
 	var compared;
-	if(!compareFunction){
-		compareFunction = function(a, b) {
-			if(a > b) return 1;
-			if(a < b) return -1;
-			if(a = b) return 0;
+	if (!compareFunction) {
+		compareFunction = function compareFunction(a, b) {
+			if (a > b) return 1;
+			if (a < b) return -1;
+			if (a == b) return 0;
 		};
 	}
-	if(end-start <= 0) {
+	if (end - start <= 0) {
 		return pivot;
 	}
 
 	compared = compareFunction(array[pivot], item);
-	if(end-start === 1) {
-		return compared > 0 ? pivot : pivot + 1;
+	if (end - start === 1) {
+		return compared >= 0 ? pivot : pivot + 1;
 	}
-
-	if(compared === 0) {
+	if (compared === 0) {
 		return pivot;
 	}
-	if(compared === -1) {
-		return EPUBJS.core.locationOf(item, array, compareFunction, pivot, end);
-	} else{
-		return EPUBJS.core.locationOf(item, array, compareFunction, start, pivot);
+	if (compared === -1) {
+		return locationOf(item, array, compareFunction, pivot, end);
+	} else {
+		return locationOf(item, array, compareFunction, start, pivot);
 	}
-};
+}
 
-EPUBJS.core.indexOfSorted = function(item, array, compareFunction, _start, _end) {
+// Returns -1 of mpt found
+function indexOfSorted(item, array, compareFunction, _start, _end) {
 	var start = _start || 0;
 	var end = _end || array.length;
 	var pivot = parseInt(start + (end - start) / 2);
 	var compared;
-	if(!compareFunction){
-		compareFunction = function(a, b) {
-			if(a > b) return 1;
-			if(a < b) return -1;
-			if(a = b) return 0;
+	if (!compareFunction) {
+		compareFunction = function compareFunction(a, b) {
+			if (a > b) return 1;
+			if (a < b) return -1;
+			if (a == b) return 0;
 		};
 	}
-	if(end-start <= 0) {
+	if (end - start <= 0) {
 		return -1; // Not found
 	}
 
 	compared = compareFunction(array[pivot], item);
-	if(end-start === 1) {
+	if (end - start === 1) {
 		return compared === 0 ? pivot : -1;
 	}
-	if(compared === 0) {
+	if (compared === 0) {
 		return pivot; // Found
 	}
-	if(compared === -1) {
-		return EPUBJS.core.indexOfSorted(item, array, compareFunction, pivot, end);
-	} else{
-		return EPUBJS.core.indexOfSorted(item, array, compareFunction, start, pivot);
+	if (compared === -1) {
+		return indexOfSorted(item, array, compareFunction, pivot, end);
+	} else {
+		return indexOfSorted(item, array, compareFunction, start, pivot);
 	}
-};
+}
 
+function bounds(el) {
 
-EPUBJS.core.queue = function(_scope){
-	var _q = [];
-	var scope = _scope;
-	// Add an item to the queue
-	var enqueue = function(funcName, args, context) {
-		_q.push({
-			"funcName" : funcName,
-			"args"     : args,
-			"context"  : context
-		});
-		return _q;
-	};
-	// Run one item
-	var dequeue = function(){
-		var inwait;
-		if(_q.length) {
-			inwait = _q.shift();
-			// Defer to any current tasks
-			// setTimeout(function(){
-			scope[inwait.funcName].apply(inwait.context || scope, inwait.args);
-			// }, 0);
-		}
-	};
+	var style = window.getComputedStyle(el);
+	var widthProps = ["width", "paddingRight", "paddingLeft", "marginRight", "marginLeft", "borderRightWidth", "borderLeftWidth"];
+	var heightProps = ["height", "paddingTop", "paddingBottom", "marginTop", "marginBottom", "borderTopWidth", "borderBottomWidth"];
 
-	// Run All
-	var flush = function(){
-		while(_q.length) {
-			dequeue();
-		}
-	};
-	// Clear all items in wait
-	var clear = function(){
-		_q = [];
-	};
+	var width = 0;
+	var height = 0;
 
-	var length = function(){
-		return _q.length;
-	};
+	widthProps.forEach(function (prop) {
+		width += parseFloat(style[prop]) || 0;
+	});
+
+	heightProps.forEach(function (prop) {
+		height += parseFloat(style[prop]) || 0;
+	});
 
 	return {
-		"enqueue" : enqueue,
-		"dequeue" : dequeue,
-		"flush" : flush,
-		"clear" : clear,
-		"length" : length
+		height: height,
+		width: width
 	};
-};
+}
 
-// From: https://code.google.com/p/fbug/source/browse/branches/firebug1.10/content/firebug/lib/xpath.js
-/**
- * Gets an XPath for an element which describes its hierarchical location.
- */
-EPUBJS.core.getElementXPath = function(element) {
-	if (element && element.id) {
-		return '//*[@id="' + element.id + '"]';
-	} else {
-		return EPUBJS.core.getElementTreeXPath(element);
-	}
-};
+function borders(el) {
 
-EPUBJS.core.getElementTreeXPath = function(element) {
-	var paths = [];
-	var 	isXhtml = (element.ownerDocument.documentElement.getAttribute('xmlns') === "http://www.w3.org/1999/xhtml");
-	var index, nodeName, tagName, pathIndex;
+	var style = window.getComputedStyle(el);
+	var widthProps = ["paddingRight", "paddingLeft", "marginRight", "marginLeft", "borderRightWidth", "borderLeftWidth"];
+	var heightProps = ["paddingTop", "paddingBottom", "marginTop", "marginBottom", "borderTopWidth", "borderBottomWidth"];
 
-	if(element.nodeType === Node.TEXT_NODE){
-		// index = Array.prototype.indexOf.call(element.parentNode.childNodes, element) + 1;
-		index = EPUBJS.core.indexOfTextNode(element) + 1;
+	var width = 0;
+	var height = 0;
 
-		paths.push("text()["+index+"]");
-		element = element.parentNode;
-	}
+	widthProps.forEach(function (prop) {
+		width += parseFloat(style[prop]) || 0;
+	});
 
-	// Use nodeName (instead of localName) so namespace prefix is included (if any).
-	for (; element && element.nodeType == 1; element = element.parentNode)
-	{
-		index = 0;
-		for (var sibling = element.previousSibling; sibling; sibling = sibling.previousSibling)
-		{
-			// Ignore document type declaration.
-			if (sibling.nodeType == Node.DOCUMENT_TYPE_NODE) {
-				continue;
-			}
-			if (sibling.nodeName == element.nodeName) {
-				++index;
-			}
-		}
-		nodeName = element.nodeName.toLowerCase();
-		tagName = (isXhtml ? "xhtml:" + nodeName : nodeName);
-		pathIndex = (index ? "[" + (index+1) + "]" : "");
-		paths.splice(0, 0, tagName + pathIndex);
-	}
+	heightProps.forEach(function (prop) {
+		height += parseFloat(style[prop]) || 0;
+	});
 
-	return paths.length ? "./" + paths.join("/") : null;
-};
-
-EPUBJS.core.nsResolver = function(prefix) {
-	var ns = {
-		'xhtml' : 'http://www.w3.org/1999/xhtml',
-		'epub': 'http://www.idpf.org/2007/ops'
+	return {
+		height: height,
+		width: width
 	};
-	return ns[prefix] || null;
-};
+}
 
-//https://stackoverflow.com/questions/13482352/xquery-looking-for-text-with-single-quote/13483496#13483496
-EPUBJS.core.cleanStringForXpath = function(str)  {
-		var parts = str.match(/[^'"]+|['"]/g);
-		parts = parts.map(function(part){
-				if (part === "'")  {
-						return '\"\'\"'; // output "'"
-				}
+function windowBounds() {
 
-				if (part === '"') {
-						return "\'\"\'"; // output '"'
-				}
-				return "\'" + part + "\'";
-		});
-		return "concat(\'\'," + parts.join(",") + ")";
-};
+	var width = window.innerWidth;
+	var height = window.innerHeight;
 
-EPUBJS.core.indexOfTextNode = function(textNode){
-	var parent = textNode.parentNode;
-	var children = parent.childNodes;
-	var sib;
-	var index = -1;
-	for (var i = 0; i < children.length; i++) {
-		sib = children[i];
-		if(sib.nodeType === Node.TEXT_NODE){
-			index++;
+	return {
+		top: 0,
+		left: 0,
+		right: width,
+		bottom: height,
+		width: width,
+		height: height
+	};
+}
+
+//-- https://stackoverflow.com/questions/13482352/xquery-looking-for-text-with-single-quote/13483496#13483496
+function cleanStringForXpath(str) {
+	var parts = str.match(/[^'"]+|['"]/g);
+	parts = parts.map(function (part) {
+		if (part === "'") {
+			return "\"\'\""; // output "'"
 		}
-		if(sib == textNode) break;
-	}
 
-	return index;
-};
+		if (part === "\"") {
+			return "\'\"\'"; // output '"'
+		}
+		return "'" + part + "'";
+	});
+	return "concat(''," + parts.join(",") + ")";
+}
 
-// Underscore
-EPUBJS.core.defaults = function(obj) {
-  for (var i = 1, length = arguments.length; i < length; i++) {
-    var source = arguments[i];
-    for (var prop in source) {
-      if (obj[prop] === void 0) obj[prop] = source[prop];
-    }
-  }
-  return obj;
-};
-
-EPUBJS.core.extend = function(target) {
-    var sources = [].slice.call(arguments, 1);
-    sources.forEach(function (source) {
-      if(!source) return;
-      Object.getOwnPropertyNames(source).forEach(function(propName) {
-        Object.defineProperty(target, propName, Object.getOwnPropertyDescriptor(source, propName));
-      });
-    });
-    return target;
-};
-
-EPUBJS.core.clone = function(obj) {
-  return EPUBJS.core.isArray(obj) ? obj.slice() : EPUBJS.core.extend({}, obj);
-};
-
-EPUBJS.core.isElement = function(obj) {
-    return !!(obj && obj.nodeType == 1);
-};
-
-EPUBJS.core.isNumber = function(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-};
-
-EPUBJS.core.isString = function(str) {
-  return (typeof str === 'string' || str instanceof String);
-};
-
-EPUBJS.core.isArray = Array.isArray || function(obj) {
-  return Object.prototype.toString.call(obj) === '[object Array]';
-};
-
-// Lodash
-EPUBJS.core.values = function(object) {
-	var index = -1;
-	var props, length, result;
-
-	if(!object) return [];
-
-  props = Object.keys(object);
-  length = props.length;
-  result = Array(length);
-
-  while (++index < length) {
-    result[index] = object[props[index]];
-  }
-  return result;
-};
-
-EPUBJS.core.indexOfNode = function(node, typeId) {
+function indexOfNode(node, typeId) {
 	var parent = node.parentNode;
 	var children = parent.childNodes;
 	var sib;
@@ -5081,4144 +361,14366 @@ EPUBJS.core.indexOfNode = function(node, typeId) {
 	return index;
 }
 
-EPUBJS.core.indexOfTextNode = function(textNode) {
-	return EPUBJS.core.indexOfNode(textNode, TEXT_NODE);
+function indexOfTextNode(textNode) {
+	return indexOfNode(textNode, TEXT_NODE);
 }
 
-EPUBJS.core.indexOfElementNode = function(elementNode) {
-	return EPUBJS.core.indexOfNode(elementNode, ELEMENT_NODE);
+function indexOfElementNode(elementNode) {
+	return indexOfNode(elementNode, ELEMENT_NODE);
 }
 
-EPUBJS.EpubCFI = function(cfiStr){
-  if(cfiStr) return this.parse(cfiStr);
-};
+function isXml(ext) {
+	return ["xml", "opf", "ncx"].indexOf(ext) > -1;
+}
 
-EPUBJS.EpubCFI.prototype.generateChapterComponent = function(_spineNodeIndex, _pos, id) {
-  var pos = parseInt(_pos),
-    spineNodeIndex = (_spineNodeIndex + 1) * 2,
-    cfi = '/'+spineNodeIndex+'/';
+function createBlob(content, mime) {
+	return new Blob([content], { type: mime });
+}
 
-  cfi += (pos + 1) * 2;
+function createBlobUrl(content, mime) {
+	var _URL = window.URL || window.webkitURL || window.mozURL;
+	var tempUrl;
+	var blob = createBlob(content, mime);
 
-  if(id) cfi += "[" + id + "]";
+	tempUrl = _URL.createObjectURL(blob);
 
-  //cfi += "!";
+	return tempUrl;
+}
 
-  return cfi;
-};
+function createBase64Url(content, mime) {
+	var data;
+	var datauri;
 
-EPUBJS.EpubCFI.prototype.generatePathComponent = function(steps) {
-  return steps.map(function(part) {
-    return (part.index + 1) * 2 + (part.id ? '[' + part.id + ']' : '');
-  }).join('/');
-};
-
-EPUBJS.EpubCFI.prototype.generateCfiFromElement = function(element, chapter) {
-  var steps = this.pathTo(element);
-  var path = this.generatePathComponent(steps);
-  if(!path.length) {
-    // Start of Chapter
-    return "epubcfi(" + chapter + "!/4/)";
-  } else {
-    // First Text Node
-    return "epubcfi(" + chapter + "!/" + path + "/1:0)";
-  }
-};
-
-EPUBJS.EpubCFI.prototype.pathTo = function(node) {
-  var stack = [],
-      children;
-
-  while(node && node.parentNode !== null && node.parentNode.nodeType != 9) {
-    children = node.parentNode.children;
-
-    stack.unshift({
-      'id' : node.id,
-      // 'classList' : node.classList,
-      'tagName' : node.tagName,
-      'index' : children ? Array.prototype.indexOf.call(children, node) : 0
-    });
-
-    node = node.parentNode;
-  }
-
-  return stack;
-};
-
-EPUBJS.EpubCFI.prototype.getChapterComponent = function(cfiStr) {
-
-  var splitStr = cfiStr.split("!");
-
-  return splitStr[0];
-};
-
-EPUBJS.EpubCFI.prototype.getPathComponent = function(cfiStr) {
-
-  var splitStr = cfiStr.split("!");
-  var pathComponent = splitStr[1] ? splitStr[1].split(":") : '';
-
-  return pathComponent[0];
-};
-
-EPUBJS.EpubCFI.prototype.getCharecterOffsetComponent = // backwards-compat
-EPUBJS.EpubCFI.prototype.getCharacterOffsetComponent = function(cfiStr) {
-  var splitStr = cfiStr.split(":");
-  return splitStr[1] || '';
-};
-
-
-EPUBJS.EpubCFI.prototype.parse = function(cfiStr) {
-  var cfi = {},
-    chapSegment,
-    chapterComponent,
-    pathComponent,
-    characterOffsetComponent,
-    assertion,
-    chapId,
-    path,
-    end,
-    endInt,
-    text,
-    parseStep = function(part){
-      var type, index, has_brackets, id;
-
-      type = "element";
-      index = parseInt(part) / 2 - 1;
-      has_brackets = part.match(/\[(.*)\]/);
-      if(has_brackets && has_brackets[1]){
-        id = has_brackets[1];
-      }
-
-      return {
-        "type" : type,
-        'index' : index,
-        'id' : id || false
-      };
-    };
-
-  if(typeof cfiStr !== "string") {
-    return {spinePos: -1};
-  }
-
-  cfi.str = cfiStr;
-
-  if(cfiStr.indexOf("epubcfi(") === 0 && cfiStr[cfiStr.length-1] === ")") {
-    // Remove intial epubcfi( and ending )
-    cfiStr = cfiStr.slice(8, cfiStr.length-1);
-  }
-
-  chapterComponent = this.getChapterComponent(cfiStr);
-  pathComponent = this.getPathComponent(cfiStr) || '';
-  characterOffsetComponent = this.getCharacterOffsetComponent(cfiStr);
-  // Make sure this is a valid cfi or return
-  if(!chapterComponent) {
-    return {spinePos: -1};
-  }
-
-  // Chapter segment is always the second one
-  chapSegment = chapterComponent.split("/")[2] || '';
-  if(!chapSegment) return {spinePos:-1};
-
-  cfi.spinePos = (parseInt(chapSegment) / 2 - 1 ) || 0;
-
-  chapId = chapSegment.match(/\[(.*)\]/);
-
-  cfi.spineId = chapId ? chapId[1] : false;
-
-  if(pathComponent.indexOf(',') != -1) {
-    // Handle ranges -- not supported yet
-    console.warn("CFI Ranges are not supported");
-  }
-
-  path = pathComponent.split('/');
-  end = path.pop();
-
-  cfi.steps = [];
-
-  path.forEach(function(part){
-    var step;
-
-    if(part) {
-      step = parseStep(part);
-      cfi.steps.push(step);
-    }
-  });
-
-  //-- Check if END is a text node or element
-  endInt = parseInt(end);
-  if(!isNaN(endInt)) {
-
-    if(endInt % 2 === 0) { // Even = is an element
-      cfi.steps.push(parseStep(end));
-    } else {
-      cfi.steps.push({
-        "type" : "text",
-        'index' : (endInt - 1 ) / 2
-      });
-    }
-
-  }
-
-  assertion = characterOffsetComponent.match(/\[(.*)\]/);
-  if(assertion && assertion[1]){
-    cfi.characterOffset = parseInt(characterOffsetComponent.split('[')[0]);
-    // We arent handling these assertions yet
-    cfi.textLocationAssertion = assertion[1];
-  } else {
-    cfi.characterOffset = parseInt(characterOffsetComponent);
-  }
-
-  return cfi;
-};
-
-EPUBJS.EpubCFI.prototype.addMarker = function(cfi, _doc, _marker) {
-  var doc = _doc || document;
-  var marker = _marker || this.createMarker(doc);
-  var parent;
-  var lastStep;
-  var text;
-  var split;
-
-  if(typeof cfi === 'string') {
-    cfi = this.parse(cfi);
-  }
-  // Get the terminal step
-  lastStep = cfi.steps[cfi.steps.length-1];
-
-  // check spinePos
-  if(cfi.spinePos === -1) {
-    // Not a valid CFI
-    return false;
-  }
-
-  // Find the CFI elements parent
-  parent = this.findParent(cfi, doc);
-
-  if(!parent) {
-    // CFI didn't return an element
-    // Maybe it isnt in the current chapter?
-    return false;
-  }
-
-  if(lastStep && lastStep.type === "text") {
-    text = parent.childNodes[lastStep.index];
-    if(cfi.characterOffset){
-      split = text.splitText(cfi.characterOffset);
-      marker.classList.add("EPUBJS-CFI-SPLIT");
-      parent.insertBefore(marker, split);
-    } else {
-      parent.insertBefore(marker, text);
-    }
-  } else {
-    parent.insertBefore(marker, parent.firstChild);
-  }
-
-  return marker;
-};
-
-EPUBJS.EpubCFI.prototype.createMarker = function(_doc) {
-  var doc = _doc || document;
-  var element = doc.createElement('span');
-  element.id = "EPUBJS-CFI-MARKER:"+ EPUBJS.core.uuid();
-  element.classList.add("EPUBJS-CFI-MARKER");
-
-  return element;
-};
-
-EPUBJS.EpubCFI.prototype.removeMarker = function(marker, _doc) {
-  var doc = _doc || document;
-  // var id = marker.id;
-
-  // Cleanup textnodes if they were split
-  if(marker.classList.contains("EPUBJS-CFI-SPLIT")){
-    nextSib = marker.nextSibling;
-    prevSib = marker.previousSibling;
-    if(nextSib &&
-        prevSib &&
-        nextSib.nodeType === 3 &&
-        prevSib.nodeType === 3){
-
-      prevSib.textContent += nextSib.textContent;
-      marker.parentNode.removeChild(nextSib);
-    }
-    marker.parentNode.removeChild(marker);
-  } else if(marker.classList.contains("EPUBJS-CFI-MARKER")) {
-    // Remove only elements added as markers
-    marker.parentNode.removeChild(marker);
-  }
-
-};
-
-EPUBJS.EpubCFI.prototype.findParent = function(cfi, _doc) {
-  var doc = _doc || document,
-      element = doc.getElementsByTagName('html')[0],
-      children = Array.prototype.slice.call(element.children),
-      num, index, part, sections,
-      text, textBegin, textEnd;
-
-  if(typeof cfi === 'string') {
-    cfi = this.parse(cfi);
-  }
-
-  sections = cfi.steps.slice(0); // Clone steps array
-  if(!sections.length) {
-    return doc.getElementsByTagName('body')[0];
-  }
-
-  while(sections && sections.length > 0) {
-    part = sections.shift();
-    // Find textNodes Parent
-    if(part.type === "text") {
-      text = element.childNodes[part.index];
-      element = text.parentNode || element;
-    // Find element by id if present
-    } else if(part.id){
-      element = doc.getElementById(part.id);
-    // Find element in parent
-    }else{
-      element = children[part.index];
-    }
-    // Element can't be found
-    if(!element || typeof element === "undefined") {
-      console.error("No Element For", part, cfi.str);
-      return false;
-    }
-    // Get current element children and continue through steps
-    children = Array.prototype.slice.call(element.children);
-  }
-
-  return element;
-};
-
-EPUBJS.EpubCFI.prototype.compare = function(cfiOne, cfiTwo) {
-  if(typeof cfiOne === 'string') {
-    cfiOne = new EPUBJS.EpubCFI(cfiOne);
-  }
-  if(typeof cfiTwo === 'string') {
-    cfiTwo = new EPUBJS.EpubCFI(cfiTwo);
-  }
-  // Compare Spine Positions
-  if(cfiOne.spinePos > cfiTwo.spinePos) {
-    return 1;
-  }
-  if(cfiOne.spinePos < cfiTwo.spinePos) {
-    return -1;
-  }
-
-
-  // Compare Each Step in the First item
-  for (var i = 0; i < cfiOne.steps.length; i++) {
-    if(!cfiTwo.steps[i]) {
-      return 1;
-    }
-    if(cfiOne.steps[i].index > cfiTwo.steps[i].index) {
-      return 1;
-    }
-    if(cfiOne.steps[i].index < cfiTwo.steps[i].index) {
-      return -1;
-    }
-    // Otherwise continue checking
-  }
-
-  // All steps in First present in Second
-  if(cfiOne.steps.length < cfiTwo.steps.length) {
-    return -1;
-  }
-
-  // Compare the character offset of the text node
-  if(cfiOne.characterOffset > cfiTwo.characterOffset) {
-    return 1;
-  }
-  if(cfiOne.characterOffset < cfiTwo.characterOffset) {
-    return -1;
-  }
-
-  // CFI's are equal
-  return 0;
-};
-
-EPUBJS.EpubCFI.prototype.generateCfiFromHref = function(href, book) {
-  var uri = EPUBJS.core.uri(href);
-  var path = uri.path;
-  var fragment = uri.fragment;
-  var spinePos = book.spineIndexByURL[path];
-  var loaded;
-  var deferred = new RSVP.defer();
-  var epubcfi = new EPUBJS.EpubCFI();
-  var spineItem;
-
-  if(typeof spinePos !== "undefined"){
-    spineItem = book.spine[spinePos];
-    loaded = book.loadXml(spineItem.url);
-    loaded.then(function(doc){
-      var element = doc.getElementById(fragment);
-      var cfi;
-      cfi = epubcfi.generateCfiFromElement(element, spineItem.cfiBase);
-      deferred.resolve(cfi);
-    });
-  }
-
-  return deferred.promise;
-};
-
-EPUBJS.EpubCFI.prototype.generateCfiFromTextNode = function(anchor, offset, base) {
-  var parent = anchor.parentNode;
-  var steps = this.pathTo(parent);
-  var path = this.generatePathComponent(steps);
-  var index = 1 + (2 * Array.prototype.indexOf.call(parent.childNodes, anchor));
-  return "epubcfi(" + base + "!/" + path + "/"+index+":"+(offset || 0)+")";
-};
-
-EPUBJS.EpubCFI.prototype.generateCfiFromRangeAnchor = function(range, base) {
-  var anchor = range.anchorNode;
-  var offset = range.anchorOffset;
-  return this.generateCfiFromTextNode(anchor, offset, base);
-};
-
-EPUBJS.EpubCFI.prototype.generateCfiFromRange = function(range, base) {
-  var start, startElement, startSteps, startPath, startOffset, startIndex;
-  var end, endElement, endSteps, endPath, endOffset, endIndex;
-
-  start = range.startContainer;
-
-  if(start.nodeType === 3) { // text node
-    startElement = start.parentNode;
-    //startIndex = 1 + (2 * Array.prototype.indexOf.call(startElement.childNodes, start));
-    startIndex = 1 + (2 * EPUBJS.core.indexOfTextNode(start));
-    startSteps = this.pathTo(startElement);
-  } else if(range.collapsed) {
-    return this.generateCfiFromElement(start, base); // single element
-  } else {
-    startSteps = this.pathTo(start);
-  }
-
-  startPath = this.generatePathComponent(startSteps);
-  startOffset = range.startOffset;
-
-  if(!range.collapsed) {
-    end = range.endContainer;
-
-    if(end.nodeType === 3) { // text node
-      endElement = end.parentNode;
-      // endIndex = 1 + (2 * Array.prototype.indexOf.call(endElement.childNodes, end));
-      endIndex = 1 + (2 * EPUBJS.core.indexOfTextNode(end));
-
-      endSteps = this.pathTo(endElement);
-    } else {
-      endSteps = this.pathTo(end);
-    }
-
-    endPath = this.generatePathComponent(endSteps);
-    endOffset = range.endOffset;
-
-    // Remove steps present in startPath
-    endPath = endPath.replace(startPath, '');
-
-    if (endPath.length) {
-      endPath = endPath + "/";
-    }
-
-    return "epubcfi(" + base + "!/" + startPath + "/" + startIndex + ":" + startOffset + "," + endPath + endIndex + ":" + endOffset + ")";
-
-  } else {
-    return "epubcfi(" + base + "!/" + startPath + "/"+ startIndex +":"+ startOffset +")";
-  }
-};
-
-EPUBJS.EpubCFI.prototype.generateXpathFromSteps = function(steps) {
-  var xpath = [".", "*"];
-
-  steps.forEach(function(step){
-    var position = step.index + 1;
-
-    if(step.id){
-      xpath.push("*[position()=" + position + " and @id='" + step.id + "']");
-    } else if(step.type === "text") {
-      xpath.push("text()[" + position + "]");
-    } else {
-      xpath.push("*[" + position + "]");
-    }
-  });
-
-  return xpath.join("/");
-};
-
-EPUBJS.EpubCFI.prototype.generateQueryFromSteps = function(steps) {
-  var query = ["html"];
-
-  steps.forEach(function(step){
-    var position = step.index + 1;
-
-    if(step.id){
-      query.push("#" + step.id);
-    } else if(step.type === "text") {
-      // unsupported in querySelector
-      // query.push("text()[" + position + "]");
-    } else {
-      query.push("*:nth-child(" + position + ")");
-    }
-  });
-
-  return query.join(">");
-};
-
-
-EPUBJS.EpubCFI.prototype.generateRangeFromCfi = function(cfi, _doc) {
-  var doc = _doc || document;
-  var range = doc.createRange();
-  var lastStep;
-  var xpath;
-  var startContainer;
-  var textLength;
-  var query;
-  var startContainerParent;
-
-  if(typeof cfi === 'string') {
-    cfi = this.parse(cfi);
-  }
-
-  // check spinePos
-  if(cfi.spinePos === -1) {
-    // Not a valid CFI
-    return false;
-  }
-
-  // Get the terminal step
-  lastStep = cfi.steps[cfi.steps.length-1];
-
-  if(typeof document.evaluate != 'undefined') {
-    xpath = this.generateXpathFromSteps(cfi.steps);
-    startContainer = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-  } else {
-      // Get the query string
-      query = this.generateQueryFromSteps(cfi.steps);
-      // Find the containing element
-      startContainerParent = doc.querySelector(query);
-      // Find the text node within that element
-      if(startContainerParent && lastStep.type == "text") {
-        startContainer = startContainerParent.childNodes[lastStep.index];
-      }
-  }
-
-  if(!startContainer) {
-    return null;
-  }
-
-  if(startContainer && cfi.characterOffset >= 0) {
-    textLength = startContainer.length;
-
-    if(cfi.characterOffset < textLength) {
-      range.setStart(startContainer, cfi.characterOffset);
-      range.setEnd(startContainer, textLength );
-    } else {
-      console.debug("offset greater than length:", cfi.characterOffset, textLength);
-      range.setStart(startContainer, textLength - 1 );
-      range.setEnd(startContainer, textLength );
-    }
-  } else if(startContainer) {
-    range.selectNode(startContainer);
-  }
-  // doc.defaultView.getSelection().addRange(range);
-  return range;
-};
-
-EPUBJS.EpubCFI.prototype.isCfiString = function(target) {
-  return typeof target === 'string' && target.indexOf('epubcfi(') === 0;
-};
-
-EPUBJS.Events = function(obj, el){
-	
-	this.events = {};
-	
-	if(!el){
-		this.el = document.createElement('div');
-	}else{
-		this.el = el;
-	}
-	
-	obj.createEvent = this.createEvent;
-	obj.tell = this.tell;
-	obj.listen = this.listen;
-	obj.deafen = this.deafen;
-	obj.listenUntil = this.listenUntil;
-	
-	return this;
-};
-
-EPUBJS.Events.prototype.createEvent = function(evt){
-	var e = new CustomEvent(evt);
-	this.events[evt] = e;
-	return e;
-};
-
-EPUBJS.Events.prototype.tell = function(evt, msg){
-	var e;
-
-	if(!this.events[evt]){
-		console.warn("No event:", evt, "defined yet, creating.");
-		e = this.createEvent(evt);
-	}else{
-		e = this.events[evt];
-	}
-
-	if(msg) e.msg = msg;
-	this.el.dispatchEvent(e);
-
-};
-
-EPUBJS.Events.prototype.listen = function(evt, func, bindto){
-	if(!this.events[evt]){
-		console.warn("No event:", evt, "defined yet, creating.");
-		this.createEvent(evt);
+	if (typeof content !== "string") {
+		// Only handles strings
 		return;
 	}
 
-	if(bindto){
-		this.el.addEventListener(evt, func.bind(bindto), false);
-	}else{
-		this.el.addEventListener(evt, func, false);
+	data = btoa(encodeURIComponent(content));
+
+	datauri = "data:" + mime + ";base64," + data;
+
+	return datauri;
+}
+
+function type(obj) {
+	return Object.prototype.toString.call(obj).slice(8, -1);
+}
+
+function parse(markup, mime, forceXMLDom) {
+	var doc;
+	var Parser;
+
+	if (typeof DOMParser === "undefined" || forceXMLDom) {
+		Parser = __webpack_require__(13).DOMParser;
+	} else {
+		Parser = DOMParser;
 	}
 
-};
-
-EPUBJS.Events.prototype.deafen = function(evt, func){
-	this.el.removeEventListener(evt, func, false);
-};
-
-EPUBJS.Events.prototype.listenUntil = function(OnEvt, OffEvt, func, bindto){
-	this.listen(OnEvt, func, bindto);
-	
-	function unlisten(){
-		this.deafen(OnEvt, func);
-		this.deafen(OffEvt, unlisten);
+	// Remove byte order mark before parsing
+	// https://www.w3.org/International/questions/qa-byte-order-mark
+	if (markup.charCodeAt(0) === 0xFEFF) {
+		markup = markup.slice(1);
 	}
-	
-	this.listen(OffEvt, unlisten, this);
-};
-EPUBJS.hooks = {};
-EPUBJS.Hooks = (function(){
-	function hooks(){}
 
-	//-- Get pre-registered hooks
-	hooks.prototype.getHooks = function(){
-		var plugs;
-		this.hooks = {};
-		Array.prototype.slice.call(arguments).forEach(function(arg){
-			this.hooks[arg] = [];
-		}, this);
+	doc = new Parser().parseFromString(markup, mime);
 
-		for (var plugType in this.hooks) {
-			plugs = EPUBJS.core.values(EPUBJS.hooks[plugType]);
+	return doc;
+}
 
-			plugs.forEach(function(hook){
-				this.registerHook(plugType, hook);
-			}, this);
+function qs(el, sel) {
+	var elements;
+	if (!el) {
+		throw new Error("No Element Provided");
+	}
+
+	if (typeof el.querySelector != "undefined") {
+		return el.querySelector(sel);
+	} else {
+		elements = el.getElementsByTagName(sel);
+		if (elements.length) {
+			return elements[0];
 		}
-	};
+	}
+}
 
-	//-- Hooks allow for injecting async functions that must all complete before continuing
-	//   Functions must have a callback as their first argument.
-	hooks.prototype.registerHook = function(type, toAdd, toFront){
+function qsa(el, sel) {
 
-		if(typeof(this.hooks[type]) != "undefined"){
+	if (typeof el.querySelector != "undefined") {
+		return el.querySelectorAll(sel);
+	} else {
+		return el.getElementsByTagName(sel);
+	}
+}
 
-			if(typeof(toAdd) === "function"){
-				if(toFront) {
-					this.hooks[type].unshift(toAdd);
-				}else{
-					this.hooks[type].push(toAdd);
+function qsp(el, sel, props) {
+	var q, filtered;
+	if (typeof el.querySelector != "undefined") {
+		sel += "[";
+		for (var prop in props) {
+			sel += prop + "='" + props[prop] + "'";
+		}
+		sel += "]";
+		return el.querySelector(sel);
+	} else {
+		q = el.getElementsByTagName(sel);
+		filtered = Array.prototype.slice.call(q, 0).filter(function (el) {
+			for (var prop in props) {
+				if (el.getAttribute(prop) === props[prop]) {
+					return true;
 				}
-			}else if(Array.isArray(toAdd)){
-				toAdd.forEach(function(hook){
-					if(toFront) {
-						this.hooks[type].unshift(hook);
-					}else{
-						this.hooks[type].push(hook);
-					}
-				}, this);
 			}
-		}else{
-			//-- Allows for undefined hooks
-			this.hooks[type] = [toAdd];
-
-			if(typeof(toAdd) === "function"){
-				this.hooks[type] = [toAdd];
-			}else if(Array.isArray(toAdd)){
-				this.hooks[type] = [];
-				toAdd.forEach(function(hook){
-					this.hooks[type].push(hook);
-				}, this);
-			}
-
-		}
-	};
-
-	hooks.prototype.removeHook = function(type, toRemove){
-		var index;
-
-		if(typeof(this.hooks[type]) != "undefined"){
-
-			if(typeof(toRemove) === "function"){
-				index = this.hooks[type].indexOf(toRemove);
-				if (index > -1) {
-					this.hooks[type].splice(index, 1);
-				}
-			}else if(Array.isArray(toRemove)){
-				toRemove.forEach(function(hook){
-					index = this.hooks[type].indexOf(hook);
-					if (index > -1) {
-						this.hooks[type].splice(index, 1);
-					}
-				}, this);
-			}
-		}
-	};
-
-	hooks.prototype.triggerHooks = function(type, callback, passed){
-		var hooks, count;
-
-		if(typeof(this.hooks[type]) == "undefined") return false;
-
-		hooks = this.hooks[type];
-
-		count = hooks.length;
-		if(count === 0 && callback) {
-			callback();
-		}
-
-		function countdown(){
-			count--;
-			if(count <= 0 && callback) callback();
-		}
-
-		hooks.forEach(function(hook){
-			hook(countdown, passed);
+			return false;
 		});
-	};
 
-	return {
-		register: function(name) {
-			if(EPUBJS.hooks[name] === undefined) { EPUBJS.hooks[name] = {}; }
-			if(typeof EPUBJS.hooks[name] !== 'object') { throw "Already registered: "+name; }
-			return EPUBJS.hooks[name];
-		},
-		mixin: function(object) {
-			for (var prop in hooks.prototype) {
-				object[prop] = hooks.prototype[prop];
+		if (filtered) {
+			return filtered[0];
+		}
+	}
+}
+
+/**
+ * Sprint through all text nodes in a document
+ * @param  {element} root element to start with
+ * @param  {function} func function to run on each element
+ */
+function sprint(root, func) {
+	var doc = root.ownerDocument || root;
+	if (typeof doc.createTreeWalker !== "undefined") {
+		treeWalker(root, func, NodeFilter.SHOW_TEXT);
+	} else {
+		walk(root, function (node) {
+			if (node && node.nodeType === 3) {
+				// Node.TEXT_NODE
+				func(node);
 			}
-		}
-	};
-})();
-
-EPUBJS.Layout = EPUBJS.Layout || {};
-
-// EPUB2 documents won't provide us with "rendition:layout", so this is used to
-// duck type the documents instead.
-EPUBJS.Layout.isFixedLayout = function (documentElement) {
-	var viewport = documentElement.querySelector("[name=viewport]");
-	if (!viewport || !viewport.hasAttribute("content")) {
-		return false;
+		}, true);
 	}
-	var content = viewport.getAttribute("content");
-	return (/width=(\d+)/.test(content) && /height=(\d+)/.test(content));
-};
-
-EPUBJS.Layout.Reflowable = function(){
-	this.documentElement = null;
-	this.spreadWidth = null;
-};
-
-EPUBJS.Layout.Reflowable.prototype.format = function(documentElement, _width, _height, _gap){
-	// Get the prefixed CSS commands
-	var columnAxis = EPUBJS.core.prefixed('columnAxis');
-	var columnGap = EPUBJS.core.prefixed('columnGap');
-	var columnWidth = EPUBJS.core.prefixed('columnWidth');
-	var columnFill = EPUBJS.core.prefixed('columnFill');
-
-	//-- Check the width and create even width columns
-	var width = Math.floor(_width);
-	// var width = (fullWidth % 2 === 0) ? fullWidth : fullWidth - 0; // Not needed for single
-	var section = Math.floor(width / 8);
-	var gap = (_gap >= 0) ? _gap : ((section % 2 === 0) ? section : section - 1);
-	this.documentElement = documentElement;
-	//-- Single Page
-	this.spreadWidth = (width + gap);
-
-
-	documentElement.style.overflow = "hidden";
-
-	// Must be set to the new calculated width or the columns will be off
-	documentElement.style.width = width + "px";
-
-	//-- Adjust height
-	documentElement.style.height = _height + "px";
-
-	//-- Add columns
-	documentElement.style[columnAxis] = "horizontal";
-	documentElement.style[columnFill] = "auto";
-	documentElement.style[columnWidth] = width+"px";
-	documentElement.style[columnGap] = gap+"px";
-	this.colWidth = width;
-	this.gap = gap;
-
-	return {
-		pageWidth : this.spreadWidth,
-		pageHeight : _height
-	};
-};
-
-EPUBJS.Layout.Reflowable.prototype.calculatePages = function() {
-	var totalWidth, displayedPages;
-	this.documentElement.style.width = "auto"; //-- reset width for calculations
-	totalWidth = this.documentElement.scrollWidth;
-	displayedPages = Math.ceil(totalWidth / this.spreadWidth);
-
-	return {
-		displayedPages : displayedPages,
-		pageCount : displayedPages
-	};
-};
-
-EPUBJS.Layout.ReflowableSpreads = function(){
-	this.documentElement = null;
-	this.spreadWidth = null;
-};
-
-EPUBJS.Layout.ReflowableSpreads.prototype.format = function(documentElement, _width, _height, _gap){
-	var columnAxis = EPUBJS.core.prefixed('columnAxis');
-	var columnGap = EPUBJS.core.prefixed('columnGap');
-	var columnWidth = EPUBJS.core.prefixed('columnWidth');
-	var columnFill = EPUBJS.core.prefixed('columnFill');
-
-	var divisor = 2,
-			cutoff = 800;
-
-	//-- Check the width and create even width columns
-	var fullWidth = Math.floor(_width);
-	var width = (fullWidth % 2 === 0) ? fullWidth : fullWidth - 1;
-
-	var section = Math.floor(width / 8);
-	var gap = (_gap >= 0) ? _gap : ((section % 2 === 0) ? section : section - 1);
-
-	//-- Double Page
-	var colWidth = Math.floor((width - gap) / divisor);
-
-	this.documentElement = documentElement;
-	this.spreadWidth = (colWidth + gap) * divisor;
-
-
-	documentElement.style.overflow = "hidden";
-
-	// Must be set to the new calculated width or the columns will be off
-	documentElement.style.width = width + "px";
-
-	//-- Adjust height
-	documentElement.style.height = _height + "px";
-
-	//-- Add columns
-	documentElement.style[columnAxis] = "horizontal";
-	documentElement.style[columnFill] = "auto";
-	documentElement.style[columnGap] = gap+"px";
-	documentElement.style[columnWidth] = colWidth+"px";
-
-	this.colWidth = colWidth;
-	this.gap = gap;
-	return {
-		pageWidth : this.spreadWidth,
-		pageHeight : _height
-	};
-};
-
-EPUBJS.Layout.ReflowableSpreads.prototype.calculatePages = function() {
-	var totalWidth = this.documentElement.scrollWidth;
-	var displayedPages = Math.ceil(totalWidth / this.spreadWidth);
-
-	//-- Add a page to the width of the document to account an for odd number of pages
-	this.documentElement.style.width = ((displayedPages * this.spreadWidth) - this.gap) + "px";
-
-	return {
-		displayedPages : displayedPages,
-		pageCount : displayedPages * 2
-	};
-};
-
-EPUBJS.Layout.Fixed = function(){
-	this.documentElement = null;
-};
-
-EPUBJS.Layout.Fixed.prototype.format = function(documentElement, _width, _height, _gap){
-	var columnWidth = EPUBJS.core.prefixed('columnWidth');
-	var transform = EPUBJS.core.prefixed('transform');
-	var transformOrigin = EPUBJS.core.prefixed('transformOrigin');
-	var viewport = documentElement.querySelector("[name=viewport]");
-	var content;
-	var contents;
-	var width, height;
-	this.documentElement = documentElement;
-	/**
-	* check for the viewport size
-	* <meta name="viewport" content="width=1024,height=697" />
-	*/
-	if(viewport && viewport.hasAttribute("content")) {
-		content = viewport.getAttribute("content");
-		contents = content.split(',');
-		if(contents[0]){
-			width = contents[0].replace("width=", '');
-		}
-		if(contents[1]){
-			height = contents[1].replace("height=", '');
-		}
-	}
-
-	//-- Scale fixed documents so their contents don't overflow, and
-	// vertically and horizontally center the contents
-	var widthScale = _width / width;
-	var heightScale = _height / height;
-	var scale = widthScale < heightScale ? widthScale : heightScale;
-	documentElement.style.position = "absolute";
-	documentElement.style.top = "50%";
-	documentElement.style.left = "50%";
-	documentElement.style[transform] = "scale(" + scale + ") translate(-50%, -50%)";
-	documentElement.style[transformOrigin] = "0px 0px 0px";
-
-	//-- Adjust width and height
-	documentElement.style.width =  width + "px" || "auto";
-	documentElement.style.height =  height + "px" || "auto";
-
-	//-- Remove columns
-	documentElement.style[columnWidth] = "auto";
-
-	//-- Scroll
-	documentElement.style.overflow = "auto";
-
-	this.colWidth = width;
-	this.gap = 0;
-
-	return {
-		pageWidth : width,
-		pageHeight : height
-	};
-
-};
-
-EPUBJS.Layout.Fixed.prototype.calculatePages = function(){
-	return {
-		displayedPages : 1,
-		pageCount : 1
-	};
-};
-
-EPUBJS.Locations = function(spine, store, credentials) {
-  this.spine = spine;
-  this.store = store;
-  this.credentials = credentials;
-
-  this.epubcfi = new EPUBJS.EpubCFI();
-
-  this._locations = [];
-  this.total = 0;
-
-  this.break = 150;
-
-  this._current = 0;
-
-};
-
-EPUBJS.Locations.prototype.generate = function(chars) {
-	var deferred = new RSVP.defer();
-	var spinePos = -1;
-	var spineLength = this.spine.length;
-  var finished;
-	var nextChapter = function(deferred){
-		var chapter;
-		var next = spinePos + 1;
-		var done = deferred || new RSVP.defer();
-		var loaded;
-		if(next >= spineLength) {
-			done.resolve();
-		} else {
-			spinePos = next;
-			chapter = new EPUBJS.Chapter(this.spine[spinePos], this.store, this.credentials);
-
-      this.process(chapter).then(function() {
-        // Load up the next chapter
-				setTimeout(function(){
-					nextChapter(done);
-				}, 1);
-
-      });
-		}
-		return done.promise;
-	}.bind(this);
-
-  if(typeof chars === 'number') {
-    this.break = chars;
-  }
-
-	finished = nextChapter().then(function(){
-    this.total = this._locations.length-1;
-
-    if (this._currentCfi) {
-      this.currentLocation = this._currentCfi;
-    }
-		deferred.resolve(this._locations);
-	}.bind(this));
-
-	return deferred.promise;
-};
-
-EPUBJS.Locations.prototype.process = function(chapter) {
-  return chapter.load()
-    .then(function(_doc) {
-
-      var range;
-      var doc = _doc;
-      var contents = doc.documentElement.querySelector("body");
-      var counter = 0;
-      var prev;
-      var cfi;
-      var _break = this.break;
-
-      this.sprint(contents, function(node) {
-        var len = node.length;
-        var dist;
-        var pos = 0;
-
-        if (node.textContent.trim().length === 0) {
-          return false; // continue
-        }
-
-        // Start range
-        if (counter === 0) {
-          range = doc.createRange();
-          range.setStart(node, 0);
-        }
-
-        dist = _break - counter;
-
-        // Node is smaller than a break
-        if(dist > len){
-          counter += len;
-          pos = len;
-        }
-
-        while (pos < len) {
-          dist = _break - counter;
-
-          if (counter === 0) {
-            pos += 1;
-            range = doc.createRange();
-            range.setStart(node, pos);
-          }
-
-          // Gone over
-          if(pos + dist >= len){
-            // Continue counter for next node
-            counter += len - pos;
-            // break
-            pos = len;
-          // At End
-          } else {
-            // Advance pos
-            pos += dist;
-
-            // End the previous range
-            range.setEnd(node, pos);
-            cfi = chapter.cfiFromRange(range);
-            this._locations.push(cfi);
-            counter = 0;
-          }
-        }
-
-        prev = node;
-
-      }.bind(this));
-
-      // Close remaining
-      if (range) {
-        range.setEnd(prev, prev.length);
-        cfi = chapter.cfiFromRange(range);
-        this._locations.push(cfi);
-        counter = 0;
-      }
-
-    }.bind(this));
-
-};
-
-EPUBJS.Locations.prototype.sprint = function(root, func) {
-  var node;
-	var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-
-	while ((node = treeWalker.nextNode())) {
+}
+
+function treeWalker(root, func, filter) {
+	var treeWalker = document.createTreeWalker(root, filter, null, false);
+	var node = void 0;
+	while (node = treeWalker.nextNode()) {
 		func(node);
 	}
+}
 
-};
+// export function walk(root, func, onlyText) {
+// 	var node = root;
+//
+// 	if (node && !onlyText || node.nodeType === 3) { // Node.TEXT_NODE
+// 		func(node);
+// 	}
+// 	console.log(root);
+//
+// 	node = node.firstChild;
+// 	while(node) {
+// 		walk(node, func, onlyText);
+// 		node = node.nextSibling;
+// 	}
+// }
 
-EPUBJS.Locations.prototype.locationFromCfi = function(cfi){
-  // Check if the location has not been set yet
-	if(this._locations.length === 0) {
-		return -1;
+/**
+ * @param callback return false for continue,true for break
+ * @return boolean true: break visit;
+ */
+function walk(node, callback) {
+	if (callback(node)) {
+		return true;
 	}
-
-  return EPUBJS.core.locationOf(cfi, this._locations, this.epubcfi.compare);
-};
-
-EPUBJS.Locations.prototype.percentageFromCfi = function(cfi) {
-  // Find closest cfi
-  var loc = this.locationFromCfi(cfi);
-  // Get percentage in total
-  return this.percentageFromLocation(loc);
-};
-
-EPUBJS.Locations.prototype.percentageFromLocation = function(loc) {
-  if (!loc || !this.total) {
-    return 0;
-  }
-  return (loc / this.total);
-};
-
-EPUBJS.Locations.prototype.cfiFromLocation = function(loc){
-	var cfi = -1;
-	// check that pg is an int
-	if(typeof loc != "number"){
-		loc = parseInt(loc);
+	node = node.firstChild;
+	if (node) {
+		do {
+			var walked = walk(node, callback);
+			if (walked) {
+				return true;
+			}
+			node = node.nextSibling;
+		} while (node);
 	}
-
-	if(loc >= 0 && loc < this._locations.length) {
-		cfi = this._locations[loc];
-	}
-
-	return cfi;
-};
-
-EPUBJS.Locations.prototype.cfiFromPercentage = function(value){
-  var percentage = (value > 1) ? value / 100 : value; // Normalize value to 0-1
-	var loc = Math.ceil(this.total * percentage);
-
-	return this.cfiFromLocation(loc);
-};
-
-EPUBJS.Locations.prototype.load = function(locations){
-	this._locations = JSON.parse(locations);
-  this.total = this._locations.length-1;
-  return this._locations;
-};
-
-EPUBJS.Locations.prototype.save = function(json){
-	return JSON.stringify(this._locations);
-};
-
-EPUBJS.Locations.prototype.getCurrent = function(json){
-	return this._current;
-};
-
-EPUBJS.Locations.prototype.setCurrent = function(curr){
-  var loc;
-
-  if(typeof curr == "string"){
-    this._currentCfi = curr;
-  } else if (typeof curr == "number") {
-    this._current = curr;
-  } else {
-    return;
-  }
-
-  if(this._locations.length === 0) {
-    return;
-	}
-
-  if(typeof curr == "string"){
-    loc = this.locationFromCfi(curr);
-    this._current = loc;
-  } else {
-    loc = curr;
-  }
-
-  this.trigger("changed", {
-    percentage: this.percentageFromLocation(loc)
-  });
-};
-
-Object.defineProperty(EPUBJS.Locations.prototype, 'currentLocation', {
-  get: function () {
-    return this._current;
-  },
-  set: function (curr) {
-    this.setCurrent(curr);
-  }
-});
-
-RSVP.EventTarget.mixin(EPUBJS.Locations.prototype);
-
-EPUBJS.Pagination = function(pageList) {
-	this.pages = [];
-	this.locations = [];
-	this.epubcfi = new EPUBJS.EpubCFI();
-	if(pageList && pageList.length) {
-		this.process(pageList);
-	}
-};
-
-EPUBJS.Pagination.prototype.process = function(pageList){
-	pageList.forEach(function(item){
-		this.pages.push(item.page);
-		this.locations.push(item.cfi);
-	}, this);
-	
-	this.pageList = pageList;
-	this.firstPage = parseInt(this.pages[0]);
-	this.lastPage = parseInt(this.pages[this.pages.length-1]);
-	this.totalPages = this.lastPage - this.firstPage;
-};
-
-EPUBJS.Pagination.prototype.pageFromCfi = function(cfi){
-	var pg = -1;
-	
-	// Check if the pageList has not been set yet
-	if(this.locations.length === 0) {
-		return -1;
-	}
-	
-	// TODO: check if CFI is valid?
-
-	// check if the cfi is in the location list
-	// var index = this.locations.indexOf(cfi);
-	var index = EPUBJS.core.indexOfSorted(cfi, this.locations, this.epubcfi.compare);
-	if(index != -1) {
-		pg = this.pages[index];
-	} else {
-		// Otherwise add it to the list of locations
-		// Insert it in the correct position in the locations page
-		//index = EPUBJS.core.insert(cfi, this.locations, this.epubcfi.compare);
-		index = EPUBJS.core.locationOf(cfi, this.locations, this.epubcfi.compare);
-		// Get the page at the location just before the new one, or return the first
-		pg = index-1 >= 0 ? this.pages[index-1] : this.pages[0];
-		if(pg !== undefined) {
-			// Add the new page in so that the locations and page array match up
-			//this.pages.splice(index, 0, pg);
-		} else {
-			pg = -1;
-		}
-
-	}
-	return pg;
-};
-
-EPUBJS.Pagination.prototype.cfiFromPage = function(pg){
-	var cfi = -1;
-	// check that pg is an int
-	if(typeof pg != "number"){
-		pg = parseInt(pg);
-	}
-
-	// check if the cfi is in the page list
-	// Pages could be unsorted.
-	var index = this.pages.indexOf(pg);
-	if(index != -1) {
-		cfi = this.locations[index];
-	}
-	// TODO: handle pages not in the list
-	return cfi;
-};
-
-EPUBJS.Pagination.prototype.pageFromPercentage = function(percent){
-	var pg = Math.round(this.totalPages * percent);
-	return pg;
-};
-
-// Returns a value between 0 - 1 corresponding to the location of a page
-EPUBJS.Pagination.prototype.percentageFromPage = function(pg){
-	var percentage = (pg - this.firstPage) / this.totalPages;
-	return Math.round(percentage * 1000) / 1000;
-};
-
-// Returns a value between 0 - 1 corresponding to the location of a cfi
-EPUBJS.Pagination.prototype.percentageFromCfi = function(cfi){
-	var pg = this.pageFromCfi(cfi);
-	var percentage = this.percentageFromPage(pg);
-	return percentage;
-};
-EPUBJS.Parser = function(baseUrl){
-	this.baseUrl = baseUrl || '';
-};
-
-EPUBJS.Parser.prototype.container = function(containerXml){
-		//-- <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
-		var rootfile, fullpath, folder, encoding;
-
-		if(!containerXml) {
-			console.error("Container File Not Found");
-			return;
-		}
-
-		rootfile = containerXml.querySelector("rootfile");
-
-		if(!rootfile) {
-			console.error("No RootFile Found");
-			return;
-		}
-
-		fullpath = rootfile.getAttribute('full-path');
-		folder = EPUBJS.core.uri(fullpath).directory;
-		encoding = containerXml.xmlEncoding;
-
-		//-- Now that we have the path we can parse the contents
-		return {
-			'packagePath' : fullpath,
-			'basePath' : folder,
-			'encoding' : encoding
-		};
-};
-
-EPUBJS.Parser.prototype.identifier = function(packageXml){
-	var metadataNode;
-
-	if(!packageXml) {
-		console.error("Package File Not Found");
-		return;
-	}
-
-	metadataNode = packageXml.querySelector("metadata");
-
-	if(!metadataNode) {
-		console.error("No Metadata Found");
-		return;
-	}
-
-	return this.getElementText(metadataNode, "identifier");
-};
-
-EPUBJS.Parser.prototype.packageContents = function(packageXml, baseUrl){
-	var parse = this;
-	var metadataNode, manifestNode, spineNode;
-	var manifest, navPath, tocPath, coverPath;
-	var spineNodeIndex;
-	var spine;
-	var spineIndexByURL;
-	var metadata;
-
-	if(baseUrl) this.baseUrl = baseUrl;
-
-	if(!packageXml) {
-		console.error("Package File Not Found");
-		return;
-	}
-
-	metadataNode = packageXml.querySelector("metadata");
-	if(!metadataNode) {
-		console.error("No Metadata Found");
-		return;
-	}
-
-	manifestNode = packageXml.querySelector("manifest");
-	if(!manifestNode) {
-		console.error("No Manifest Found");
-		return;
-	}
-
-	spineNode = packageXml.querySelector("spine");
-	if(!spineNode) {
-		console.error("No Spine Found");
-		return;
-	}
-
-	manifest = parse.manifest(manifestNode);
-	navPath = parse.findNavPath(manifestNode);
-	tocPath = parse.findTocPath(manifestNode, spineNode);
-	coverPath = parse.findCoverPath(packageXml);
-
-	spineNodeIndex = Array.prototype.indexOf.call(spineNode.parentNode.childNodes, spineNode);
-
-	spine = parse.spine(spineNode, manifest);
-
-	spineIndexByURL = {};
-	spine.forEach(function(item){
-		spineIndexByURL[item.href] = item.index;
-	});
-
-	metadata = parse.metadata(metadataNode);
-
-	metadata.direction = spineNode.getAttribute("page-progression-direction");
-
-	return {
-		'metadata' : metadata,
-		'spine'    : spine,
-		'manifest' : manifest,
-		'navPath'  : navPath,
-		'tocPath'  : tocPath,
-		'coverPath': coverPath,
-		'spineNodeIndex' : spineNodeIndex,
-		'spineIndexByURL' : spineIndexByURL
-	};
-};
-
-//-- Find TOC NAV
-EPUBJS.Parser.prototype.findNavPath = function(manifestNode){
-	// Find item with property 'nav'
-	// Should catch nav irregardless of order
-  var node = manifestNode.querySelector("item[properties$='nav'], item[properties^='nav '], item[properties*=' nav ']");
-  return node ? node.getAttribute('href') : false;
-};
-
-//-- Find TOC NCX: media-type="application/x-dtbncx+xml" href="toc.ncx"
-EPUBJS.Parser.prototype.findTocPath = function(manifestNode, spineNode){
-	var node = manifestNode.querySelector("item[media-type='application/x-dtbncx+xml']");
-	var tocId;
-
-	// If we can't find the toc by media-type then try to look for id of the item in the spine attributes as
-	// according to http://www.idpf.org/epub/20/spec/OPF_2.0.1_draft.htm#Section2.4.1.2,
-	// "The item that describes the NCX must be referenced by the spine toc attribute."
-	if (!node) {
-		tocId = spineNode.getAttribute("toc");
-		if(tocId) {
-			node = manifestNode.querySelector("item[id='" + tocId + "']");
-		}
-	}
-
-	return node ? node.getAttribute('href') : false;
-};
-
-//-- Expanded to match Readium web components
-EPUBJS.Parser.prototype.metadata = function(xml){
-	var metadata = {},
-			p = this;
-
-	metadata.bookTitle = p.getElementText(xml, 'title');
-	metadata.creator = p.getElementText(xml, 'creator');
-	metadata.description = p.getElementText(xml, 'description');
-
-	metadata.pubdate = p.getElementText(xml, 'date');
-
-	metadata.publisher = p.getElementText(xml, 'publisher');
-
-	metadata.identifier = p.getElementText(xml, "identifier");
-	metadata.language = p.getElementText(xml, "language");
-	metadata.rights = p.getElementText(xml, "rights");
-
-	metadata.modified_date = p.querySelectorText(xml, "meta[property='dcterms:modified']");
-	metadata.layout = p.querySelectorText(xml, "meta[property='rendition:layout']");
-	metadata.orientation = p.querySelectorText(xml, "meta[property='rendition:orientation']");
-	metadata.spread = p.querySelectorText(xml, "meta[property='rendition:spread']");
-
-	return metadata;
-};
-
-//-- Find Cover: <item properties="cover-image" id="ci" href="cover.svg" media-type="image/svg+xml" />
-//-- Fallback for Epub 2.0
-EPUBJS.Parser.prototype.findCoverPath = function(packageXml){
-
-	var epubVersion = packageXml.querySelector('package').getAttribute('version');
-	if (epubVersion === '2.0') {
-		var metaCover = packageXml.querySelector('meta[name="cover"]');
-		if (metaCover) {
-			var coverId = metaCover.getAttribute('content');
-			var cover = packageXml.querySelector("item[id='" + coverId + "']");
-			return cover ? cover.getAttribute('href') : false;
-		}
-		else {
-			return false;
-		}
-	}
-	else {
-		var node = packageXml.querySelector("item[properties='cover-image']");
-		return node ? node.getAttribute('href') : false;
-	}
-};
-
-EPUBJS.Parser.prototype.getElementText = function(xml, tag){
-	var found = xml.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", tag),
-		el;
-
-	if(!found || found.length === 0) return '';
-
-	el = found[0];
-
-	if(el.childNodes.length){
-		return el.childNodes[0].nodeValue;
-	}
-
-	return '';
-
-};
-
-EPUBJS.Parser.prototype.querySelectorText = function(xml, q){
-	var el = xml.querySelector(q);
-
-	if(el && el.childNodes.length){
-		return el.childNodes[0].nodeValue;
-	}
-
-	return '';
-};
-
-EPUBJS.Parser.prototype.manifest = function(manifestXml){
-	var baseUrl = this.baseUrl,
-			manifest = {};
-
-	//-- Turn items into an array
-	var selected = manifestXml.querySelectorAll("item"),
-		items = Array.prototype.slice.call(selected);
-
-	//-- Create an object with the id as key
-	items.forEach(function(item){
-		var id = item.getAttribute('id'),
-				href = item.getAttribute('href') || '',
-				type = item.getAttribute('media-type') || '',
-				properties = item.getAttribute('properties') || '';
-
-		manifest[id] = {
-			'href' : href,
-			'url' : baseUrl + href, //-- Absolute URL for loading with a web worker
-			'type' : type,
-      'properties' : properties
-		};
-
-	});
-
-	return manifest;
-
-};
-
-EPUBJS.Parser.prototype.spine = function(spineXml, manifest){
-	var selected = spineXml.getElementsByTagName("itemref"),
-			items = Array.prototype.slice.call(selected);
-
-	// var spineNodeIndex = Array.prototype.indexOf.call(spineXml.parentNode.childNodes, spineXml);
-	var spineNodeIndex = EPUBJS.core.indexOfElementNode(spineXml);
-
-	var epubcfi = new EPUBJS.EpubCFI();
-
-	//-- Add to array to mantain ordering and cross reference with manifest
-	return items.map(function(item, index) {
-		var Id = item.getAttribute('idref');
-		var cfiBase = epubcfi.generateChapterComponent(spineNodeIndex, index, Id);
-		var props = item.getAttribute('properties') || '';
-		var propArray = props.length ? props.split(' ') : [];
-		var manifestProps = manifest[Id].properties;
-		var manifestPropArray = manifestProps.length ? manifestProps.split(' ') : [];
-		return {
-			'id' : Id,
-			'linear' : item.getAttribute('linear') || '',
-			'properties' : propArray,
-			'manifestProperties' : manifestPropArray,
-			'href' : manifest[Id].href,
-			'url' :  manifest[Id].url,
-			'index' : index,
-			'cfiBase' : cfiBase,
-			'cfi' : "epubcfi(" + cfiBase + ")"
+}
+
+function blob2base64(blob) {
+	return new Promise(function (resolve, reject) {
+		var reader = new FileReader();
+		reader.readAsDataURL(blob);
+		reader.onloadend = function () {
+			resolve(reader.result);
 		};
 	});
-};
+}
 
-EPUBJS.Parser.prototype.querySelectorByType = function(html, element, type){
-	var query = html.querySelector(element+'[*|type="'+type+'"]');
+// From: https://developer.mozilla.org/en-US/docs/Mozilla/JavaScript_code_modules/Promise.jsm/Deferred#backwards_forwards_compatible
+function defer() {
+	var _this = this;
+
+	/* A method to resolve the associated Promise with the value passed.
+  * If the promise is already settled it does nothing.
+  *
+  * @param {anything} value : This value is used to resolve the promise
+  * If the value is a Promise then the associated promise assumes the state
+  * of Promise passed as value.
+  */
+	this.resolve = null;
+
+	/* A method to reject the assocaited Promise with the value passed.
+  * If the promise is already settled it does nothing.
+  *
+  * @param {anything} reason: The reason for the rejection of the Promise.
+  * Generally its an Error object. If however a Promise is passed, then the Promise
+  * itself will be the reason for rejection no matter the state of the Promise.
+  */
+	this.reject = null;
+
+	this.id = uuid();
+
+	/* A newly created Pomise object.
+  * Initially in pending state.
+  */
+	this.promise = new Promise(function (resolve, reject) {
+		_this.resolve = resolve;
+		_this.reject = reject;
+	});
+	Object.freeze(this);
+}
+
+function querySelectorByType(html, element, type) {
+	var query;
+	if (typeof html.querySelector != "undefined") {
+		query = html.querySelector(element + "[*|type=\"" + type + "\"]");
+	}
 	// Handle IE not supporting namespaced epub:type in querySelector
-	if(query === null || query.length === 0) {
-		query = html.querySelectorAll(element);
+	if (!query || query.length === 0) {
+		query = qsa(html, element);
 		for (var i = 0; i < query.length; i++) {
-			if(query[i].getAttributeNS("http://www.idpf.org/2007/ops", "type") === type) {
+			if (query[i].getAttributeNS("http://www.idpf.org/2007/ops", "type") === type || query[i].getAttribute("epub:type") === type) {
 				return query[i];
 			}
 		}
 	} else {
 		return query;
 	}
-};
+}
 
-EPUBJS.Parser.prototype.nav = function (navHtml, spineIndexByURL, bookSpine) {
-	var toc = this.querySelectorByType(navHtml, 'nav', 'toc');
-	return this.navItems(toc, spineIndexByURL, bookSpine);
-};
-
-EPUBJS.Parser.prototype.navItems = function (navNode, spineIndexByURL, bookSpine) {
-	if (!navNode) return [];
-
-	var list = navNode.querySelector('ol');
-	if (!list) return [];
-
-	var items = list.childNodes,
-			result = [];
-
-	Array.prototype.forEach.call(items, function (item) {
-		if (item.tagName !== 'li') return;
-
-		var content = item.querySelector('a, span'),
-				href = content.getAttribute('href') || '',
-				label = content.textContent || '',
-				split = href.split('#'),
-				baseUrl = split[0],
-				spinePos = spineIndexByURL[baseUrl],
-				spineItem = bookSpine[spinePos],
-				cfi = spineItem ? spineItem.cfi : '',
-				subitems = this.navItems(item, spineIndexByURL, bookSpine);
-
-		result.push({
-			href: href,
-			label: label,
-			spinePos: spinePos,
-			subitems: subitems,
-			cfi: cfi
-		});
-	}.bind(this));
-
+function findChildren(el) {
+	var result = [];
+	var childNodes = el.childNodes;
+	for (var i = 0; i < childNodes.length; i++) {
+		var node = childNodes[i];
+		if (node.nodeType === 1) {
+			result.push(node);
+		}
+	}
 	return result;
-};
+}
 
-EPUBJS.Parser.prototype.toc = function(tocXml, spineIndexByURL, bookSpine){
-	var navPoints = tocXml.querySelectorAll("navMap navPoint");
-	var length = navPoints.length;
-	var i;
-	var toc = {};
-	var list = [];
-	var item, parent;
+function parents(node) {
+	var nodes = [node];
+	for (; node; node = node.parentNode) {
+		nodes.unshift(node);
+	}
+	return nodes;
+}
 
-	if(!navPoints || length === 0) return list;
+var RangeObject = exports.RangeObject = function () {
+	function RangeObject() {
+		_classCallCheck(this, RangeObject);
 
-	for (i = 0; i < length; ++i) {
-		item = this.tocItem(navPoints[i], spineIndexByURL, bookSpine);
-		toc[item.id] = item;
-		if(!item.parent) {
-			list.push(item);
-		} else {
-			parent = toc[item.parent];
-			parent.subitems.push(item);
-		}
+		this.collapsed = false;
+		this.commonAncestorContainer = undefined;
+		this.endContainer = undefined;
+		this.endOffset = undefined;
+		this.startContainer = undefined;
+		this.startOffset = undefined;
 	}
 
-	return list;
-};
-
-EPUBJS.Parser.prototype.tocItem = function(item, spineIndexByURL, bookSpine){
-	var id = item.getAttribute('id') || false,
-			content = item.querySelector("content"),
-			src = content.getAttribute('src'),
-			navLabel = item.querySelector("navLabel"),
-			text = navLabel.textContent ? navLabel.textContent : "",
-			split = src.split("#"),
-			baseUrl = split[0],
-			spinePos = spineIndexByURL[baseUrl],
-			spineItem = bookSpine[spinePos],
-			subitems = [],
-			parentNode = item.parentNode,
-			parent,
-			cfi = spineItem ? spineItem.cfi : '';
-
-	if(parentNode && parentNode.nodeName === "navPoint") {
-		parent = parentNode.getAttribute('id');
-	}
-
-	if(!id) {
-		if(spinePos) {
-			spineItem = bookSpine[spinePos];
-			id = spineItem.id;
-			cfi = spineItem.cfi;
-		} else {
-			id = 'epubjs-autogen-toc-id-' + EPUBJS.core.uuid();
-			item.setAttribute('id', id);
-		}
-	}
-
-	return {
-		"id": id,
-		"href": src,
-		"label": text,
-		"spinePos": spinePos,
-		"subitems" : subitems,
-		"parent" : parent,
-		"cfi" : cfi
-	};
-};
-
-
-EPUBJS.Parser.prototype.pageList = function(navHtml, spineIndexByURL, bookSpine){
-	var navElement = this.querySelectorByType(navHtml, "nav", "page-list");
-	var navItems = navElement ? navElement.querySelectorAll("ol li") : [];
-	var length = navItems.length;
-	var i;
-	var toc = {};
-	var list = [];
-	var item;
-
-	if(!navItems || length === 0) return list;
-
-	for (i = 0; i < length; ++i) {
-		item = this.pageListItem(navItems[i], spineIndexByURL, bookSpine);
-		list.push(item);
-	}
-
-	return list;
-};
-
-EPUBJS.Parser.prototype.pageListItem = function(item, spineIndexByURL, bookSpine){
-	var id = item.getAttribute('id') || false,
-		content = item.querySelector("a"),
-		href = content.getAttribute('href') || '',
-		text = content.textContent || "",
-		page = parseInt(text),
-		isCfi = href.indexOf("epubcfi"),
-		split,
-		packageUrl,
-		cfi;
-
-	if(isCfi != -1) {
-		split = href.split("#");
-		packageUrl = split[0];
-		cfi = split.length > 1 ? split[1] : false;
-		return {
-			"cfi" : cfi,
-			"href" : href,
-			"packageUrl" : packageUrl,
-			"page" : page
-		};
-	} else {
-		return {
-			"href" : href,
-			"page" : page
-		};
-	}
-};
-
-EPUBJS.Render.Iframe = function() {
-	this.iframe = null;
-	this.document = null;
-	this.window = null;
-	this.docEl = null;
-	this.bodyEl = null;
-
-	this.leftPos = 0;
-	this.pageWidth = 0;
-	this.id = EPUBJS.core.uuid();
-};
-
-//-- Build up any html needed
-EPUBJS.Render.Iframe.prototype.create = function(){
-	this.element = document.createElement('div');
-	this.element.id = "epubjs-view:" + this.id;
-
-	this.isMobile = navigator.userAgent.match(/(iPad|iPhone|iPod|Mobile|Android)/g);
-	this.transform = EPUBJS.core.prefixed('transform');
-
-	return this.element;
-};
-
-EPUBJS.Render.Iframe.prototype.addIframe = function(){
-	this.iframe = document.createElement('iframe');
-	this.iframe.id = "epubjs-iframe:" + this.id;
-	this.iframe.scrolling = this.scrolling || "no";
-	this.iframe.seamless = "seamless";
-	// Back up if seamless isn't supported
-	this.iframe.style.border = "none";
-
-	this.iframe.addEventListener("load", this.loaded.bind(this), false);
-
-	if (this._width || this._height) {
-		this.iframe.height = this._height;
-		this.iframe.width = this._width;
-	}
-	return this.iframe;
-};
-
-/**
-* Sets the source of the iframe with the given URL string
-* Takes:  Document Contents String
-* Returns: promise with document element
-*/
-EPUBJS.Render.Iframe.prototype.load = function(contents, url){
-	var render = this,
-			deferred = new RSVP.defer();
-
-	if(this.window) {
-		this.unload();
-	}
-
-	if (this.iframe) {
-		this.element.removeChild(this.iframe);
-	}
-
-	this.iframe = this.addIframe();
-	this.element.appendChild(this.iframe);
-
-
-	this.iframe.onload = function(e) {
-		var title;
-
-		render.document = render.iframe.contentDocument;
-		render.docEl = render.document.documentElement;
-		render.headEl = render.document.head;
-		render.bodyEl = render.document.body || render.document.querySelector("body");
-		render.window = render.iframe.contentWindow;
-
-		render.window.addEventListener("resize", render.resized.bind(render), false);
-
-		// Reset the scroll position
-		render.leftPos = 0;
-		render.setLeft(0);
-
-		//-- Clear Margins
-		if(render.bodyEl) {
-			render.bodyEl.style.margin = "0";
-		}
-
-		deferred.resolve(render.docEl);
-	};
-
-	this.iframe.onerror = function(e) {
-		//console.error("Error Loading Contents", e);
-		deferred.reject({
-				message : "Error Loading Contents: " + e,
-				stack : new Error().stack
-			});
-	};
-
-	// this.iframe.contentWindow.location.replace(url);
-	this.document = this.iframe.contentDocument;
-
-  if(!this.document) {
-    deferred.reject(new Error("No Document Available"));
-    return deferred.promise;
-  }
-
-  this.iframe.contentDocument.open();
-  this.iframe.contentDocument.write(contents);
-  this.iframe.contentDocument.close();
-
-  return deferred.promise;
-};
-
-
-EPUBJS.Render.Iframe.prototype.loaded = function(v){
-	var url = this.iframe.contentWindow.location.href;
-	var baseEl, base;
-
-	this.document = this.iframe.contentDocument;
-	this.docEl = this.document.documentElement;
-	this.headEl = this.document.head;
-	this.bodyEl = this.document.body || this.document.querySelector("body");
-	this.window = this.iframe.contentWindow;
-	this.window.focus();
-
-	if(url != "about:blank"){
-		baseEl = this.iframe.contentDocument.querySelector("base");
-		base = baseEl.getAttribute('href');
-		this.trigger("render:loaded", base);
-	}
-
-};
-
-// Resize the iframe to the given width and height
-EPUBJS.Render.Iframe.prototype.resize = function(width, height){
-	var iframeBox;
-
-	if(!this.element) return;
-
-	this.element.style.height = height;
-
-
-	if(!isNaN(width) && width % 2 !== 0){
-		width += 1; //-- Prevent cutting off edges of text in columns
-	}
-
-	this.element.style.width = width;
-
-	if (this.iframe) {
-		this.iframe.height = height;
-		this.iframe.width = width;
-	}
-
-	// Set the width for the iframe
-	this._height = height;
-	this._width = width;
-
-	// Get the fractional height and width of the iframe
-	// Default to orginal if bounding rect is 0
-	this.width = this.element.getBoundingClientRect().width || width;
-	this.height = this.element.getBoundingClientRect().height || height;
-
-};
-
-
-EPUBJS.Render.Iframe.prototype.resized = function(e){
-	// Get the fractional height and width of the iframe
-	this.width = this.iframe.getBoundingClientRect().width;
-	this.height = this.iframe.getBoundingClientRect().height;
-};
-
-EPUBJS.Render.Iframe.prototype.totalWidth = function(){
-	return this.docEl.scrollWidth;
-};
-
-EPUBJS.Render.Iframe.prototype.totalHeight = function(){
-	return this.docEl.scrollHeight;
-};
-
-EPUBJS.Render.Iframe.prototype.setPageDimensions = function(pageWidth, pageHeight){
-	this.pageWidth = pageWidth;
-	this.pageHeight = pageHeight;
-	//-- Add a page to the width of the document to account an for odd number of pages
-	// this.docEl.style.width = this.docEl.scrollWidth + pageWidth + "px";
-};
-
-EPUBJS.Render.Iframe.prototype.setDirection = function(direction){
-
-	this.direction = direction;
-
-	// Undo previous changes if needed
-	if(this.docEl && this.docEl.dir == "rtl"){
-		this.docEl.dir = "rtl";
-		if (this.layout !== "pre-paginated") {
-			this.docEl.style.position = "static";
-			this.docEl.style.right = "auto";
-		}
-	}
-
-};
-
-EPUBJS.Render.Iframe.prototype.setLeft = function(leftPos){
-	// this.bodyEl.style.marginLeft = -leftPos + "px";
-	// this.docEl.style.marginLeft = -leftPos + "px";
-	// this.docEl.style[EPUBJS.Render.Iframe.transform] = 'translate('+ (-leftPos) + 'px, 0)';
-
-	if (this.isMobile) {
-		this.docEl.style[this.transform] = 'translate('+ (-leftPos) + 'px, 0)';
-	} else {
-		this.document.defaultView.scrollTo(leftPos, 0);
-	}
-
-};
-
-EPUBJS.Render.Iframe.prototype.setLayout = function (layout) {
-	this.layout = layout;
-};
-
-EPUBJS.Render.Iframe.prototype.setStyle = function(style, val, prefixed){
-	if(prefixed) {
-		style = EPUBJS.core.prefixed(style);
-	}
-
-	if(this.bodyEl) this.bodyEl.style[style] = val;
-};
-
-EPUBJS.Render.Iframe.prototype.removeStyle = function(style){
-
-	if(this.bodyEl) this.bodyEl.style[style] = '';
-
-};
-
-EPUBJS.Render.Iframe.prototype.setClasses = function(classes){
-	if(this.bodyEl) this.bodyEl.className = classes.join(" ");
-};
-
-EPUBJS.Render.Iframe.prototype.addHeadTag = function(tag, attrs, _doc) {
-	var doc = _doc || this.document;
-	var tagEl = doc.createElement(tag);
-	var headEl = doc.head;
-
-	for(var attr in attrs) {
-		tagEl.setAttribute(attr, attrs[attr]);
-	}
-
-	if(headEl) headEl.insertBefore(tagEl, headEl.firstChild);
-};
-
-EPUBJS.Render.Iframe.prototype.page = function(pg){
-	this.leftPos = this.pageWidth * (pg-1); //-- pages start at 1
-
-	// Reverse for rtl langs
-	if(this.direction === "rtl"){
-		this.leftPos = this.leftPos * -1;
-	}
-
-	this.setLeft(this.leftPos);
-};
-
-//-- Show the page containing an Element
-EPUBJS.Render.Iframe.prototype.getPageNumberByElement = function(el){
-	var left, pg;
-	if(!el) return;
-
-	left = this.leftPos + el.getBoundingClientRect().left; //-- Calculate left offset compaired to scrolled position
-
-	pg = Math.floor(left / this.pageWidth) + 1; //-- pages start at 1
-
-	return pg;
-};
-
-//-- Show the page containing an Element
-EPUBJS.Render.Iframe.prototype.getPageNumberByRect = function(boundingClientRect){
-	var left, pg;
-
-	left = this.leftPos + boundingClientRect.left; //-- Calculate left offset compaired to scrolled position
-	pg = Math.floor(left / this.pageWidth) + 1; //-- pages start at 1
-
-	return pg;
-};
-
-// Return the root element of the content
-EPUBJS.Render.Iframe.prototype.getBaseElement = function(){
-	return this.bodyEl;
-};
-
-// Return the document element
-EPUBJS.Render.Iframe.prototype.getDocumentElement = function(){
-	return this.docEl;
-};
-
-// Checks if an element is on the screen
-EPUBJS.Render.Iframe.prototype.isElementVisible = function(el){
-	var rect;
-	var left;
-
-	if(el && typeof el.getBoundingClientRect === 'function'){
-		rect = el.getBoundingClientRect();
-		left = rect.left; //+ rect.width;
-		if( rect.width !== 0 &&
-				rect.height !== 0 && // Element not visible
-				left >= 0 &&
-				left < this.pageWidth ) {
-			return true;
-		}
-	}
-
-	return false;
-};
-
-
-EPUBJS.Render.Iframe.prototype.scroll = function(bool){
-	if(bool) {
-		// this.iframe.scrolling = "yes";
-		this.scrolling = "yes";
-	} else {
-		this.scrolling = "no";
-		// this.iframe.scrolling = "no";
-	}
-};
-
-// Cleanup event listeners
-EPUBJS.Render.Iframe.prototype.unload = function(){
-	this.window.removeEventListener("resize", this.resized);
-	this.iframe.removeEventListener("load", this.loaded);
-};
-
-//-- Enable binding events to Render
-RSVP.EventTarget.mixin(EPUBJS.Render.Iframe.prototype);
-
-EPUBJS.Renderer = function(renderMethod, hidden) {
-	// Dom events to listen for
-	this.listenedEvents = ["keydown", "keyup", "keypressed", "mouseup", "mousedown", "click"];
-	this.upEvent = "mouseup";
-	this.downEvent = "mousedown";
-	if('ontouchstart' in document.documentElement) {
-		this.listenedEvents.push("touchstart", "touchend");
-		this.upEvent = "touchend";
-		this.downEvent = "touchstart";
-	}
-	/**
-	* Setup a render method.
-	* Options are: Iframe
-	*/
-	if(renderMethod && typeof(EPUBJS.Render[renderMethod]) != "undefined"){
-		this.render = new EPUBJS.Render[renderMethod]();
-	} else {
-		console.error("Not a Valid Rendering Method");
-	}
-
-	// Listen for load events
-	this.render.on("render:loaded", this.loaded.bind(this));
-
-	// Cached for replacement urls from storage
-	this.caches = {};
-
-	// Blank Cfi for Parsing
-	this.epubcfi = new EPUBJS.EpubCFI();
-
-	this.spreads = true;
-	this.isForcedSingle = false;
-	this.resized = this.onResized.bind(this);
-
-	this.layoutSettings = {};
-
-	this.hidden = hidden || false;
-	//-- Adds Hook methods to the Book prototype
-	//   Hooks will all return before triggering the callback.
-	EPUBJS.Hooks.mixin(this);
-	//-- Get pre-registered hooks for events
-	this.getHooks("beforeChapterDisplay");
-
-	//-- Queue up page changes if page map isn't ready
-	this._q = EPUBJS.core.queue(this);
-
-	this._moving = false;
-
-};
-
-//-- Renderer events for listening
-EPUBJS.Renderer.prototype.Events = [
-	"renderer:keydown",
-	"renderer:keyup",
-	"renderer:keypressed",
-	"renderer:mouseup",
-	"renderer:mousedown",
-	"renderer:click",
-	"renderer:touchstart",
-	"renderer:touchend",
-	"renderer:selected",
-	"renderer:chapterUnload",
-	"renderer:chapterUnloaded",
-	"renderer:chapterDisplayed",
-	"renderer:locationChanged",
-	"renderer:visibleLocationChanged",
-	"renderer:visibleRangeChanged",
-	"renderer:resized",
-	"renderer:spreads",
-	"renderer:beforeResize"
-];
-
-/**
-* Creates an element to render to.
-* Resizes to passed width and height or to the elements size
-*/
-EPUBJS.Renderer.prototype.initialize = function(element, width, height){
-	this.container = element;
-	this.element = this.render.create();
-
-	this.initWidth = width;
-	this.initHeight = height;
-
-	this.width = width || this.container.clientWidth;
-	this.height = height || this.container.clientHeight;
-
-	this.container.appendChild(this.element);
-
-	if(width && height){
-		this.render.resize(this.width, this.height);
-	} else {
-		this.render.resize('100%', '100%');
-	}
-
-	document.addEventListener("orientationchange", this.onResized.bind(this));
-};
-
-/**
-* Display a chapter
-* Takes: chapter object, global layout settings
-* Returns: Promise with passed Renderer after pages has loaded
-*/
-EPUBJS.Renderer.prototype.displayChapter = function(chapter, globalLayout){
-	var store = false;
-	if(this._moving) {
-		console.warning("Rendering In Progress");
-        var deferred = new RSVP.defer();
-        deferred.reject({
-            message : "Rendering In Progress",
-            stack : new Error().stack
-        });
-		return deferred.promise;
-	}
-	this._moving = true;
-	// Get the url string from the chapter (may be from storage)
-	return chapter.render().
-		then(function(contents) {
-
-			// Unload the previous chapter listener
-			if(this.currentChapter) {
-				this.trigger("renderer:chapterUnload");
-				this.currentChapter.unload(); // Remove stored blobs
-
-				if(this.render.window){
-					this.render.window.removeEventListener("resize", this.resized);
-				}
-
-				this.removeEventListeners();
-				this.removeSelectionListeners();
-				this.trigger("renderer:chapterUnloaded");
-				this.contents = null;
-				this.doc = null;
-				this.pageMap = null;
-			}
-
-			this.currentChapter = chapter;
-
-			this.chapterPos = 1;
-
-			this.currentChapterCfiBase = chapter.cfiBase;
-
-			this.layoutSettings = this.reconcileLayoutSettings(globalLayout, chapter.properties);
-
-			return this.load(contents, chapter.href);
-
-		}.bind(this), function() {
-            this._moving = false;
-        }.bind(this));
-
-};
-
-/**
-* Loads a url (string) and renders it,
-* attaching event listeners and triggering hooks.
-* Returns: Promise with the rendered contents.
-*/
-
-EPUBJS.Renderer.prototype.load = function(contents, url){
-	var deferred = new RSVP.defer();
-	var loaded;
-
-	// Switch to the required layout method for the settings
-	this.layoutMethod = this.determineLayout(this.layoutSettings);
-	this.layout = new EPUBJS.Layout[this.layoutMethod]();
-
-	this.visible(false);
-
-	this.render.load(contents, url).then(function(contents) {
-
-		// Duck-type fixed layout books.
-		if (EPUBJS.Layout.isFixedLayout(contents)) {
-			this.layoutSettings.layout = "pre-paginated";
-			this.layoutMethod = this.determineLayout(this.layoutSettings);
-			this.layout = new EPUBJS.Layout[this.layoutMethod]();
-		}
-		this.render.setLayout(this.layoutSettings.layout);
-
-		// HTML element must have direction set if RTL or columnns will
-		// not be in the correct direction in Firefox
-		// Firefox also need the html element to be position right
-		if(this.render.direction == "rtl" && this.render.docEl.dir != "rtl"){
-			this.render.docEl.dir = "rtl";
-			if (this.render.layout !== "pre-paginated") {
-				this.render.docEl.style.position = "absolute";
-				this.render.docEl.style.right = "0";
-			}
-		}
-
-		this.afterLoad(contents);
-
-		//-- Trigger registered hooks before displaying
-		this.beforeDisplay(function(){
-
-			this.afterDisplay();
-
-			this.visible(true);
-
-
-			deferred.resolve(this); //-- why does this return the renderer?
-
-		}.bind(this));
-
-	}.bind(this));
-
-	return deferred.promise;
-};
-
-EPUBJS.Renderer.prototype.afterLoad = function(contents) {
-	var formated;
-	// this.currentChapter.setDocument(this.render.document);
-	this.contents = contents;
-	this.doc = this.render.document;
-
-	// Format the contents using the current layout method
-	this.formated = this.layout.format(contents, this.render.width, this.render.height, this.gap);
-	this.render.setPageDimensions(this.formated.pageWidth, this.formated.pageHeight);
-
-	// window.addEventListener("orientationchange", this.onResized.bind(this), false);
-	if(!this.initWidth && !this.initHeight){
-		this.render.window.addEventListener("resize", this.resized, false);
-	}
-
-	this.addEventListeners();
-	this.addSelectionListeners();
-
-};
-
-EPUBJS.Renderer.prototype.afterDisplay = function(contents) {
-
-	var pages = this.layout.calculatePages();
-	var msg = this.currentChapter;
-	var queued = this._q.length();
-	this._moving = false;
-
-	this.updatePages(pages);
-
-	this.visibleRangeCfi = this.getVisibleRangeCfi();
-	this.currentLocationCfi = this.visibleRangeCfi.start;
-
-	if(queued === 0) {
-		this.trigger("renderer:locationChanged", this.currentLocationCfi);
-		this.trigger("renderer:visibleRangeChanged", this.visibleRangeCfi);
-	}
-
-	msg.cfi = this.currentLocationCfi; //TODO: why is this cfi passed to chapterDisplayed
-	this.trigger("renderer:chapterDisplayed", msg);
-
-};
-
-EPUBJS.Renderer.prototype.loaded = function(url){
-	this.trigger("render:loaded", url);
-	// var uri = EPUBJS.core.uri(url);
-	// var relative = uri.path.replace(book.bookUrl, '');
-	// console.log(url, uri, relative);
-};
-
-/**
-* Reconciles the current chapters layout properies with
-* the global layout properities.
-* Takes: global layout settings object, chapter properties string
-* Returns: Object with layout properties
-*/
-EPUBJS.Renderer.prototype.reconcileLayoutSettings = function(global, chapter){
-	var settings = {};
-
-	//-- Get the global defaults
-	for (var attr in global) {
-		if (global.hasOwnProperty(attr)){
-			settings[attr] = global[attr];
-		}
-	}
-	//-- Get the chapter's display type
-	chapter.forEach(function(prop){
-		var rendition = prop.replace("rendition:", '');
-		var split = rendition.indexOf("-");
-		var property, value;
-
-		if(split != -1){
-			property = rendition.slice(0, split);
-			value = rendition.slice(split+1);
-
-			settings[property] = value;
-		}
-	});
- return settings;
-};
-
-/**
-* Uses the settings to determine which Layout Method is needed
-* Triggers events based on the method choosen
-* Takes: Layout settings object
-* Returns: String of appropriate for EPUBJS.Layout function
-*/
-EPUBJS.Renderer.prototype.determineLayout = function(settings){
-	// Default is layout: reflowable & spread: auto
-	var spreads = this.determineSpreads(this.minSpreadWidth);
-	var layoutMethod = spreads ? "ReflowableSpreads" : "Reflowable";
-	var scroll = false;
-
-	if(settings.layout === "pre-paginated") {
-		layoutMethod = "Fixed";
-		scroll = true;
-		spreads = false;
-	}
-
-	if(settings.layout === "reflowable" && settings.spread === "none") {
-		layoutMethod = "Reflowable";
-		scroll = false;
-		spreads = false;
-	}
-
-	if(settings.layout === "reflowable" && settings.spread === "both") {
-		layoutMethod = "ReflowableSpreads";
-		scroll = false;
-		spreads = true;
-	}
-
-	this.spreads = spreads;
-	this.render.scroll(scroll);
-	this.trigger("renderer:spreads", spreads);
-	return layoutMethod;
-};
-
-// Shortcut to trigger the hook before displaying the chapter
-EPUBJS.Renderer.prototype.beforeDisplay = function(callback, renderer){
-	this.triggerHooks("beforeChapterDisplay", callback, this);
-};
-
-// Update the renderer with the information passed by the layout
-EPUBJS.Renderer.prototype.updatePages = function(layout){
-	this.pageMap = this.mapPage();
-	// this.displayedPages = layout.displayedPages;
-
-	if (this.spreads) {
-		this.displayedPages = Math.ceil(this.pageMap.length / 2);
-	} else {
-		this.displayedPages = this.pageMap.length;
-	}
-
-	this.currentChapter.pages = this.pageMap.length;
-
-	this._q.flush();
-};
-
-// Apply the layout again and jump back to the previous cfi position
-EPUBJS.Renderer.prototype.reformat = function(){
-	var renderer = this;
-	var formated, pages;
-	var spreads;
-
-	if(!this.contents) return;
-
-	spreads = this.determineSpreads(this.minSpreadWidth);
-
-	// Only re-layout if the spreads have switched
-	if(spreads != this.spreads){
-		this.spreads = spreads;
-		this.layoutMethod = this.determineLayout(this.layoutSettings);
-		this.layout = new EPUBJS.Layout[this.layoutMethod]();
-	}
-
-	// Reset pages
-	this.chapterPos = 1;
-
-	this.render.page(this.chapterPos);
-	// Give the css styles time to update
-	// clearTimeout(this.timeoutTillCfi);
-	// this.timeoutTillCfi = setTimeout(function(){
-	renderer.formated = renderer.layout.format(renderer.render.docEl, renderer.render.width, renderer.render.height, renderer.gap);
-	renderer.render.setPageDimensions(renderer.formated.pageWidth, renderer.formated.pageHeight);
-
-	pages = renderer.layout.calculatePages();
-	renderer.updatePages(pages);
-
-	//-- Go to current page after formating
-	if(renderer.currentLocationCfi){
-		renderer.gotoCfi(renderer.currentLocationCfi);
-	}
-		// renderer.timeoutTillCfi = null;
-
-};
-
-// Hide and show the render's container .
-EPUBJS.Renderer.prototype.visible = function(bool){
-	if(typeof(bool) === "undefined") {
-		return this.element.style.visibility;
-	}
-
-	if(bool === true && !this.hidden){
-		this.element.style.visibility = "visible";
-	}else if(bool === false){
-		this.element.style.visibility = "hidden";
-	}
-};
-
-// Remove the render element and clean up listeners
-EPUBJS.Renderer.prototype.remove = function() {
-	if(this.render.window) {
-		this.render.unload();
-		this.render.window.removeEventListener("resize", this.resized);
-		this.removeEventListeners();
-		this.removeSelectionListeners();
-	}
-
-	// clean container content
-	//this.container.innerHtml = ""; // not safe
-	this.container.removeChild(this.element);
-};
-
-//-- STYLES
-
-EPUBJS.Renderer.prototype.applyStyles = function(styles) {
-	for (var style in styles) {
-		this.render.setStyle(style, styles[style]);
-	}
-};
-
-EPUBJS.Renderer.prototype.setStyle = function(style, val, prefixed){
-	this.render.setStyle(style, val, prefixed);
-};
-
-EPUBJS.Renderer.prototype.removeStyle = function(style){
-	this.render.removeStyle(style);
-};
-
-EPUBJS.Renderer.prototype.setClasses = function(classes){
-  this.render.setClasses(classes);
-};
-
-//-- HEAD TAGS
-EPUBJS.Renderer.prototype.applyHeadTags = function(headTags) {
-	for ( var headTag in headTags ) {
-		this.render.addHeadTag(headTag, headTags[headTag]);
-	}
-};
-
-//-- NAVIGATION
-
-EPUBJS.Renderer.prototype.page = function(pg){
-	if(!this.pageMap) {
-		console.warn("pageMap not set, queuing");
-		this._q.enqueue("page", arguments);
-		return true;
-	}
-
-	if(pg >= 1 && pg <= this.displayedPages){
-		this.chapterPos = pg;
-
-		this.render.page(pg);
-		this.visibleRangeCfi = this.getVisibleRangeCfi();
-		this.currentLocationCfi = this.visibleRangeCfi.start;
-		this.trigger("renderer:locationChanged", this.currentLocationCfi);
-		this.trigger("renderer:visibleRangeChanged", this.visibleRangeCfi);
-
-		return true;
-	}
-	//-- Return false if page is greater than the total
-	return false;
-};
-
-// Short cut to find next page's cfi starting at the last visible element
-/*
-EPUBJS.Renderer.prototype.nextPage = function(){
-	var pg = this.chapterPos + 1;
-	if(pg <= this.displayedPages){
-		this.chapterPos = pg;
-
-		this.render.page(pg);
-
-		this.currentLocationCfi = this.getPageCfi(this.visibileEl);
-		this.trigger("renderer:locationChanged", this.currentLocationCfi);
-
-		return true;
-	}
-	//-- Return false if page is greater than the total
-	return false;
-};
-*/
-EPUBJS.Renderer.prototype.nextPage = function(){
-	return this.page(this.chapterPos + 1);
-};
-
-EPUBJS.Renderer.prototype.prevPage = function(){
-	return this.page(this.chapterPos - 1);
-};
-
-//-- Show the page containing an Element
-EPUBJS.Renderer.prototype.pageByElement = function(el){
-	var pg;
-	if(!el) return;
-
-	pg = this.render.getPageNumberByElement(el);
-	this.page(pg);
-};
-
-// Jump to the last page of the chapter
-EPUBJS.Renderer.prototype.lastPage = function(){
-	if(this._moving) {
-		return this._q.enqueue("lastPage", arguments);
-	}
-
-	this.page(this.displayedPages);
-};
-
-// Jump to the first page of the chapter
-EPUBJS.Renderer.prototype.firstPage = function(){
-	if(this._moving) {
-		return this._q.enqueue("firstPage", arguments);
-	}
-
-	this.page(1);
-};
-
-//-- Find a section by fragement id
-EPUBJS.Renderer.prototype.section = function(fragment){
-	var el = this.doc.getElementById(fragment);
-
-	if(el){
-		this.pageByElement(el);
-	}
-
-};
-
-EPUBJS.Renderer.prototype.firstElementisTextNode = function(node) {
-	var children = node.childNodes;
-	var leng = children.length;
-
-	if(leng &&
-		children[0] && // First Child
-		children[0].nodeType === 3 && // This is a textNodes
-		children[0].textContent.trim().length) { // With non whitespace or return characters
-		return true;
-	}
-	return false;
-};
-
-EPUBJS.Renderer.prototype.isGoodNode = function(node) {
-	var embeddedElements = ["audio", "canvas", "embed", "iframe", "img", "math", "object", "svg", "video"];
-	if (embeddedElements.indexOf(node.tagName.toLowerCase()) !== -1) {
-		// Embedded elements usually do not have a text node as first element, but are also good nodes
-		return true;
-	}
-	return this.firstElementisTextNode(node);
-};
-
-// Walk the node tree from a start element to next visible element
-EPUBJS.Renderer.prototype.walk = function(node, x, y) {
-	var r, children, leng,
-		startNode = node,
-		prevNode,
-		stack = [startNode];
-
-	var STOP = 10000, ITER=0;
-
-	while(!r && stack.length) {
-		node = stack.shift();
-		if( this.containsPoint(node, x, y) && this.isGoodNode(node)) {
-			r = node;
-		}
-
-		if(!r && node && node.childElementCount > 0){
-			children = node.children;
-			if (children && children.length) {
-				leng = children.length ? children.length : 0;
+	_createClass(RangeObject, [{
+		key: "setStart",
+		value: function setStart(startNode, startOffset) {
+			this.startContainer = startNode;
+			this.startOffset = startOffset;
+
+			if (!this.endContainer) {
+				this.collapse(true);
 			} else {
-				return r;
+				this.commonAncestorContainer = this._commonAncestorContainer();
 			}
-			for (var i = leng-1; i >= 0; i--) {
-				if(children[i] != prevNode) stack.unshift(children[i]);
+
+			this._checkCollapsed();
+		}
+	}, {
+		key: "setEnd",
+		value: function setEnd(endNode, endOffset) {
+			this.endContainer = endNode;
+			this.endOffset = endOffset;
+
+			if (!this.startContainer) {
+				this.collapse(false);
+			} else {
+				this.collapsed = false;
+				this.commonAncestorContainer = this._commonAncestorContainer();
+			}
+
+			this._checkCollapsed();
+		}
+	}, {
+		key: "collapse",
+		value: function collapse(toStart) {
+			this.collapsed = true;
+			if (toStart) {
+				this.endContainer = this.startContainer;
+				this.endOffset = this.startOffset;
+				this.commonAncestorContainer = this.startContainer.parentNode;
+			} else {
+				this.startContainer = this.endContainer;
+				this.startOffset = this.endOffset;
+				this.commonAncestorContainer = this.endOffset.parentNode;
 			}
 		}
+	}, {
+		key: "selectNode",
+		value: function selectNode(referenceNode) {
+			var parent = referenceNode.parentNode;
+			var index = Array.prototype.indexOf.call(parent.childNodes, referenceNode);
+			this.setStart(parent, index);
+			this.setEnd(parent, index + 1);
+		}
+	}, {
+		key: "selectNodeContents",
+		value: function selectNodeContents(referenceNode) {
+			var end = referenceNode.childNodes[referenceNode.childNodes - 1];
+			var endIndex = referenceNode.nodeType === 3 ? referenceNode.textContent.length : parent.childNodes.length;
+			this.setStart(referenceNode, 0);
+			this.setEnd(referenceNode, endIndex);
+		}
+	}, {
+		key: "_commonAncestorContainer",
+		value: function _commonAncestorContainer(startContainer, endContainer) {
+			var startParents = parents(startContainer || this.startContainer);
+			var endParents = parents(endContainer || this.endContainer);
 
-		if(!r && stack.length === 0 && startNode && startNode.parentNode !== null){
-			stack.push(startNode.parentNode);
-			prevNode = startNode;
-			startNode = startNode.parentNode;
+			if (startParents[0] != endParents[0]) return undefined;
+
+			for (var i = 0; i < startParents.length; i++) {
+				if (startParents[i] != endParents[i]) {
+					return startParents[i - 1];
+				}
+			}
+		}
+	}, {
+		key: "_checkCollapsed",
+		value: function _checkCollapsed() {
+			if (this.startContainer === this.endContainer && this.startOffset === this.endOffset) {
+				this.collapsed = true;
+			} else {
+				this.collapsed = false;
+			}
+		}
+	}, {
+		key: "toString",
+		value: function toString() {
+			// TODO: implement walking between start and end to find text
+		}
+	}]);
+
+	return RangeObject;
+}();
+
+/***/ }),
+/* 1 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+	EPUB CFI spec: http://www.idpf.org/epub/linking/cfi/epub-cfi.html
+
+	Implements:
+	- Character Offset: epubcfi(/6/4[chap01ref]!/4[body01]/10[para05]/2/1:3)
+	- Simple Ranges : epubcfi(/6/4[chap01ref]!/4[body01]/10[para05],/2/1:1,/3:4)
+
+	Does Not Implement:
+	- Temporal Offset (~)
+	- Spatial Offset (@)
+	- Temporal-Spatial Offset (~ + @)
+	- Text Location Assertion ([)
+*/
+
+var ELEMENT_NODE = 1;
+var TEXT_NODE = 3;
+// const COMMENT_NODE = 8;
+var DOCUMENT_NODE = 9;
+
+var EpubCFI = function () {
+	function EpubCFI(cfiFrom, base, ignoreClass) {
+		_classCallCheck(this, EpubCFI);
+
+		var type;
+
+		this.str = "";
+
+		this.base = {};
+		this.spinePos = 0; // For compatibility
+
+		this.range = false; // true || false;
+
+		this.path = {};
+		this.start = null;
+		this.end = null;
+
+		// Allow instantiation without the "new" keyword
+		if (!(this instanceof EpubCFI)) {
+			return new EpubCFI(cfiFrom, base, ignoreClass);
 		}
 
-
-		ITER++;
-		if(ITER > STOP) {
-			console.error("ENDLESS LOOP");
-			break;
+		if (typeof base === "string") {
+			this.base = this.parseComponent(base);
+		} else if ((typeof base === "undefined" ? "undefined" : _typeof(base)) === "object" && base.steps) {
+			this.base = base;
 		}
 
-	}
+		type = this.checkType(cfiFrom);
 
-	return r;
-};
-
-// Checks if an element is on the screen
-EPUBJS.Renderer.prototype.containsPoint = function(el, x, y){
-	var rect;
-	var left;
-	if(el && typeof el.getBoundingClientRect === 'function'){
-		rect = el.getBoundingClientRect();
-		// console.log(el, rect, x, y);
-
-		if( rect.width !== 0 &&
-				rect.height !== 0 && // Element not visible
-				rect.left >= x &&
-				x <= rect.left + rect.width) {
-			return true;
-		}
-	}
-
-	return false;
-};
-
-EPUBJS.Renderer.prototype.textSprint = function(root, func) {
-	var filterEmpty = function(node){
-		if ( ! /^\s*$/.test(node.data) ) {
-			return NodeFilter.FILTER_ACCEPT;
+		if (type === "string") {
+			this.str = cfiFrom;
+			return (0, _core.extend)(this, this.parse(cfiFrom));
+		} else if (type === "range") {
+			return (0, _core.extend)(this, this.fromRange(cfiFrom, this.base, ignoreClass));
+		} else if (type === "node") {
+			return (0, _core.extend)(this, this.fromNode(cfiFrom, this.base, ignoreClass));
+		} else if (type === "EpubCFI" && cfiFrom.path) {
+			return cfiFrom;
+		} else if (!cfiFrom) {
+			return this;
 		} else {
-			return NodeFilter.FILTER_REJECT;
-		}
-	};
-	var treeWalker;
-	var node;
-
-	try {
-		treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-			acceptNode: filterEmpty
-		}, false);
-		while ((node = treeWalker.nextNode())) {
-			func(node);
-		}
-	} catch (e) {
-		// IE doesn't accept the object, just wants a function
-		// https://msdn.microsoft.com/en-us/library/ff974820(v=vs.85).aspx
-		treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, filterEmpty, false);
-		while ((node = treeWalker.nextNode())) {
-			func(node);
+			throw new TypeError("not a valid argument for EpubCFI");
 		}
 	}
 
+	_createClass(EpubCFI, [{
+		key: "checkType",
+		value: function checkType(cfi) {
 
+			if (this.isCfiString(cfi)) {
+				return "string";
+				// Is a range object
+			} else if ((typeof cfi === "undefined" ? "undefined" : _typeof(cfi)) === "object" && ((0, _core.type)(cfi) === "Range" || typeof cfi.startContainer != "undefined")) {
+				return "range";
+			} else if ((typeof cfi === "undefined" ? "undefined" : _typeof(cfi)) === "object" && typeof cfi.nodeType != "undefined") {
+				// || typeof cfi === "function"
+				return "node";
+			} else if ((typeof cfi === "undefined" ? "undefined" : _typeof(cfi)) === "object" && cfi instanceof EpubCFI) {
+				return "EpubCFI";
+			} else {
+				return false;
+			}
+		}
+	}, {
+		key: "parse",
+		value: function parse(cfiStr) {
+			var cfi = {
+				spinePos: -1,
+				range: false,
+				base: {},
+				path: {},
+				start: null,
+				end: null
+			};
+			var baseComponent, pathComponent, range;
 
-};
+			if (typeof cfiStr !== "string") {
+				return { spinePos: -1 };
+			}
 
-EPUBJS.Renderer.prototype.sprint = function(root, func) {
-	var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
-	var node;
-	while ((node = treeWalker.nextNode())) {
-		func(node);
-	}
+			if (cfiStr.indexOf("epubcfi(") === 0 && cfiStr[cfiStr.length - 1] === ")") {
+				// Remove intial epubcfi( and ending )
+				cfiStr = cfiStr.slice(8, cfiStr.length - 1);
+			}
 
-};
+			baseComponent = this.getChapterComponent(cfiStr);
 
-EPUBJS.Renderer.prototype.mapPage = function(){
-	var renderer = this;
-	var map = [];
-	var root = this.render.getBaseElement();
-	var page = 1;
-	var width = this.layout.colWidth + this.layout.gap;
-	var offset = this.formated.pageWidth * (this.chapterPos-1);
-	var limit = (width * page) - offset;// (width * page) - offset;
-	var elLimit = 0;
-	var prevRange;
-	var prevRanges;
-	var cfi;
-	var lastChildren = null;
-	var prevElement;
-	var startRange, endRange;
-	var startCfi, endCfi;
-	var check = function(node) {
-		var elPos;
-		var elRange;
-		var found;
-		if (node.nodeType == Node.TEXT_NODE) {
+			// Make sure this is a valid cfi or return
+			if (!baseComponent) {
+				return { spinePos: -1 };
+			}
 
-			elRange = document.createRange();
-			elRange.selectNodeContents(node);
-			elPos = elRange.getBoundingClientRect();
+			cfi.base = this.parseComponent(baseComponent);
 
-			if(!elPos || (elPos.width === 0 && elPos.height === 0)) {
+			pathComponent = this.getPathComponent(cfiStr);
+			cfi.path = this.parseComponent(pathComponent);
+
+			range = this.getRange(cfiStr);
+
+			if (range) {
+				cfi.range = true;
+				cfi.start = this.parseComponent(range[0]);
+				cfi.end = this.parseComponent(range[1]);
+			}
+
+			// Get spine node position
+			// cfi.spineSegment = cfi.base.steps[1];
+
+			// Chapter segment is always the second step
+			cfi.spinePos = cfi.base.steps[1].index;
+
+			return cfi;
+		}
+	}, {
+		key: "parseComponent",
+		value: function parseComponent(componentStr) {
+			var component = {
+				steps: [],
+				terminal: {
+					offset: null,
+					assertion: null
+				}
+			};
+			var parts = componentStr.split(":");
+			var steps = parts[0].split("/");
+			var terminal;
+
+			if (parts.length > 1) {
+				terminal = parts[1];
+				component.terminal = this.parseTerminal(terminal);
+			}
+
+			if (steps[0] === "") {
+				steps.shift(); // Ignore the first slash
+			}
+
+			component.steps = steps.map(function (step) {
+				return this.parseStep(step);
+			}.bind(this));
+
+			return component;
+		}
+	}, {
+		key: "parseStep",
+		value: function parseStep(stepStr) {
+			var type, num, index, has_brackets, id;
+
+			has_brackets = stepStr.match(/\[(.*)\]/);
+			if (has_brackets && has_brackets[1]) {
+				id = has_brackets[1];
+			}
+
+			//-- Check if step is a text node or element
+			num = parseInt(stepStr);
+
+			if (isNaN(num)) {
 				return;
 			}
 
-			//-- Element starts new Col
-			if(elPos.left > elLimit) {
-				found = checkText(node);
+			if (num % 2 === 0) {
+				// Even = is an element
+				type = "element";
+				index = num / 2 - 1;
+			} else {
+				type = "text";
+				index = (num - 1) / 2;
 			}
 
-			//-- Element Spans new Col
-			if(elPos.right > elLimit) {
-				found = checkText(node);
+			return {
+				"type": type,
+				"index": index,
+				"id": id || null
+			};
+		}
+	}, {
+		key: "parseTerminal",
+		value: function parseTerminal(termialStr) {
+			var characterOffset, textLocationAssertion;
+			var assertion = termialStr.match(/\[(.*)\]/);
+
+			if (assertion && assertion[1]) {
+				characterOffset = parseInt(termialStr.split("[")[0]);
+				textLocationAssertion = assertion[1];
+			} else {
+				characterOffset = parseInt(termialStr);
 			}
 
-			prevElement = node;
+			if (!(0, _core.isNumber)(characterOffset)) {
+				characterOffset = null;
+			}
 
-			if (found) {
-				prevRange = null;
+			return {
+				"offset": characterOffset,
+				"assertion": textLocationAssertion
+			};
+		}
+	}, {
+		key: "getChapterComponent",
+		value: function getChapterComponent(cfiStr) {
+
+			var indirection = cfiStr.split("!");
+
+			return indirection[0];
+		}
+	}, {
+		key: "getPathComponent",
+		value: function getPathComponent(cfiStr) {
+
+			var indirection = cfiStr.split("!");
+
+			if (indirection[1]) {
+				var ranges = indirection[1].split(",");
+				return ranges[0];
 			}
 		}
+	}, {
+		key: "getRange",
+		value: function getRange(cfiStr) {
 
-	};
-	var checkText = function(node){
-		var result;
-		var ranges = renderer.splitTextNodeIntoWordsRanges(node);
+			var ranges = cfiStr.split(",");
 
-		ranges.forEach(function(range){
-			var pos = range.getBoundingClientRect();
+			if (ranges.length === 3) {
+				return [ranges[1], ranges[2]];
+			}
 
-			if(!pos || (pos.width === 0 && pos.height === 0)) {
+			return false;
+		}
+	}, {
+		key: "getCharecterOffsetComponent",
+		value: function getCharecterOffsetComponent(cfiStr) {
+			var splitStr = cfiStr.split(":");
+			return splitStr[1] || "";
+		}
+	}, {
+		key: "joinSteps",
+		value: function joinSteps(steps) {
+			if (!steps) {
+				return "";
+			}
+
+			return steps.map(function (part) {
+				var segment = "";
+
+				if (part.type === "element") {
+					segment += (part.index + 1) * 2;
+				}
+
+				if (part.type === "text") {
+					segment += 1 + 2 * part.index; // TODO: double check that this is odd
+				}
+
+				if (part.id) {
+					segment += "[" + part.id + "]";
+				}
+
+				return segment;
+			}).join("/");
+		}
+	}, {
+		key: "segmentString",
+		value: function segmentString(segment) {
+			var segmentString = "/";
+
+			segmentString += this.joinSteps(segment.steps);
+
+			if (segment.terminal && segment.terminal.offset != null) {
+				segmentString += ":" + segment.terminal.offset;
+			}
+
+			if (segment.terminal && segment.terminal.assertion != null) {
+				segmentString += "[" + segment.terminal.assertion + "]";
+			}
+
+			return segmentString;
+		}
+	}, {
+		key: "toString",
+		value: function toString() {
+			var cfiString = "epubcfi(";
+
+			cfiString += this.segmentString(this.base);
+
+			cfiString += "!";
+			cfiString += this.segmentString(this.path);
+
+			// Add Range, if present
+			if (this.range && this.start) {
+				cfiString += ",";
+				cfiString += this.segmentString(this.start);
+			}
+
+			if (this.range && this.end) {
+				cfiString += ",";
+				cfiString += this.segmentString(this.end);
+			}
+
+			cfiString += ")";
+
+			return cfiString;
+		}
+	}, {
+		key: "compare",
+		value: function compare(cfiOne, cfiTwo) {
+			var stepsA, stepsB;
+			var terminalA, terminalB;
+
+			var rangeAStartSteps, rangeAEndSteps;
+			var rangeBEndSteps, rangeBEndSteps;
+			var rangeAStartTerminal, rangeAEndTerminal;
+			var rangeBStartTerminal, rangeBEndTerminal;
+
+			if (typeof cfiOne === "string") {
+				cfiOne = new EpubCFI(cfiOne);
+			}
+			if (typeof cfiTwo === "string") {
+				cfiTwo = new EpubCFI(cfiTwo);
+			}
+			// Compare Spine Positions
+			if (cfiOne.spinePos > cfiTwo.spinePos) {
+				return 1;
+			}
+			if (cfiOne.spinePos < cfiTwo.spinePos) {
+				return -1;
+			}
+
+			if (cfiOne.range) {
+				stepsA = cfiOne.path.steps.concat(cfiOne.start.steps);
+				terminalA = cfiOne.start.terminal;
+			} else {
+				stepsA = cfiOne.path.steps;
+				terminalA = cfiOne.path.terminal;
+			}
+
+			if (cfiTwo.range) {
+				stepsB = cfiTwo.path.steps.concat(cfiTwo.start.steps);
+				terminalB = cfiTwo.start.terminal;
+			} else {
+				stepsB = cfiTwo.path.steps;
+				terminalB = cfiTwo.path.terminal;
+			}
+
+			// Compare Each Step in the First item
+			for (var i = 0; i < stepsA.length; i++) {
+				if (!stepsA[i]) {
+					return -1;
+				}
+				if (!stepsB[i]) {
+					return 1;
+				}
+				if (stepsA[i].index > stepsB[i].index) {
+					return 1;
+				}
+				if (stepsA[i].index < stepsB[i].index) {
+					return -1;
+				}
+				// Otherwise continue checking
+			}
+
+			// All steps in First equal to Second and First is Less Specific
+			if (stepsA.length < stepsB.length) {
+				return 1;
+			}
+
+			// Compare the charecter offset of the text node
+			if (terminalA.offset > terminalB.offset) {
+				return 1;
+			}
+			if (terminalA.offset < terminalB.offset) {
+				return -1;
+			}
+
+			// CFI's are equal
+			return 0;
+		}
+	}, {
+		key: "step",
+		value: function step(node) {
+			var nodeType = node.nodeType === TEXT_NODE ? "text" : "element";
+
+			return {
+				"id": node.id,
+				"tagName": node.tagName,
+				"type": nodeType,
+				"index": this.position(node)
+			};
+		}
+	}, {
+		key: "filteredStep",
+		value: function filteredStep(node, ignoreClass) {
+			var filteredNode = this.filter(node, ignoreClass);
+			var nodeType;
+
+			// Node filtered, so ignore
+			if (!filteredNode) {
 				return;
 			}
-			if(pos.left + pos.width < limit) {
-				if(!map[page-1]){
-					range.collapse(true);
-					cfi = renderer.currentChapter.cfiFromRange(range);
-					// map[page-1].start = cfi;
-					result = map.push({ start: cfi, end: null });
+
+			// Otherwise add the filter node in
+			nodeType = filteredNode.nodeType === TEXT_NODE ? "text" : "element";
+
+			return {
+				"id": filteredNode.id,
+				"tagName": filteredNode.tagName,
+				"type": nodeType,
+				"index": this.filteredPosition(filteredNode, ignoreClass)
+			};
+		}
+	}, {
+		key: "pathTo",
+		value: function pathTo(node, offset, ignoreClass) {
+			var segment = {
+				steps: [],
+				terminal: {
+					offset: null,
+					assertion: null
 				}
-			} else {
-				// Previous Range is null since we already found our last map pair
-				// Use that last walked textNode
-				if(!prevRange && prevElement) {
-					prevRanges = renderer.splitTextNodeIntoWordsRanges(prevElement);
-					prevRange = prevRanges[prevRanges.length-1];
+			};
+			var currentNode = node;
+			var step;
+
+			while (currentNode && currentNode.parentNode && currentNode.parentNode.nodeType != DOCUMENT_NODE) {
+
+				if (ignoreClass) {
+					step = this.filteredStep(currentNode, ignoreClass);
+				} else {
+					step = this.step(currentNode);
 				}
 
-				if(prevRange && map.length){
-					prevRange.collapse(false);
-					cfi = renderer.currentChapter.cfiFromRange(prevRange);
-					if (map[map.length-1]) {
-						map[map.length-1].end = cfi;
+				if (step) {
+					segment.steps.unshift(step);
+				}
+
+				currentNode = currentNode.parentNode;
+			}
+
+			if (offset != null && offset >= 0) {
+
+				segment.terminal.offset = offset;
+
+				// Make sure we are getting to a textNode if there is an offset
+				if (segment.steps[segment.steps.length - 1].type != "text") {
+					segment.steps.push({
+						"type": "text",
+						"index": 0
+					});
+				}
+			}
+
+			return segment;
+		}
+	}, {
+		key: "equalStep",
+		value: function equalStep(stepA, stepB) {
+			if (!stepA || !stepB) {
+				return false;
+			}
+
+			if (stepA.index === stepB.index && stepA.id === stepB.id && stepA.type === stepB.type) {
+				return true;
+			}
+
+			return false;
+		}
+	}, {
+		key: "fromRange",
+		value: function fromRange(range, base, ignoreClass) {
+			var cfi = {
+				range: false,
+				base: {},
+				path: {},
+				start: null,
+				end: null
+			};
+
+			var start = range.startContainer;
+			var end = range.endContainer;
+
+			var startOffset = range.startOffset;
+			var endOffset = range.endOffset;
+
+			var needsIgnoring = false;
+
+			if (ignoreClass) {
+				// Tell pathTo if / what to ignore
+				needsIgnoring = start.ownerDocument.querySelector("." + ignoreClass) != null;
+			}
+
+			if (typeof base === "string") {
+				cfi.base = this.parseComponent(base);
+				cfi.spinePos = cfi.base.steps[1].index;
+			} else if ((typeof base === "undefined" ? "undefined" : _typeof(base)) === "object") {
+				cfi.base = base;
+			}
+
+			if (range.collapsed) {
+				if (needsIgnoring) {
+					startOffset = this.patchOffset(start, startOffset, ignoreClass);
+				}
+				cfi.path = this.pathTo(start, startOffset, ignoreClass);
+			} else {
+				cfi.range = true;
+
+				if (needsIgnoring) {
+					startOffset = this.patchOffset(start, startOffset, ignoreClass);
+				}
+
+				cfi.start = this.pathTo(start, startOffset, ignoreClass);
+				if (needsIgnoring) {
+					endOffset = this.patchOffset(end, endOffset, ignoreClass);
+				}
+
+				cfi.end = this.pathTo(end, endOffset, ignoreClass);
+
+				// Create a new empty path
+				cfi.path = {
+					steps: [],
+					terminal: null
+				};
+
+				// Push steps that are shared between start and end to the common path
+				var len = cfi.start.steps.length;
+				var i;
+
+				for (i = 0; i < len; i++) {
+					if (this.equalStep(cfi.start.steps[i], cfi.end.steps[i])) {
+						if (i === len - 1) {
+							// Last step is equal, check terminals
+							if (cfi.start.terminal === cfi.end.terminal) {
+								// CFI's are equal
+								cfi.path.steps.push(cfi.start.steps[i]);
+								// Not a range
+								cfi.range = false;
+							}
+						} else {
+							cfi.path.steps.push(cfi.start.steps[i]);
+						}
+					} else {
+						break;
 					}
 				}
 
-				range.collapse(true);
-				cfi = renderer.currentChapter.cfiFromRange(range);
-				result = map.push({
-						start: cfi,
-						end: null
-				});
+				cfi.start.steps = cfi.start.steps.slice(cfi.path.steps.length);
+				cfi.end.steps = cfi.end.steps.slice(cfi.path.steps.length);
 
-				page += 1;
-				limit = (width * page) - offset;
-				elLimit = limit;
+				// TODO: Add Sanity check to make sure that the end if greater than the start
 			}
 
-			prevRange = range;
-		});
-
-		return result;
-	};
-	var docEl = this.render.getDocumentElement();
-	var dir = docEl.dir;
-
-	// Set back to ltr before sprinting to get correct order
-	if(dir == "rtl") {
-		docEl.dir = "ltr";
-		if (this.layoutSettings.layout !== "pre-paginated") {
-			docEl.style.position = "static";
+			return cfi;
 		}
-	}
+	}, {
+		key: "fromNode",
+		value: function fromNode(anchor, base, ignoreClass) {
+			var cfi = {
+				range: false,
+				base: {},
+				path: {},
+				start: null,
+				end: null
+			};
 
-	this.textSprint(root, check);
-
-	// Reset back to previous RTL settings
-	if(dir == "rtl") {
-		docEl.dir = dir;
-		if (this.layoutSettings.layout !== "pre-paginated") {
-			docEl.style.left = "auto";
-			docEl.style.right = "0";
-		}
-	}
-
-	// Check the remaining children that fit on this page
-	// to ensure the end is correctly calculated
-	if(!prevRange && prevElement) {
-		prevRanges = renderer.splitTextNodeIntoWordsRanges(prevElement);
-		prevRange = prevRanges[prevRanges.length-1];
-	}
-
-	if(prevRange){
-		prevRange.collapse(false);
-		cfi = renderer.currentChapter.cfiFromRange(prevRange);
-		map[map.length-1].end = cfi;
-	}
-
-	// Handle empty map
-	if(!map.length) {
-		startRange = this.doc.createRange();
-		startRange.selectNodeContents(root);
-		startRange.collapse(true);
-		startCfi = renderer.currentChapter.cfiFromRange(startRange);
-
-		endRange = this.doc.createRange();
-		endRange.selectNodeContents(root);
-		endRange.collapse(false);
-		endCfi = renderer.currentChapter.cfiFromRange(endRange);
-
-
-		map.push({ start: startCfi, end: endCfi });
-
-	}
-
-	// clean up
-	prevRange = null;
-	prevRanges = undefined;
-	startRange = null;
-	endRange = null;
-	root = null;
-
-	return map;
-};
-
-
-EPUBJS.Renderer.prototype.indexOfBreakableChar = function (text, startPosition) {
-	var whiteCharacters = "\x2D\x20\t\r\n\b\f";
-	// '-' \x2D
-	// ' ' \x20
-
-	if (! startPosition) {
-		startPosition = 0;
-	}
-
-	for (var i = startPosition; i < text.length; i++) {
-		if (whiteCharacters.indexOf(text.charAt(i)) != -1) {
-			return i;
-		}
-	}
-
-	return -1;
-};
-
-
-EPUBJS.Renderer.prototype.splitTextNodeIntoWordsRanges = function(node){
-	var ranges = [];
-	var text = node.textContent.trim();
-	var range;
-	var rect;
-	var list;
-
-	// Usage of indexOf() function for space character as word delimiter
-	// is not sufficient in case of other breakable characters like \r\n- etc
-	var pos = this.indexOfBreakableChar(text);
-
-	if(pos === -1) {
-		range = this.doc.createRange();
-		range.selectNodeContents(node);
-		return [range];
-	}
-
-	range = this.doc.createRange();
-	range.setStart(node, 0);
-	range.setEnd(node, pos);
-	ranges.push(range);
-
-	// there was a word miss in case of one letter words
-	range = this.doc.createRange();
-	range.setStart(node, pos+1);
-
-	while ( pos != -1 ) {
-
-		pos = this.indexOfBreakableChar(text, pos + 1);
-		if(pos > 0) {
-
-			if(range) {
-				range.setEnd(node, pos);
-				ranges.push(range);
+			if (typeof base === "string") {
+				cfi.base = this.parseComponent(base);
+				cfi.spinePos = cfi.base.steps[1].index;
+			} else if ((typeof base === "undefined" ? "undefined" : _typeof(base)) === "object") {
+				cfi.base = base;
 			}
 
-			range = this.doc.createRange();
-			range.setStart(node, pos+1);
+			cfi.path = this.pathTo(anchor, null, ignoreClass);
+
+			return cfi;
 		}
-	}
+	}, {
+		key: "filter",
+		value: function filter(anchor, ignoreClass) {
+			var needsIgnoring;
+			var sibling; // to join with
+			var parent, previousSibling, nextSibling;
+			var isText = false;
 
-	if(range) {
-		range.setEnd(node, text.length);
-		ranges.push(range);
-	}
-
-	return ranges;
-};
-
-EPUBJS.Renderer.prototype.rangePosition = function(range){
-	var rect;
-	var list;
-
-	list = range.getClientRects();
-
-	if(list.length) {
-		rect = list[0];
-		return rect;
-	}
-
-	return null;
-};
-
-/*
-// Get the cfi of the current page
-EPUBJS.Renderer.prototype.getPageCfi = function(prevEl){
-	var range = this.doc.createRange();
-	var position;
-	// TODO : this might need to take margin / padding into account?
-	var x = 1;//this.formated.pageWidth/2;
-	var y = 1;//;this.formated.pageHeight/2;
-
-	range = this.getRange(x, y);
-
-	// var test = this.doc.defaultView.getSelection();
-	// var r = this.doc.createRange();
-	// test.removeAllRanges();
-	// r.setStart(range.startContainer, range.startOffset);
-	// r.setEnd(range.startContainer, range.startOffset + 1);
-	// test.addRange(r);
-
-	return this.currentChapter.cfiFromRange(range);
-};
-*/
-
-// Get the cfi of the current page
-EPUBJS.Renderer.prototype.getPageCfi = function(){
-	var pg = (this.chapterPos * 2)-1;
-	return this.pageMap[pg].start;
-};
-
-EPUBJS.Renderer.prototype.getRange = function(x, y, forceElement){
-	var range = this.doc.createRange();
-	var position;
-	forceElement = true; // temp override
-	if(typeof document.caretPositionFromPoint !== "undefined" && !forceElement){
-		position = this.doc.caretPositionFromPoint(x, y);
-		range.setStart(position.offsetNode, position.offset);
-	} else if(typeof document.caretRangeFromPoint !== "undefined" && !forceElement){
-		range = this.doc.caretRangeFromPoint(x, y);
-	} else {
-		this.visibileEl = this.findElementAfter(x, y);
-		range.setStart(this.visibileEl, 1);
-	}
-
-	// var test = this.doc.defaultView.getSelection();
-	// var r = this.doc.createRange();
-	// test.removeAllRanges();
-	// r.setStart(range.startContainer, range.startOffset);
-	// r.setEnd(range.startContainer, range.startOffset + 1);
-	// test.addRange(r);
-	return range;
-};
-
-/*
-EPUBJS.Renderer.prototype.getVisibleRangeCfi = function(prevEl){
-	var startX = 0;
-	var startY = 0;
-	var endX = this.width-1;
-	var endY = this.height-1;
-	var startRange = this.getRange(startX, startY);
-	var endRange = this.getRange(endX, endY); //fix if carret not avail
-	var startCfi = this.currentChapter.cfiFromRange(startRange);
-	var endCfi;
-	if(endRange) {
-		endCfi = this.currentChapter.cfiFromRange(endRange);
-	}
-
-	return {
-		start: startCfi,
-		end: endCfi || false
-	};
-};
-*/
-
-EPUBJS.Renderer.prototype.pagesInCurrentChapter = function() {
-	var pgs;
-	var length;
-
-	if(!this.pageMap) {
-		console.warn("page map not loaded");
-		return false;
-	}
-
-	length = this.pageMap.length;
-
-	// if(this.spreads){
-	// 	pgs = Math.ceil(length / 2);
-	// } else {
-	// 	pgs = length;
-	// }
-
-	return length;
-};
-
-EPUBJS.Renderer.prototype.currentRenderedPage = function(){
-	var pg;
-
-	if(!this.pageMap) {
-		console.warn("page map not loaded");
-		return false;
-	}
-
-	if (this.spreads && this.pageMap.length > 1) {
-		pg = (this.chapterPos*2) - 1;
-	} else {
-		pg = this.chapterPos;
-	}
-
-	return pg;
-};
-
-EPUBJS.Renderer.prototype.getRenderedPagesLeft = function(){
-	var pg;
-	var lastPage;
-	var pagesLeft;
-
-	if(!this.pageMap) {
-		console.warn("page map not loaded");
-		return false;
-	}
-
-	lastPage = this.pageMap.length;
-
-	if (this.spreads) {
-		pg = (this.chapterPos*2) - 1;
-	} else {
-		pg = this.chapterPos;
-	}
-
-	pagesLeft = lastPage - pg;
-	return pagesLeft;
-
-};
-
-EPUBJS.Renderer.prototype.getVisibleRangeCfi = function(){
-	var pg;
-	var startRange, endRange;
-
-	if(!this.pageMap) {
-		console.warn("page map not loaded");
-		return false;
-	}
-
-	if (this.spreads) {
-		pg = this.chapterPos*2;
-		startRange = this.pageMap[pg-2];
-		endRange = startRange;
-
-		if(this.pageMap.length > 1 && this.pageMap.length > pg-1) {
-			endRange = this.pageMap[pg-1];
-		}
-	} else {
-		pg = this.chapterPos;
-		startRange = this.pageMap[pg-1];
-		endRange = startRange;
-	}
-
-	if(!startRange) {
-		console.warn("page range miss:", pg, this.pageMap);
-		startRange = this.pageMap[this.pageMap.length-1];
-		endRange = startRange;
-	}
-
-	return {
-		start: startRange.start,
-		end: endRange.end
-	};
-};
-
-// Goto a cfi position in the current chapter
-EPUBJS.Renderer.prototype.gotoCfi = function(cfi){
-	var pg;
-	var marker;
-	var range;
-
-	if(this._moving){
-		return this._q.enqueue("gotoCfi", arguments);
-	}
-
-	if(EPUBJS.core.isString(cfi)){
-		cfi = this.epubcfi.parse(cfi);
-	}
-
-	if(typeof document.evaluate === 'undefined') {
-		marker = this.epubcfi.addMarker(cfi, this.doc);
-		if(marker) {
-			pg = this.render.getPageNumberByElement(marker);
-			// Must Clean up Marker before going to page
-			this.epubcfi.removeMarker(marker, this.doc);
-			this.page(pg);
-		}
-	} else {
-		range = this.epubcfi.generateRangeFromCfi(cfi, this.doc);
-		if(range) {
-			// jaroslaw.bielski@7bulls.com
-			// It seems that sometimes getBoundingClientRect() returns null for first page CFI in chapter.
-			// It is always reproductible if few consecutive chapters have only one page.
-			// NOTE: This is only workaround and the issue needs an deeper investigation.
-			// NOTE: Observed on Android 4.2.1 using WebView widget as HTML renderer (Asus TF300T).
-			var rect = range.getBoundingClientRect();
-			if (rect) {
-				pg = this.render.getPageNumberByRect(rect);
-
+			if (anchor.nodeType === TEXT_NODE) {
+				isText = true;
+				parent = anchor.parentNode;
+				needsIgnoring = anchor.parentNode.classList.contains(ignoreClass);
 			} else {
-				// Goto first page in chapter
-				pg = 1;
+				isText = false;
+				needsIgnoring = anchor.classList.contains(ignoreClass);
 			}
 
-			this.page(pg);
+			if (needsIgnoring && isText) {
+				previousSibling = parent.previousSibling;
+				nextSibling = parent.nextSibling;
 
-			// Reset the current location cfi to requested cfi
-			this.currentLocationCfi = cfi.str;
-		} else {
-			// Failed to find a range, go to first page
-			this.page(1);
+				// If the sibling is a text node, join the nodes
+				if (previousSibling && previousSibling.nodeType === TEXT_NODE) {
+					sibling = previousSibling;
+				} else if (nextSibling && nextSibling.nodeType === TEXT_NODE) {
+					sibling = nextSibling;
+				}
+
+				if (sibling) {
+					return sibling;
+				} else {
+					// Parent will be ignored on next step
+					return anchor;
+				}
+			} else if (needsIgnoring && !isText) {
+				// Otherwise just skip the element node
+				return false;
+			} else {
+				// No need to filter
+				return anchor;
+			}
+		}
+	}, {
+		key: "patchOffset",
+		value: function patchOffset(anchor, offset, ignoreClass) {
+			if (anchor.nodeType != TEXT_NODE) {
+				throw new Error("Anchor must be a text node");
+			}
+
+			var curr = anchor;
+			var totalOffset = offset;
+
+			// If the parent is a ignored node, get offset from it's start
+			if (anchor.parentNode.classList.contains(ignoreClass)) {
+				curr = anchor.parentNode;
+			}
+
+			while (curr.previousSibling) {
+				if (curr.previousSibling.nodeType === ELEMENT_NODE) {
+					// Originally a text node, so join
+					if (curr.previousSibling.classList.contains(ignoreClass)) {
+						totalOffset += curr.previousSibling.textContent.length;
+					} else {
+						break; // Normal node, dont join
+					}
+				} else {
+					// If the previous sibling is a text node, join the nodes
+					totalOffset += curr.previousSibling.textContent.length;
+				}
+
+				curr = curr.previousSibling;
+			}
+
+			return totalOffset;
+		}
+	}, {
+		key: "normalizedMap",
+		value: function normalizedMap(children, nodeType, ignoreClass) {
+			var output = {};
+			var prevIndex = -1;
+			var i,
+			    len = children.length;
+			var currNodeType;
+			var prevNodeType;
+
+			for (i = 0; i < len; i++) {
+
+				currNodeType = children[i].nodeType;
+
+				// Check if needs ignoring
+				if (currNodeType === ELEMENT_NODE && children[i].classList.contains(ignoreClass)) {
+					currNodeType = TEXT_NODE;
+				}
+
+				if (i > 0 && currNodeType === TEXT_NODE && prevNodeType === TEXT_NODE) {
+					// join text nodes
+					output[i] = prevIndex;
+				} else if (nodeType === currNodeType) {
+					prevIndex = prevIndex + 1;
+					output[i] = prevIndex;
+				}
+
+				prevNodeType = currNodeType;
+			}
+
+			return output;
+		}
+	}, {
+		key: "position",
+		value: function position(anchor) {
+			var children, index;
+			if (anchor.nodeType === ELEMENT_NODE) {
+				children = anchor.parentNode.children;
+				if (!children) {
+					children = (0, _core.findChildren)(anchor.parentNode);
+				}
+				index = Array.prototype.indexOf.call(children, anchor);
+			} else {
+				children = this.textNodes(anchor.parentNode);
+				index = children.indexOf(anchor);
+			}
+
+			return index;
+		}
+	}, {
+		key: "filteredPosition",
+		value: function filteredPosition(anchor, ignoreClass) {
+			var children, index, map;
+
+			if (anchor.nodeType === ELEMENT_NODE) {
+				children = anchor.parentNode.children;
+				map = this.normalizedMap(children, ELEMENT_NODE, ignoreClass);
+			} else {
+				children = anchor.parentNode.childNodes;
+				// Inside an ignored node
+				if (anchor.parentNode.classList.contains(ignoreClass)) {
+					anchor = anchor.parentNode;
+					children = anchor.parentNode.childNodes;
+				}
+				map = this.normalizedMap(children, TEXT_NODE, ignoreClass);
+			}
+
+			index = Array.prototype.indexOf.call(children, anchor);
+
+			return map[index];
+		}
+	}, {
+		key: "stepsToXpath",
+		value: function stepsToXpath(steps) {
+			var xpath = [".", "*"];
+
+			steps.forEach(function (step) {
+				var position = step.index + 1;
+
+				if (step.id) {
+					xpath.push("*[position()=" + position + " and @id='" + step.id + "']");
+				} else if (step.type === "text") {
+					xpath.push("text()[" + position + "]");
+				} else {
+					xpath.push("*[" + position + "]");
+				}
+			});
+
+			return xpath.join("/");
+		}
+
+		/*
+  	To get the last step if needed:
+  	// Get the terminal step
+  lastStep = steps[steps.length-1];
+  // Get the query string
+  query = this.stepsToQuery(steps);
+  // Find the containing element
+  startContainerParent = doc.querySelector(query);
+  // Find the text node within that element
+  if(startContainerParent && lastStep.type == "text") {
+  	container = startContainerParent.childNodes[lastStep.index];
+  }
+  */
+
+	}, {
+		key: "stepsToQuerySelector",
+		value: function stepsToQuerySelector(steps) {
+			var query = ["html"];
+
+			steps.forEach(function (step) {
+				var position = step.index + 1;
+
+				if (step.id) {
+					query.push("#" + step.id);
+				} else if (step.type === "text") {
+					// unsupported in querySelector
+					// query.push("text()[" + position + "]");
+				} else {
+					query.push("*:nth-child(" + position + ")");
+				}
+			});
+
+			return query.join(">");
+		}
+	}, {
+		key: "textNodes",
+		value: function textNodes(container, ignoreClass) {
+			return Array.prototype.slice.call(container.childNodes).filter(function (node) {
+				if (node.nodeType === TEXT_NODE) {
+					return true;
+				} else if (ignoreClass && node.classList.contains(ignoreClass)) {
+					return true;
+				}
+				return false;
+			});
+		}
+	}, {
+		key: "walkToNode",
+		value: function walkToNode(steps, _doc, ignoreClass) {
+			var doc = _doc || document;
+			var container = doc.documentElement;
+			var children;
+			var step;
+			var len = steps.length;
+			var i;
+
+			for (i = 0; i < len; i++) {
+				step = steps[i];
+
+				if (step.type === "element") {
+					//better to get a container using id as some times step.index may not be correct
+					//For ex.https://github.com/futurepress/epub.js/issues/561
+					if (step.id) {
+						container = doc.getElementById(step.id);
+					} else {
+						children = container.children || (0, _core.findChildren)(container);
+						container = children[step.index];
+					}
+				} else if (step.type === "text") {
+					container = this.textNodes(container, ignoreClass)[step.index];
+				}
+				if (!container) {
+					//Break the for loop as due to incorrect index we can get error if
+					//container is undefined so that other functionailties works fine
+					//like navigation
+					break;
+				}
+			}
+
+			return container;
+		}
+	}, {
+		key: "findNode",
+		value: function findNode(steps, _doc, ignoreClass) {
+			var doc = _doc || document;
+			var container;
+			var xpath;
+
+			if (!ignoreClass && typeof doc.evaluate != "undefined") {
+				xpath = this.stepsToXpath(steps);
+				container = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+			} else if (ignoreClass) {
+				container = this.walkToNode(steps, doc, ignoreClass);
+			} else {
+				container = this.walkToNode(steps, doc);
+			}
+
+			return container;
+		}
+	}, {
+		key: "fixMiss",
+		value: function fixMiss(steps, offset, _doc, ignoreClass) {
+			var container = this.findNode(steps.slice(0, -1), _doc, ignoreClass);
+			var children = container.childNodes;
+			var map = this.normalizedMap(children, TEXT_NODE, ignoreClass);
+			var child;
+			var len;
+			var lastStepIndex = steps[steps.length - 1].index;
+
+			for (var childIndex in map) {
+				if (!map.hasOwnProperty(childIndex)) return;
+
+				if (map[childIndex] === lastStepIndex) {
+					child = children[childIndex];
+					len = child.textContent.length;
+					if (offset > len) {
+						offset = offset - len;
+					} else {
+						if (child.nodeType === ELEMENT_NODE) {
+							container = child.childNodes[0];
+						} else {
+							container = child;
+						}
+						break;
+					}
+				}
+			}
+
+			return {
+				container: container,
+				offset: offset
+			};
+		}
+	}, {
+		key: "toRange",
+		value: function toRange(_doc, ignoreClass) {
+			var doc = _doc || document;
+			var range;
+			var start, end, startContainer, endContainer;
+			var cfi = this;
+			var startSteps, endSteps;
+			var needsIgnoring = ignoreClass ? doc.querySelector("." + ignoreClass) != null : false;
+			var missed;
+
+			if (typeof doc.createRange !== "undefined") {
+				range = doc.createRange();
+			} else {
+				range = new _core.RangeObject();
+			}
+
+			if (cfi.range) {
+				start = cfi.start;
+				startSteps = cfi.path.steps.concat(start.steps);
+				startContainer = this.findNode(startSteps, doc, needsIgnoring ? ignoreClass : null);
+				end = cfi.end;
+				endSteps = cfi.path.steps.concat(end.steps);
+				endContainer = this.findNode(endSteps, doc, needsIgnoring ? ignoreClass : null);
+			} else {
+				start = cfi.path;
+				startSteps = cfi.path.steps;
+				startContainer = this.findNode(cfi.path.steps, doc, needsIgnoring ? ignoreClass : null);
+			}
+
+			if (startContainer) {
+				try {
+
+					if (start.terminal.offset != null) {
+						range.setStart(startContainer, start.terminal.offset);
+					} else {
+						range.setStart(startContainer, 0);
+					}
+				} catch (e) {
+					missed = this.fixMiss(startSteps, start.terminal.offset, doc, needsIgnoring ? ignoreClass : null);
+					range.setStart(missed.container, missed.offset);
+				}
+			} else {
+				console.log("NO START");
+				// No start found
+				return null;
+			}
+
+			if (endContainer) {
+				try {
+
+					if (end.terminal.offset != null) {
+						range.setEnd(endContainer, end.terminal.offset);
+					} else {
+						range.setEnd(endContainer, 0);
+					}
+				} catch (e) {
+					missed = this.fixMiss(endSteps, cfi.end.terminal.offset, doc, needsIgnoring ? ignoreClass : null);
+					range.setEnd(missed.container, missed.offset);
+				}
+			}
+
+			// doc.defaultView.getSelection().addRange(range);
+			return range;
+		}
+
+		// is a cfi string, should be wrapped with "epubcfi()"
+
+	}, {
+		key: "isCfiString",
+		value: function isCfiString(str) {
+			if (typeof str === "string" && str.indexOf("epubcfi(") === 0 && str[str.length - 1] === ")") {
+				return true;
+			}
+
+			return false;
+		}
+	}, {
+		key: "generateChapterComponent",
+		value: function generateChapterComponent(_spineNodeIndex, _pos, id) {
+			var pos = parseInt(_pos),
+			    spineNodeIndex = (_spineNodeIndex + 1) * 2,
+			    cfi = "/" + spineNodeIndex + "/";
+
+			cfi += (pos + 1) * 2;
+
+			if (id) {
+				cfi += "[" + id + "]";
+			}
+
+			return cfi;
+		}
+	}, {
+		key: "collapse",
+		value: function collapse(toStart) {
+			if (!this.range) {
+				return;
+			}
+
+			this.range = false;
+
+			if (toStart) {
+				this.path.steps = this.path.steps.concat(this.start.steps);
+				this.path.terminal = this.start.terminal;
+			} else {
+				this.path.steps = this.path.steps.concat(this.end.steps);
+				this.path.terminal = this.end.terminal;
+			}
+		}
+	}]);
+
+	return EpubCFI;
+}();
+
+exports.default = EpubCFI;
+module.exports = exports["default"];
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var d        = __webpack_require__(22)
+  , callable = __webpack_require__(35)
+
+  , apply = Function.prototype.apply, call = Function.prototype.call
+  , create = Object.create, defineProperty = Object.defineProperty
+  , defineProperties = Object.defineProperties
+  , hasOwnProperty = Object.prototype.hasOwnProperty
+  , descriptor = { configurable: true, enumerable: false, writable: true }
+
+  , on, once, off, emit, methods, descriptors, base;
+
+on = function (type, listener) {
+	var data;
+
+	callable(listener);
+
+	if (!hasOwnProperty.call(this, '__ee__')) {
+		data = descriptor.value = create(null);
+		defineProperty(this, '__ee__', descriptor);
+		descriptor.value = null;
+	} else {
+		data = this.__ee__;
+	}
+	if (!data[type]) data[type] = listener;
+	else if (typeof data[type] === 'object') data[type].push(listener);
+	else data[type] = [data[type], listener];
+
+	return this;
+};
+
+once = function (type, listener) {
+	var once, self;
+
+	callable(listener);
+	self = this;
+	on.call(this, type, once = function () {
+		off.call(self, type, once);
+		apply.call(listener, this, arguments);
+	});
+
+	once.__eeOnceListener__ = listener;
+	return this;
+};
+
+off = function (type, listener) {
+	var data, listeners, candidate, i;
+
+	callable(listener);
+
+	if (!hasOwnProperty.call(this, '__ee__')) return this;
+	data = this.__ee__;
+	if (!data[type]) return this;
+	listeners = data[type];
+
+	if (typeof listeners === 'object') {
+		for (i = 0; (candidate = listeners[i]); ++i) {
+			if ((candidate === listener) ||
+					(candidate.__eeOnceListener__ === listener)) {
+				if (listeners.length === 2) data[type] = listeners[i ? 0 : 1];
+				else listeners.splice(i, 1);
+			}
+		}
+	} else {
+		if ((listeners === listener) ||
+				(listeners.__eeOnceListener__ === listener)) {
+			delete data[type];
+		}
+	}
+
+	return this;
+};
+
+emit = function (type) {
+	var i, l, listener, listeners, args;
+
+	if (!hasOwnProperty.call(this, '__ee__')) return;
+	listeners = this.__ee__[type];
+	if (!listeners) return;
+
+	if (typeof listeners === 'object') {
+		l = arguments.length;
+		args = new Array(l - 1);
+		for (i = 1; i < l; ++i) args[i - 1] = arguments[i];
+
+		listeners = listeners.slice();
+		for (i = 0; (listener = listeners[i]); ++i) {
+			apply.call(listener, this, args);
+		}
+	} else {
+		switch (arguments.length) {
+		case 1:
+			call.call(listeners, this);
+			break;
+		case 2:
+			call.call(listeners, this, arguments[1]);
+			break;
+		case 3:
+			call.call(listeners, this, arguments[1], arguments[2]);
+			break;
+		default:
+			l = arguments.length;
+			args = new Array(l - 1);
+			for (i = 1; i < l; ++i) {
+				args[i - 1] = arguments[i];
+			}
+			apply.call(listeners, this, args);
 		}
 	}
 };
 
-//  Walk nodes until a visible element is found
-EPUBJS.Renderer.prototype.findFirstVisible = function(startEl){
-	var el = startEl || this.render.getBaseElement();
-	var	found;
-	// kgolunski@7bulls.com
-	// Looks like an old API usage
-	// Set x and y as 0 to fullfill walk method API.
-	found = this.walk(el, 0, 0);
+methods = {
+	on: on,
+	once: once,
+	off: off,
+	emit: emit
+};
 
-	if(found) {
-		return found;
-	}else{
-		return startEl;
+descriptors = {
+	on: d(on),
+	once: d(once),
+	off: d(off),
+	emit: d(emit)
+};
+
+base = defineProperties({}, descriptors);
+
+module.exports = exports = function (o) {
+	return (o == null) ? create(base) : defineProperties(Object(o), descriptors);
+};
+exports.methods = methods;
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _pathWebpack = __webpack_require__(5);
+
+var _pathWebpack2 = _interopRequireDefault(_pathWebpack);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Path = function () {
+	function Path(pathString) {
+		_classCallCheck(this, Path);
+
+		var protocol;
+		var parsed;
+
+		protocol = pathString.indexOf("://");
+		if (protocol > -1) {
+			pathString = new URL(pathString).pathname;
+		}
+
+		parsed = this.parse(pathString);
+
+		this.path = pathString;
+
+		if (this.isDirectory(pathString)) {
+			this.directory = pathString;
+		} else {
+			this.directory = parsed.dir + "/";
+		}
+
+		this.filename = parsed.base;
+		this.extension = parsed.ext.slice(1);
 	}
 
-};
-// TODO: remove me - unsused
-EPUBJS.Renderer.prototype.findElementAfter = function(x, y, startEl){
-	var el = startEl || this.render.getBaseElement();
-	var	found;
-	found = this.walk(el, x, y);
-	if(found) {
-		return found;
-	}else{
-		return el;
-	}
+	_createClass(Path, [{
+		key: "parse",
+		value: function parse(what) {
+			return _pathWebpack2.default.parse(what);
+		}
+	}, {
+		key: "isAbsolute",
+		value: function isAbsolute(what) {
+			return _pathWebpack2.default.isAbsolute(what || this.path);
+		}
+	}, {
+		key: "isDirectory",
+		value: function isDirectory(what) {
+			return what.charAt(what.length - 1) === "/";
+		}
+	}, {
+		key: "resolve",
+		value: function resolve(what) {
+			return _pathWebpack2.default.resolve(this.directory, what);
+		}
+	}, {
+		key: "relative",
+		value: function relative(what) {
+			return _pathWebpack2.default.relative(this.directory, what);
+		}
+	}, {
+		key: "splitPath",
+		value: function splitPath(filename) {
+			return this.splitPathRe.exec(filename).slice(1);
+		}
+	}, {
+		key: "toString",
+		value: function toString() {
+			return this.path;
+		}
+	}]);
 
-};
+	return Path;
+}();
 
-/*
-EPUBJS.Renderer.prototype.route = function(hash, callback){
-	var location = window.location.hash.replace('#/', '');
-	if(this.useHash && location.length && location != this.prevLocation){
-		this.show(location, callback);
-		this.prevLocation = location;
-		return true;
-	}
-	return false;
-}
+exports.default = Path;
+module.exports = exports["default"];
 
-EPUBJS.Renderer.prototype.hideHashChanges = function(){
-	this.useHash = false;
-}
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
 
-*/
-
-EPUBJS.Renderer.prototype.resize = function(width, height, setSize){
-	var spreads;
-
-	this.width = width;
-	this.height = height;
-
-	if(setSize !== false) {
-		this.render.resize(this.width, this.height);
-	}
-
-
-
-	if(this.contents){
-		this.reformat();
-	}
-
-	this.trigger("renderer:resized", {
-		width: this.width,
-		height: this.height
-	});
-};
-
-//-- Listeners for events in the frame
-
-EPUBJS.Renderer.prototype.onResized = function(e) {
-	this.trigger('renderer:beforeResize');
-
-	var width = this.container.clientWidth;
-	var height = this.container.clientHeight;
-
-	this.resize(width, height, false);
-};
-
-EPUBJS.Renderer.prototype.addEventListeners = function(){
-	if(!this.render.document) {
-		return;
-	}
-	this.listenedEvents.forEach(function(eventName){
-		this.render.document.addEventListener(eventName, this.triggerEvent.bind(this), false);
-	}, this);
-
-};
-
-EPUBJS.Renderer.prototype.removeEventListeners = function(){
-	if(!this.render.document) {
-		return;
-	}
-	this.listenedEvents.forEach(function(eventName){
-		this.render.document.removeEventListener(eventName, this.triggerEvent, false);
-	}, this);
-
-};
-
-// Pass browser events
-EPUBJS.Renderer.prototype.triggerEvent = function(e){
-	this.trigger("renderer:"+e.type, e);
-};
-
-EPUBJS.Renderer.prototype.addSelectionListeners = function(){
-	this.render.document.addEventListener("selectionchange", this.onSelectionChange.bind(this), false);
-};
-
-EPUBJS.Renderer.prototype.removeSelectionListeners = function(){
-	if(!this.render.document) {
-		return;
-	}
-	this.doc.removeEventListener("selectionchange", this.onSelectionChange, false);
-};
-
-EPUBJS.Renderer.prototype.onSelectionChange = function(e){
-	if (this.selectionEndTimeout) {
-		clearTimeout(this.selectionEndTimeout);
-	}
-	this.selectionEndTimeout = setTimeout(function() {
-		this.selectedRange = this.render.window.getSelection();
-		this.trigger("renderer:selected", this.selectedRange);
-	}.bind(this), 500);
-};
+"use strict";
 
 
-//-- Spreads
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
 
-EPUBJS.Renderer.prototype.setMinSpreadWidth = function(width){
-	this.minSpreadWidth = width;
-	this.spreads = this.determineSpreads(width);
-};
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-EPUBJS.Renderer.prototype.determineSpreads = function(cutoff){
-	if(this.isForcedSingle || !cutoff || this.width < cutoff) {
-		return false; //-- Single Page
-	}else{
-		return true; //-- Double Page
-	}
-};
+var _path = __webpack_require__(3);
 
-EPUBJS.Renderer.prototype.forceSingle = function(bool){
-	if(bool) {
-		this.isForcedSingle = true;
-		// this.spreads = false;
-	} else {
-		this.isForcedSingle = false;
-		// this.spreads = this.determineSpreads(this.minSpreadWidth);
-	}
-};
+var _path2 = _interopRequireDefault(_path);
 
-EPUBJS.Renderer.prototype.setGap = function(gap){
-	this.gap = gap; //-- False == auto gap
-};
+var _pathWebpack = __webpack_require__(5);
 
-EPUBJS.Renderer.prototype.setDirection = function(direction){
-	this.direction = direction;
-	this.render.setDirection(this.direction);
-};
+var _pathWebpack2 = _interopRequireDefault(_pathWebpack);
 
-//-- Content Replacements
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-EPUBJS.Renderer.prototype.replace = function(query, func, finished, progress){
-	var items = this.contents.querySelectorAll(query),
-		resources = Array.prototype.slice.call(items),
-		count = resources.length;
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+/**
+ * creates a uri object
+ * @param	{string} urlString	a url string (relative or absolute)
+ * @param	{[string]} baseString optional base for the url,
+ * default to window.location.href
+ * @return {object} url
+ */
 
-	if(count === 0) {
-		finished(false);
-		return;
-	}
-	resources.forEach(function(item){
-		var called = false;
-		var after = function(result, full){
-			if(called === false) {
-				count--;
-				if(progress) progress(result, full, count);
-				if(count <= 0 && finished) finished(true);
-				called = true;
+var Url = function () {
+	function Url(urlString, baseString) {
+		_classCallCheck(this, Url);
+
+		var absolute = urlString.indexOf("://") > -1;
+		var pathname = urlString;
+		var basePath;
+
+		this.Url = undefined;
+		this.href = urlString;
+		this.protocol = "";
+		this.origin = "";
+		this.hash = "";
+		this.hash = "";
+		this.search = "";
+		this.base = baseString;
+
+		if (!absolute && baseString !== false && typeof baseString !== "string" && window && window.location) {
+			this.base = window.location.href;
+		}
+
+		// URL Polyfill doesn't throw an error if base is empty
+		if (absolute || this.base) {
+			try {
+				if (this.base) {
+					// Safari doesn't like an undefined base
+					this.Url = new URL(urlString, this.base);
+				} else {
+					this.Url = new URL(urlString);
+				}
+				this.href = this.Url.href;
+
+				this.protocol = this.Url.protocol;
+				this.origin = this.Url.origin;
+				this.hash = this.Url.hash;
+				this.search = this.Url.search;
+
+				pathname = this.Url.pathname;
+			} catch (e) {
+				// Skip URL parsing
+				this.Url = undefined;
+				// resolve the pathname from the base
+				if (this.base) {
+					basePath = new _path2.default(this.base);
+					pathname = basePath.resolve(pathname);
+				}
 			}
-		};
+		}
 
-		func(item, after);
+		this.Path = new _path2.default(pathname);
 
-	}.bind(this));
+		this.directory = this.Path.directory;
+		this.filename = this.Path.filename;
+		this.extension = this.Path.extension;
+	}
 
+	_createClass(Url, [{
+		key: "path",
+		value: function path() {
+			return this.Path;
+		}
+	}, {
+		key: "resolve",
+		value: function resolve(what) {
+			var isAbsolute = what.indexOf("://") > -1;
+			var fullpath;
+
+			if (isAbsolute) {
+				return what;
+			}
+
+			fullpath = _pathWebpack2.default.resolve(this.directory, what);
+			return this.origin + fullpath;
+		}
+	}, {
+		key: "relative",
+		value: function relative(what) {
+			return _pathWebpack2.default.relative(what, this.directory);
+		}
+	}, {
+		key: "toString",
+		value: function toString() {
+			return this.href;
+		}
+	}]);
+
+	return Url;
+}();
+
+exports.default = Url;
+module.exports = exports["default"];
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+if (!process) {
+  var process = {
+    "cwd" : function () { return '/' }
+  };
+}
+
+function assertPath(path) {
+  if (typeof path !== 'string') {
+    throw new TypeError('Path must be a string. Received ' + path);
+  }
+}
+
+// Resolves . and .. elements in a path with directory names
+function normalizeStringPosix(path, allowAboveRoot) {
+  var res = '';
+  var lastSlash = -1;
+  var dots = 0;
+  var code;
+  for (var i = 0; i <= path.length; ++i) {
+    if (i < path.length)
+      code = path.charCodeAt(i);
+    else if (code === 47/*/*/)
+      break;
+    else
+      code = 47/*/*/;
+    if (code === 47/*/*/) {
+      if (lastSlash === i - 1 || dots === 1) {
+        // NOOP
+      } else if (lastSlash !== i - 1 && dots === 2) {
+        if (res.length < 2 ||
+            res.charCodeAt(res.length - 1) !== 46/*.*/ ||
+            res.charCodeAt(res.length - 2) !== 46/*.*/) {
+          if (res.length > 2) {
+            var start = res.length - 1;
+            var j = start;
+            for (; j >= 0; --j) {
+              if (res.charCodeAt(j) === 47/*/*/)
+                break;
+            }
+            if (j !== start) {
+              if (j === -1)
+                res = '';
+              else
+                res = res.slice(0, j);
+              lastSlash = i;
+              dots = 0;
+              continue;
+            }
+          } else if (res.length === 2 || res.length === 1) {
+            res = '';
+            lastSlash = i;
+            dots = 0;
+            continue;
+          }
+        }
+        if (allowAboveRoot) {
+          if (res.length > 0)
+            res += '/..';
+          else
+            res = '..';
+        }
+      } else {
+        if (res.length > 0)
+          res += '/' + path.slice(lastSlash + 1, i);
+        else
+          res = path.slice(lastSlash + 1, i);
+      }
+      lastSlash = i;
+      dots = 0;
+    } else if (code === 46/*.*/ && dots !== -1) {
+      ++dots;
+    } else {
+      dots = -1;
+    }
+  }
+  return res;
+}
+
+function _format(sep, pathObject) {
+  var dir = pathObject.dir || pathObject.root;
+  var base = pathObject.base ||
+    ((pathObject.name || '') + (pathObject.ext || ''));
+  if (!dir) {
+    return base;
+  }
+  if (dir === pathObject.root) {
+    return dir + base;
+  }
+  return dir + sep + base;
+}
+
+var posix = {
+  // path.resolve([from ...], to)
+  resolve: function resolve() {
+    var resolvedPath = '';
+    var resolvedAbsolute = false;
+    var cwd;
+
+    for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
+      var path;
+      if (i >= 0)
+        path = arguments[i];
+      else {
+        if (cwd === undefined)
+          cwd = process.cwd();
+        path = cwd;
+      }
+
+      assertPath(path);
+
+      // Skip empty entries
+      if (path.length === 0) {
+        continue;
+      }
+
+      resolvedPath = path + '/' + resolvedPath;
+      resolvedAbsolute = path.charCodeAt(0) === 47/*/*/;
+    }
+
+    // At this point the path should be resolved to a full absolute path, but
+    // handle relative paths to be safe (might happen when process.cwd() fails)
+
+    // Normalize the path
+    resolvedPath = normalizeStringPosix(resolvedPath, !resolvedAbsolute);
+
+    if (resolvedAbsolute) {
+      if (resolvedPath.length > 0)
+        return '/' + resolvedPath;
+      else
+        return '/';
+    } else if (resolvedPath.length > 0) {
+      return resolvedPath;
+    } else {
+      return '.';
+    }
+  },
+
+
+  normalize: function normalize(path) {
+    assertPath(path);
+
+    if (path.length === 0)
+      return '.';
+
+    var isAbsolute = path.charCodeAt(0) === 47/*/*/;
+    var trailingSeparator = path.charCodeAt(path.length - 1) === 47/*/*/;
+
+    // Normalize the path
+    path = normalizeStringPosix(path, !isAbsolute);
+
+    if (path.length === 0 && !isAbsolute)
+      path = '.';
+    if (path.length > 0 && trailingSeparator)
+      path += '/';
+
+    if (isAbsolute)
+      return '/' + path;
+    return path;
+  },
+
+
+  isAbsolute: function isAbsolute(path) {
+    assertPath(path);
+    return path.length > 0 && path.charCodeAt(0) === 47/*/*/;
+  },
+
+
+  join: function join() {
+    if (arguments.length === 0)
+      return '.';
+    var joined;
+    for (var i = 0; i < arguments.length; ++i) {
+      var arg = arguments[i];
+      assertPath(arg);
+      if (arg.length > 0) {
+        if (joined === undefined)
+          joined = arg;
+        else
+          joined += '/' + arg;
+      }
+    }
+    if (joined === undefined)
+      return '.';
+    return posix.normalize(joined);
+  },
+
+
+  relative: function relative(from, to) {
+    assertPath(from);
+    assertPath(to);
+
+    if (from === to)
+      return '';
+
+    from = posix.resolve(from);
+    to = posix.resolve(to);
+
+    if (from === to)
+      return '';
+
+    // Trim any leading backslashes
+    var fromStart = 1;
+    for (; fromStart < from.length; ++fromStart) {
+      if (from.charCodeAt(fromStart) !== 47/*/*/)
+        break;
+    }
+    var fromEnd = from.length;
+    var fromLen = (fromEnd - fromStart);
+
+    // Trim any leading backslashes
+    var toStart = 1;
+    for (; toStart < to.length; ++toStart) {
+      if (to.charCodeAt(toStart) !== 47/*/*/)
+        break;
+    }
+    var toEnd = to.length;
+    var toLen = (toEnd - toStart);
+
+    // Compare paths to find the longest common path from root
+    var length = (fromLen < toLen ? fromLen : toLen);
+    var lastCommonSep = -1;
+    var i = 0;
+    for (; i <= length; ++i) {
+      if (i === length) {
+        if (toLen > length) {
+          if (to.charCodeAt(toStart + i) === 47/*/*/) {
+            // We get here if `from` is the exact base path for `to`.
+            // For example: from='/foo/bar'; to='/foo/bar/baz'
+            return to.slice(toStart + i + 1);
+          } else if (i === 0) {
+            // We get here if `from` is the root
+            // For example: from='/'; to='/foo'
+            return to.slice(toStart + i);
+          }
+        } else if (fromLen > length) {
+          if (from.charCodeAt(fromStart + i) === 47/*/*/) {
+            // We get here if `to` is the exact base path for `from`.
+            // For example: from='/foo/bar/baz'; to='/foo/bar'
+            lastCommonSep = i;
+          } else if (i === 0) {
+            // We get here if `to` is the root.
+            // For example: from='/foo'; to='/'
+            lastCommonSep = 0;
+          }
+        }
+        break;
+      }
+      var fromCode = from.charCodeAt(fromStart + i);
+      var toCode = to.charCodeAt(toStart + i);
+      if (fromCode !== toCode)
+        break;
+      else if (fromCode === 47/*/*/)
+        lastCommonSep = i;
+    }
+
+    var out = '';
+    // Generate the relative path based on the path difference between `to`
+    // and `from`
+    for (i = fromStart + lastCommonSep + 1; i <= fromEnd; ++i) {
+      if (i === fromEnd || from.charCodeAt(i) === 47/*/*/) {
+        if (out.length === 0)
+          out += '..';
+        else
+          out += '/..';
+      }
+    }
+
+    // Lastly, append the rest of the destination (`to`) path that comes after
+    // the common path parts
+    if (out.length > 0)
+      return out + to.slice(toStart + lastCommonSep);
+    else {
+      toStart += lastCommonSep;
+      if (to.charCodeAt(toStart) === 47/*/*/)
+        ++toStart;
+      return to.slice(toStart);
+    }
+  },
+
+
+  _makeLong: function _makeLong(path) {
+    return path;
+  },
+
+
+  dirname: function dirname(path) {
+    assertPath(path);
+    if (path.length === 0)
+      return '.';
+    var code = path.charCodeAt(0);
+    var hasRoot = (code === 47/*/*/);
+    var end = -1;
+    var matchedSlash = true;
+    for (var i = path.length - 1; i >= 1; --i) {
+      code = path.charCodeAt(i);
+      if (code === 47/*/*/) {
+        if (!matchedSlash) {
+          end = i;
+          break;
+        }
+      } else {
+        // We saw the first non-path separator
+        matchedSlash = false;
+      }
+    }
+
+    if (end === -1)
+      return hasRoot ? '/' : '.';
+    if (hasRoot && end === 1)
+      return '//';
+    return path.slice(0, end);
+  },
+
+
+  basename: function basename(path, ext) {
+    if (ext !== undefined && typeof ext !== 'string')
+      throw new TypeError('"ext" argument must be a string');
+    assertPath(path);
+
+    var start = 0;
+    var end = -1;
+    var matchedSlash = true;
+    var i;
+
+    if (ext !== undefined && ext.length > 0 && ext.length <= path.length) {
+      if (ext.length === path.length && ext === path)
+        return '';
+      var extIdx = ext.length - 1;
+      var firstNonSlashEnd = -1;
+      for (i = path.length - 1; i >= 0; --i) {
+        var code = path.charCodeAt(i);
+        if (code === 47/*/*/) {
+          // If we reached a path separator that was not part of a set of path
+          // separators at the end of the string, stop now
+          if (!matchedSlash) {
+            start = i + 1;
+            break;
+          }
+        } else {
+          if (firstNonSlashEnd === -1) {
+            // We saw the first non-path separator, remember this index in case
+            // we need it if the extension ends up not matching
+            matchedSlash = false;
+            firstNonSlashEnd = i + 1;
+          }
+          if (extIdx >= 0) {
+            // Try to match the explicit extension
+            if (code === ext.charCodeAt(extIdx)) {
+              if (--extIdx === -1) {
+                // We matched the extension, so mark this as the end of our path
+                // component
+                end = i;
+              }
+            } else {
+              // Extension does not match, so our result is the entire path
+              // component
+              extIdx = -1;
+              end = firstNonSlashEnd;
+            }
+          }
+        }
+      }
+
+      if (start === end)
+        end = firstNonSlashEnd;
+      else if (end === -1)
+        end = path.length;
+      return path.slice(start, end);
+    } else {
+      for (i = path.length - 1; i >= 0; --i) {
+        if (path.charCodeAt(i) === 47/*/*/) {
+          // If we reached a path separator that was not part of a set of path
+          // separators at the end of the string, stop now
+          if (!matchedSlash) {
+            start = i + 1;
+            break;
+          }
+        } else if (end === -1) {
+          // We saw the first non-path separator, mark this as the end of our
+          // path component
+          matchedSlash = false;
+          end = i + 1;
+        }
+      }
+
+      if (end === -1)
+        return '';
+      return path.slice(start, end);
+    }
+  },
+
+
+  extname: function extname(path) {
+    assertPath(path);
+    var startDot = -1;
+    var startPart = 0;
+    var end = -1;
+    var matchedSlash = true;
+    // Track the state of characters (if any) we see before our first dot and
+    // after any path separator we find
+    var preDotState = 0;
+    for (var i = path.length - 1; i >= 0; --i) {
+      var code = path.charCodeAt(i);
+      if (code === 47/*/*/) {
+        // If we reached a path separator that was not part of a set of path
+        // separators at the end of the string, stop now
+        if (!matchedSlash) {
+          startPart = i + 1;
+          break;
+        }
+        continue;
+      }
+      if (end === -1) {
+        // We saw the first non-path separator, mark this as the end of our
+        // extension
+        matchedSlash = false;
+        end = i + 1;
+      }
+      if (code === 46/*.*/) {
+        // If this is our first dot, mark it as the start of our extension
+        if (startDot === -1)
+          startDot = i;
+        else if (preDotState !== 1)
+          preDotState = 1;
+      } else if (startDot !== -1) {
+        // We saw a non-dot and non-path separator before our dot, so we should
+        // have a good chance at having a non-empty extension
+        preDotState = -1;
+      }
+    }
+
+    if (startDot === -1 ||
+        end === -1 ||
+        // We saw a non-dot character immediately before the dot
+        preDotState === 0 ||
+        // The (right-most) trimmed path component is exactly '..'
+        (preDotState === 1 &&
+         startDot === end - 1 &&
+         startDot === startPart + 1)) {
+      return '';
+    }
+    return path.slice(startDot, end);
+  },
+
+
+  format: function format(pathObject) {
+    if (pathObject === null || typeof pathObject !== 'object') {
+      throw new TypeError(
+        'Parameter "pathObject" must be an object, not ' + typeof(pathObject)
+      );
+    }
+    return _format('/', pathObject);
+  },
+
+
+  parse: function parse(path) {
+    assertPath(path);
+
+    var ret = { root: '', dir: '', base: '', ext: '', name: '' };
+    if (path.length === 0)
+      return ret;
+    var code = path.charCodeAt(0);
+    var isAbsolute = (code === 47/*/*/);
+    var start;
+    if (isAbsolute) {
+      ret.root = '/';
+      start = 1;
+    } else {
+      start = 0;
+    }
+    var startDot = -1;
+    var startPart = 0;
+    var end = -1;
+    var matchedSlash = true;
+    var i = path.length - 1;
+
+    // Track the state of characters (if any) we see before our first dot and
+    // after any path separator we find
+    var preDotState = 0;
+
+    // Get non-dir info
+    for (; i >= start; --i) {
+      code = path.charCodeAt(i);
+      if (code === 47/*/*/) {
+        // If we reached a path separator that was not part of a set of path
+        // separators at the end of the string, stop now
+        if (!matchedSlash) {
+          startPart = i + 1;
+          break;
+        }
+        continue;
+      }
+      if (end === -1) {
+        // We saw the first non-path separator, mark this as the end of our
+        // extension
+        matchedSlash = false;
+        end = i + 1;
+      }
+      if (code === 46/*.*/) {
+        // If this is our first dot, mark it as the start of our extension
+        if (startDot === -1)
+          startDot = i;
+        else if (preDotState !== 1)
+          preDotState = 1;
+      } else if (startDot !== -1) {
+        // We saw a non-dot and non-path separator before our dot, so we should
+        // have a good chance at having a non-empty extension
+        preDotState = -1;
+      }
+    }
+
+    if (startDot === -1 ||
+        end === -1 ||
+        // We saw a non-dot character immediately before the dot
+        preDotState === 0 ||
+        // The (right-most) trimmed path component is exactly '..'
+        (preDotState === 1 &&
+         startDot === end - 1 &&
+         startDot === startPart + 1)) {
+      if (end !== -1) {
+        if (startPart === 0 && isAbsolute)
+          ret.base = ret.name = path.slice(1, end);
+        else
+          ret.base = ret.name = path.slice(startPart, end);
+      }
+    } else {
+      if (startPart === 0 && isAbsolute) {
+        ret.name = path.slice(1, startDot);
+        ret.base = path.slice(1, end);
+      } else {
+        ret.name = path.slice(startPart, startDot);
+        ret.base = path.slice(startPart, end);
+      }
+      ret.ext = path.slice(startDot, end);
+    }
+
+    if (startPart > 0)
+      ret.dir = path.slice(0, startPart - 1);
+    else if (isAbsolute)
+      ret.dir = '/';
+
+    return ret;
+  },
+
+
+  sep: '/',
+  delimiter: ':',
+  posix: null
 };
 
-//-- Enable binding events to Renderer
-RSVP.EventTarget.mixin(EPUBJS.Renderer.prototype);
 
-var EPUBJS = EPUBJS || {};
-EPUBJS.replace = {};
+module.exports = posix;
 
-//-- Replaces the relative links within the book to use our internal page changer
-EPUBJS.replace.hrefs = function(callback, renderer){
-	var book = this;
-	var replacments = function(link, done){
-		var href = link.getAttribute("href"),
-				isRelative = href.search("://"),
-				directory,
-				relative,
-				location,
-				base,
-				uri,
-				url;
 
-		if(href.indexOf("mailto:") === 0){
-			done();
+/***/ }),
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports.replaceBase = replaceBase;
+exports.replaceCanonical = replaceCanonical;
+exports.replaceMeta = replaceMeta;
+exports.replaceLinks = replaceLinks;
+exports.substitute = substitute;
+
+var _core = __webpack_require__(0);
+
+var _url = __webpack_require__(4);
+
+var _url2 = _interopRequireDefault(_url);
+
+var _path = __webpack_require__(3);
+
+var _path2 = _interopRequireDefault(_path);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function replaceBase(doc, section) {
+	var base;
+	var head;
+
+	if (!doc) {
+		return;
+	}
+
+	// head = doc.querySelector("head");
+	// base = head.querySelector("base");
+	head = (0, _core.qs)(doc, "head");
+	base = (0, _core.qs)(head, "base");
+
+	if (!base) {
+		base = doc.createElement("base");
+		head.insertBefore(base, head.firstChild);
+	}
+
+	base.setAttribute("href", section.url);
+}
+
+function replaceCanonical(doc, section) {
+	var head;
+	var link;
+	var url = section.url; // window.location.origin +  window.location.pathname + "?loc=" + encodeURIComponent(section.url);
+
+	if (!doc) {
+		return;
+	}
+
+	head = (0, _core.qs)(doc, "head");
+	link = (0, _core.qs)(head, "link[rel='canonical']");
+
+	if (link) {
+		link.setAttribute("href", url);
+	} else {
+		link = doc.createElement("link");
+		link.setAttribute("rel", "canonical");
+		link.setAttribute("href", url);
+		head.appendChild(link);
+	}
+}
+
+function replaceMeta(doc, section) {
+	var head;
+	var meta;
+	var id = section.idref;
+	if (!doc) {
+		return;
+	}
+
+	head = (0, _core.qs)(doc, "head");
+	meta = (0, _core.qs)(head, "link[property='dc.identifier']");
+
+	if (meta) {
+		meta.setAttribute("content", id);
+	} else {
+		meta = doc.createElement("meta");
+		meta.setAttribute("name", "dc.identifier");
+		meta.setAttribute("content", id);
+		head.appendChild(meta);
+	}
+}
+
+// TODO: move me to Contents
+function replaceLinks(contents, fn) {
+
+	var links = contents.querySelectorAll("a[href]");
+
+	if (!links.length) {
+		return;
+	}
+
+	var base = (0, _core.qs)(contents.ownerDocument, "base");
+	var location = base ? base.getAttribute("href") : undefined;
+	var replaceLink = function (link) {
+		var href = link.getAttribute("href");
+
+		if (href.indexOf("mailto:") === 0) {
 			return;
 		}
 
-		if(isRelative != -1){
+		var absolute = href.indexOf("://") > -1;
+		var linkUrl = new _url2.default(href, location);
+
+		if (absolute) {
 
 			link.setAttribute("target", "_blank");
+		} else {
+			link.onclick = function () {
 
-		}else{
-			// Links may need to be resolved, such as ../chp1.xhtml
-			base = renderer.render.docEl.querySelector('base');
-			url = base.getAttribute("href");
-			uri = EPUBJS.core.uri(url);
-			directory = uri.directory;
-
-			if (href.indexOf("#") === 0) {
-				href = uri.filename + href;
-			}
-
-			if(directory) {
-				// We must ensure that the file:// protocol is preserved for
-				// local file links, as in certain contexts (such as under
-				// Titanium), file links without the file:// protocol will not
-				// work
-				if (uri.protocol === "file") {
-					relative = EPUBJS.core.resolveUrl(uri.base, href);
+				if (linkUrl && linkUrl.hash) {
+					fn(linkUrl.Path.path + linkUrl.hash);
+				} else if (linkUrl) {
+					fn(linkUrl.Path.path);
 				} else {
-					relative = EPUBJS.core.resolveUrl(directory, href);
+					fn(href);
 				}
-			} else {
-				relative = href;
-			}
 
-			link.onclick = function(){
-                                book.trigger("book:linkClicked", href);
-				book.goto(relative);
 				return false;
 			};
-
 		}
-		done();
-
-	};
-
-	renderer.replace("a[href]", replacments, callback);
-
-};
-
-EPUBJS.replace.head = function(callback, renderer) {
-
-	renderer.replaceWithStored("link[href]", "href", EPUBJS.replace.links, callback);
-
-};
-
-
-//-- Replaces assets src's to point to stored version if browser is offline
-EPUBJS.replace.resources = function(callback, renderer){
-	//srcs = this.doc.querySelectorAll('[src]');
-	renderer.replaceWithStored("[src]", "src", EPUBJS.replace.srcs, callback);
-
-};
-
-EPUBJS.replace.posters = function(callback, renderer){
-
-	renderer.replaceWithStored("[poster]", "poster", EPUBJS.replace.srcs, callback);
-
-};
-
-EPUBJS.replace.svg = function(callback, renderer) {
-
-	renderer.replaceWithStored("svg image", "xlink:href", function(_store, full, done){
-		_store.getUrl(full).then(done);
-	}, callback);
-
-};
-
-EPUBJS.replace.srcs = function(_store, full, done){
-
-	var isRelative = (full.search("://") === -1);
-
-	if (isRelative) {
-		_store.getUrl(full).then(done);
-	} else {
-		done();
-	}
-
-};
-
-//-- Replaces links in head, such as stylesheets - link[href]
-EPUBJS.replace.links = function(_store, full, done, link){
-	//-- Handle replacing urls in CSS
-	if(link.getAttribute("rel") === "stylesheet") {
-		EPUBJS.replace.stylesheets(_store, full).then(function(url, full){
-			// done
-			done(url, full);
-		},  function(reason) {
-			// we were unable to replace the style sheets
-			done(null);
-		});
-	}else{
-		_store.getUrl(full).then(done, function(reason) {
-			// we were unable to get the url, signal to upper layer
-			done(null);
-		});
-	}
-};
-
-EPUBJS.replace.stylesheets = function(_store, full) {
-	var deferred = new RSVP.defer();
-
-	if(!_store) return;
-
-	_store.getText(full).then(function(text){
-		var url;
-
-		 EPUBJS.replace.cssImports(_store, full, text).then(function (importText) {
-
-          text = importText + text;
-
-			EPUBJS.replace.cssUrls(_store, full, text).then(function(newText){
-				var _URL = window.URL || window.webkitURL || window.mozURL;
-
-				var blob = new Blob([newText], { "type" : "text\/css" }),
-						url = _URL.createObjectURL(blob);
-
-				deferred.resolve(url);
-
-			}, function(reason) {
-				deferred.reject(reason);
-			});
-
-		},function(reason) {
-			deferred.reject(reason);
-		});
-
-	}, function(reason) {
-		deferred.reject(reason);
-	});
-
-	return deferred.promise;
-};
-
-EPUBJS.replace.cssImports = function (_store, base, text) {
-  var deferred = new RSVP.defer();
-  if(!_store) return;
-
-  // check for css @import
-  var importRegex = /@import\s+(?:url\()?\'?\"?((?!data:)[^\'|^\"^\)]*)\'?\"?\)?/gi;
-  var importMatches, importFiles = [], allImportText =  '';
-
-  while (importMatches = importRegex.exec(text)) {
-      importFiles.push(importMatches[1]);
-  }
-
-  if (importFiles.length === 0) {
-    deferred.resolve(allImportText);
-  }
-
-  importFiles.forEach(function (fileUrl) {
-      var full = EPUBJS.core.resolveUrl(base, fileUrl);
-      full = EPUBJS.core.uri(full).path;
-      _store.getText(full).then(function(importText){
-        allImportText += importText;
-        if (importFiles.indexOf(fileUrl) === importFiles.length - 1) {
-          deferred.resolve(allImportText);
-        }
-      }, function(reason) {
-        deferred.reject(reason);
-      });
-  });
-
-  return deferred.promise;
-
-};
-
-
-EPUBJS.replace.cssUrls = function(_store, base, text){
-	var deferred = new RSVP.defer(),
-		matches = text.match(/url\(\'?\"?((?!data:)[^\'|^\"^\)]*)\'?\"?\)/g);
-
-	if(!_store) return;
-
-	if(!matches){
-		deferred.resolve(text);
-		return deferred.promise;
-	}
-
-	var promises = matches.map(function(str) {
-		var full = EPUBJS.core.resolveUrl(base, str.replace(/url\(|[|\)|\'|\"]|\?.*$/g, ''));
-		return _store.getUrl(full).then(function(url) {
-			text = text.replace(str, 'url("'+url+'")');
-		}, function(reason) {
-			deferred.reject(reason);
-		});
-	});
-
-	RSVP.all(promises).then(function(){
-		deferred.resolve(text);
-	});
-
-	return deferred.promise;
-};
-
-
-EPUBJS.Storage = function(withCredentials){
-
-	this.checkRequirements();
-	this.urlCache = {};
-	this.withCredentials = withCredentials;
-	this.URL = window.URL || window.webkitURL || window.mozURL;
-	this.offline = false;
-};
-
-//-- Load the zip lib and set the workerScriptsPath
-EPUBJS.Storage.prototype.checkRequirements = function(callback){
-	if(typeof(localforage) == "undefined") console.error("localForage library not loaded");
-};
-
-EPUBJS.Storage.prototype.put = function(assets, store) {
-	var deferred = new RSVP.defer();
-	var count = assets.length;
-	var current = 0;
-	var next = function(deferred){
-		var done = deferred || new RSVP.defer();
-		var url;
-		var encodedUrl;
-
-		if(current >= count) {
-			done.resolve();
-		} else {
-			url = assets[current].url;
-			encodedUrl = window.encodeURIComponent(url);
-
-			EPUBJS.core.request(url, "binary")
-			.then(function (data) {
-				return localforage.setItem(encodedUrl, data);
-			})
-			.then(function(data){
-				current++;
-        // Load up the next
-				setTimeout(function(){
-					next(done);
-				}, 1);
-
-      });
-		}
-		return done.promise;
 	}.bind(this);
 
-	if(!Array.isArray(assets)) {
-		assets = [assets];
+	for (var i = 0; i < links.length; i++) {
+		replaceLink(links[i]);
+	}
+}
+
+function substitute(content, urls, replacements) {
+	urls.forEach(function (url, i) {
+		if (url && replacements[i]) {
+			content = content.replace(new RegExp(url, "g"), replacements[i]);
+		}
+	});
+	return content;
+}
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports) {
+
+var g;
+
+// This works in non-strict mode
+g = (function() {
+	return this;
+})();
+
+try {
+	// This works if eval is allowed (see CSP)
+	g = g || Function("return this")() || (1,eval)("this");
+} catch(e) {
+	// This works if the window reference is available
+	if(typeof window === "object")
+		g = window;
+}
+
+// g can still be undefined, but nothing to do about it...
+// We return undefined, instead of nothing here, so it's
+// easier to handle this case. if(!global) { ...}
+
+module.exports = g;
+
+
+/***/ }),
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Hooks allow for injecting functions that must all complete in order before finishing
+ * They will execute in parallel but all must finish before continuing
+ * Functions may return a promise if they are asycn.
+ * @param {any} context scope of this
+ * @example this.content = new EPUBJS.Hook(this);
+ */
+var Hook = function () {
+	function Hook(context) {
+		_classCallCheck(this, Hook);
+
+		this.context = context || this;
+		this.hooks = [];
 	}
 
-	next().then(function(){
-		deferred.resolve();
-	}.bind(this));
+	/**
+  * Adds a function to be run before a hook completes
+  * @example this.content.register(function(){...});
+  */
 
-	return deferred.promise;
-};
 
-EPUBJS.Storage.prototype.token = function(url, value){
-	var encodedUrl = window.encodeURIComponent(url);
-	return localforage.setItem(encodedUrl, value)
-		.then(function (result) {
-			if (result === null) {
-				return false;
-			} else {
-				return true;
+	_createClass(Hook, [{
+		key: "register",
+		value: function register() {
+			for (var i = 0; i < arguments.length; ++i) {
+				if (typeof arguments[i] === "function") {
+					this.hooks.push(arguments[i]);
+				} else {
+					// unpack array
+					for (var j = 0; j < arguments[i].length; ++j) {
+						this.hooks.push(arguments[i][j]);
+					}
+				}
 			}
+		}
+
+		/**
+   * Triggers a hook to run all functions
+   * @example this.content.trigger(args).then(function(){...});
+   */
+
+	}, {
+		key: "trigger",
+		value: function trigger() {
+			var args = arguments;
+			var context = this.context;
+			var promises = [];
+
+			this.hooks.forEach(function (task) {
+				var executing = task.apply(context, args);
+
+				if (executing && typeof executing["then"] === "function") {
+					// Task is a function that returns a promise
+					promises.push(executing);
+				}
+				// Otherwise Task resolves immediately, continue
+			});
+
+			return Promise.all(promises);
+		}
+
+		// Adds a function to be run before a hook completes
+
+	}, {
+		key: "list",
+		value: function list() {
+			return this.hooks;
+		}
+	}, {
+		key: "clear",
+		value: function clear() {
+			return this.hooks = [];
+		}
+	}]);
+
+	return Hook;
+}();
+
+exports.default = Hook;
+module.exports = exports["default"];
+
+/***/ }),
+/* 9 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _core = __webpack_require__(0);
+
+var _path = __webpack_require__(3);
+
+var _path2 = _interopRequireDefault(_path);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function request(url, type, withCredentials, headers) {
+	var supportsURL = typeof window != "undefined" ? window.URL : false; // TODO: fallback for url if window isn't defined
+	var BLOB_RESPONSE = supportsURL ? "blob" : "arraybuffer";
+
+	var deferred = new _core.defer();
+
+	var xhr = new XMLHttpRequest();
+
+	//-- Check from PDF.js:
+	//   https://github.com/mozilla/pdf.js/blob/master/web/compatibility.js
+	var xhrPrototype = XMLHttpRequest.prototype;
+
+	var header;
+
+	if (!("overrideMimeType" in xhrPrototype)) {
+		// IE10 might have response, but not overrideMimeType
+		Object.defineProperty(xhrPrototype, "overrideMimeType", {
+			value: function xmlHttpRequestOverrideMimeType() {}
 		});
-};
-
-EPUBJS.Storage.prototype.isStored = function(url){
-	var encodedUrl = window.encodeURIComponent(url);
-	return localforage.getItem(encodedUrl)
-		.then(function (result) {
-			if (result === null) {
-				return false;
-			} else {
-				return true;
-			}
-		});
-};
-
-EPUBJS.Storage.prototype.getText = function(url){
-	var encodedUrl = window.encodeURIComponent(url);
-
-	return EPUBJS.core.request(url, 'arraybuffer', this.withCredentials)
-		.then(function(buffer){
-
-			if(this.offline){
-				this.offline = false;
-				this.trigger("offline", false);
-			}
-			localforage.setItem(encodedUrl, buffer);
-			return buffer;
-		}.bind(this))
-		.then(function(data) {
-			var deferred = new RSVP.defer();
-			var mimeType = EPUBJS.core.getMimeType(url);
-			var blob = new Blob([data], {type : mimeType});
-			var reader = new FileReader();
-			reader.addEventListener("loadend", function() {
-				deferred.resolve(reader.result);
-			});
-			reader.readAsText(blob, mimeType);
-			return deferred.promise;
-		})
-		.catch(function() {
-
-			var deferred = new RSVP.defer();
-			var entry = localforage.getItem(encodedUrl);
-
-			if(!this.offline){
-				this.offline = true;
-				this.trigger("offline", true);
-			}
-
-			if(!entry) {
-				deferred.reject({
-					message : "File not found in the storage: " + url,
-					stack : new Error().stack
-				});
-				return deferred.promise;
-			}
-
-			entry.then(function(data) {
-				var mimeType = EPUBJS.core.getMimeType(url);
-				var blob = new Blob([data], {type : mimeType});
-				var reader = new FileReader();
-				reader.addEventListener("loadend", function() {
-					deferred.resolve(reader.result);
-				});
-				reader.readAsText(blob, mimeType);
-			});
-
-			return deferred.promise;
-		}.bind(this));
-};
-
-EPUBJS.Storage.prototype.getUrl = function(url){
-	var encodedUrl = window.encodeURIComponent(url);
-
-	return EPUBJS.core.request(url, 'arraybuffer', this.withCredentials)
-		.then(function(buffer){
-			if(this.offline){
-				this.offline = false;
-				this.trigger("offline", false);
-			}
-			localforage.setItem(encodedUrl, buffer);
-			return url;
-		}.bind(this))
-		.catch(function() {
-			var deferred = new RSVP.defer();
-			var entry;
-			var _URL = window.URL || window.webkitURL || window.mozURL;
-			var tempUrl;
-
-			if(!this.offline){
-				this.offline = true;
-				this.trigger("offline", true);
-			}
-
-			if(encodedUrl in this.urlCache) {
-				deferred.resolve(this.urlCache[encodedUrl]);
-				return deferred.promise;
-			}
-
-			entry = localforage.getItem(encodedUrl);
-
-			if(!entry) {
-				deferred.reject({
-					message : "File not found in the storage: " + url,
-					stack : new Error().stack
-				});
-				return deferred.promise;
-			}
-
-			entry.then(function(data) {
-				var blob = new Blob([data], {type : EPUBJS.core.getMimeType(url)});
-				tempUrl = _URL.createObjectURL(blob);
-				deferred.resolve(tempUrl);
-				this.urlCache[encodedUrl] = tempUrl;
-			}.bind(this));
-
-
-			return deferred.promise;
-	}.bind(this));
-};
-
-EPUBJS.Storage.prototype.getXml = function(url){
-	var encodedUrl = window.encodeURIComponent(url);
-
-	return EPUBJS.core.request(url, 'arraybuffer', this.withCredentials)
-		.then(function(buffer){
-			if(this.offline){
-				this.offline = false;
-				this.trigger("offline", false);
-			}
-			localforage.setItem(encodedUrl, buffer);
-			return buffer;
-		}.bind(this))
-		.then(function(data) {
-			var deferred = new RSVP.defer();
-			var mimeType = EPUBJS.core.getMimeType(url);
-			var blob = new Blob([data], {type : mimeType});
-			var reader = new FileReader();
-			reader.addEventListener("loadend", function() {
-				var parser = new DOMParser();
-				var doc = parser.parseFromString(reader.result, "text/xml");
-				deferred.resolve(doc);
-			});
-			reader.readAsText(blob, mimeType);
-			return deferred.promise;
-		})
-		.catch(function() {
-			var deferred = new RSVP.defer();
-			var entry = localforage.getItem(encodedUrl);
-
-			if(!this.offline){
-				this.offline = true;
-				this.trigger("offline", true);
-			}
-
-			if(!entry) {
-				deferred.reject({
-					message : "File not found in the storage: " + url,
-					stack : new Error().stack
-				});
-				return deferred.promise;
-			}
-
-			entry.then(function(data) {
-				var mimeType = EPUBJS.core.getMimeType(url);
-				var blob = new Blob([data], {type : mimeType});
-				var reader = new FileReader();
-				reader.addEventListener("loadend", function() {
-					var parser = new DOMParser();
-					var doc = parser.parseFromString(reader.result, "text/xml");
-					deferred.resolve(doc);
-				});
-				reader.readAsText(blob, mimeType);
-			});
-
-			return deferred.promise;
-		}.bind(this));
-};
-
-EPUBJS.Storage.prototype.revokeUrl = function(url){
-	var _URL = window.URL || window.webkitURL || window.mozURL;
-	var fromCache = this.urlCache[url];
-	if(fromCache) _URL.revokeObjectURL(fromCache);
-};
-
-EPUBJS.Storage.prototype.failed = function(error){
-	console.error(error);
-};
-
-RSVP.EventTarget.mixin(EPUBJS.Storage.prototype);
-
-EPUBJS.Unarchiver = function(url){
-
-	this.checkRequirements();
-	this.urlCache = {};
-
-};
-
-//-- Load the zip lib and set the workerScriptsPath
-EPUBJS.Unarchiver.prototype.checkRequirements = function(callback){
-	if(typeof(JSZip) == "undefined") console.error("JSZip lib not loaded");
-};
-
-EPUBJS.Unarchiver.prototype.open = function(zipUrl, callback){
-	if (zipUrl instanceof ArrayBuffer) {
-		this.zip = new JSZip(zipUrl);
-		var deferred = new RSVP.defer();
-		deferred.resolve();
-		return deferred.promise;
-	} else {
-		return EPUBJS.core.request(zipUrl, "binary").then(function(data){
-			this.zip = new JSZip(data);
-		}.bind(this));
 	}
-};
 
-EPUBJS.Unarchiver.prototype.getXml = function(url, encoding){
-	var decodededUrl = window.decodeURIComponent(url);
-	return this.getText(decodededUrl, encoding).
-			then(function(text){
-				var parser = new DOMParser();
-				var mimeType = EPUBJS.core.getMimeType(url);
+	if (withCredentials) {
+		xhr.withCredentials = true;
+	}
 
-				// Remove byte order mark before parsing
-				// https://www.w3.org/International/questions/qa-byte-order-mark
-				if(text.charCodeAt(0) === 0xFEFF) {
-					text = text.slice(1);
+	xhr.onreadystatechange = handler;
+	xhr.onerror = err;
+
+	xhr.open("GET", url, true);
+
+	for (header in headers) {
+		xhr.setRequestHeader(header, headers[header]);
+	}
+
+	if (type == "json") {
+		xhr.setRequestHeader("Accept", "application/json");
+	}
+
+	// If type isn"t set, determine it from the file extension
+	if (!type) {
+		type = new _path2.default(url).extension;
+	}
+
+	if (type == "blob") {
+		xhr.responseType = BLOB_RESPONSE;
+	}
+
+	if ((0, _core.isXml)(type)) {
+		// xhr.responseType = "document";
+		xhr.overrideMimeType("text/xml"); // for OPF parsing
+	}
+
+	if (type == "xhtml") {
+		// xhr.responseType = "document";
+	}
+
+	if (type == "html" || type == "htm") {
+		// xhr.responseType = "document";
+	}
+
+	if (type == "binary") {
+		xhr.responseType = "arraybuffer";
+	}
+
+	xhr.send();
+
+	function err(e) {
+		deferred.reject(e);
+	}
+
+	function handler() {
+		if (this.readyState === XMLHttpRequest.DONE) {
+			var responseXML = false;
+
+			if (this.responseType === "" || this.responseType === "document") {
+				responseXML = this.responseXML;
+			}
+
+			if (this.status === 200 || responseXML) {
+				//-- Firefox is reporting 0 for blob urls
+				var r;
+
+				if (!this.response && !responseXML) {
+					deferred.reject({
+						status: this.status,
+						message: "Empty Response",
+						stack: new Error().stack
+					});
+					return deferred.promise;
 				}
 
-				return parser.parseFromString(text, mimeType);
+				if (this.status === 403) {
+					deferred.reject({
+						status: this.status,
+						response: this.response,
+						message: "Forbidden",
+						stack: new Error().stack
+					});
+					return deferred.promise;
+				}
+				if (responseXML) {
+					r = this.responseXML;
+				} else if ((0, _core.isXml)(type)) {
+					// xhr.overrideMimeType("text/xml"); // for OPF parsing
+					// If this.responseXML wasn't set, try to parse using a DOMParser from text
+					r = (0, _core.parse)(this.response, "text/xml");
+				} else if (type == "xhtml") {
+					r = (0, _core.parse)(this.response, "application/xhtml+xml");
+				} else if (type == "html" || type == "htm") {
+					r = (0, _core.parse)(this.response, "text/html");
+				} else if (type == "json") {
+					r = JSON.parse(this.response);
+				} else if (type == "blob") {
+
+					if (supportsURL) {
+						r = this.response;
+					} else {
+						//-- Safari doesn't support responseType blob, so create a blob from arraybuffer
+						r = new Blob([this.response]);
+					}
+				} else {
+					r = this.response;
+				}
+
+				deferred.resolve(r);
+			} else {
+
+				deferred.reject({
+					status: this.status,
+					message: this.response,
+					stack: new Error().stack
+				});
+			}
+		}
+	}
+
+	return deferred.promise;
+}
+
+exports.default = request;
+module.exports = exports["default"];
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports.Task = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Queue for handling tasks one at a time
+ * @class
+ * @param {scope} context what this will resolve to in the tasks
+ */
+var Queue = function () {
+	function Queue(context) {
+		_classCallCheck(this, Queue);
+
+		this._q = [];
+		this.context = context;
+		this.tick = _core.requestAnimationFrame;
+		this.running = false;
+		this.paused = false;
+	}
+
+	/**
+  * Add an item to the queue
+  * @return {Promise}
+  */
+
+
+	_createClass(Queue, [{
+		key: "enqueue",
+		value: function enqueue() {
+			var deferred, promise;
+			var queued;
+			var task = [].shift.call(arguments);
+			var args = arguments;
+
+			// Handle single args without context
+			// if(args && !Array.isArray(args)) {
+			//   args = [args];
+			// }
+			if (!task) {
+				throw new Error("No Task Provided");
+			}
+
+			if (typeof task === "function") {
+
+				deferred = new _core.defer();
+				promise = deferred.promise;
+
+				queued = {
+					"task": task,
+					"args": args,
+					//"context"  : context,
+					"deferred": deferred,
+					"promise": promise
+				};
+			} else {
+				// Task is a promise
+				queued = {
+					"promise": task
+				};
+			}
+
+			this._q.push(queued);
+
+			// Wait to start queue flush
+			if (this.paused == false && !this.running) {
+				// setTimeout(this.flush.bind(this), 0);
+				// this.tick.call(window, this.run.bind(this));
+				this.run();
+			}
+
+			return queued.promise;
+		}
+
+		/**
+   * Run one item
+   * @return {Promise}
+   */
+
+	}, {
+		key: "dequeue",
+		value: function dequeue() {
+			var inwait, task, result;
+
+			if (this._q.length && !this.paused) {
+				inwait = this._q.shift();
+				task = inwait.task;
+				if (task) {
+					// console.log(task)
+
+					result = task.apply(this.context, inwait.args);
+
+					if (result && typeof result["then"] === "function") {
+						// Task is a function that returns a promise
+						return result.then(function () {
+							inwait.deferred.resolve.apply(this.context, arguments);
+						}.bind(this), function () {
+							inwait.deferred.reject.apply(this.context, arguments);
+						}.bind(this));
+					} else {
+						// Task resolves immediately
+						inwait.deferred.resolve.apply(this.context, result);
+						return inwait.promise;
+					}
+				} else if (inwait.promise) {
+					// Task is a promise
+					return inwait.promise;
+				}
+			} else {
+				inwait = new _core.defer();
+				inwait.deferred.resolve();
+				return inwait.promise;
+			}
+		}
+
+		// Run All Immediately
+
+	}, {
+		key: "dump",
+		value: function dump() {
+			while (this._q.length) {
+				this.dequeue();
+			}
+		}
+
+		/**
+   * Run all tasks sequentially, at convince
+   * @return {Promise}
+   */
+
+	}, {
+		key: "run",
+		value: function run() {
+			var _this = this;
+
+			if (!this.running) {
+				this.running = true;
+				this.defered = new _core.defer();
+			}
+
+			this.tick.call(window, function () {
+
+				if (_this._q.length) {
+
+					_this.dequeue().then(function () {
+						this.run();
+					}.bind(_this));
+				} else {
+					_this.defered.resolve();
+					_this.running = undefined;
+				}
 			});
 
-};
+			// Unpause
+			if (this.paused == true) {
+				this.paused = false;
+			}
 
-EPUBJS.Unarchiver.prototype.getUrl = function(url, mime){
-	var unarchiver = this;
-	var deferred = new RSVP.defer();
-	var decodededUrl = window.decodeURIComponent(url);
-	var entry = this.zip.file(decodededUrl);
-	var _URL = window.URL || window.webkitURL || window.mozURL;
-	var tempUrl;
-	var blob;
+			return this.defered.promise;
+		}
 
-	if(!entry) {
-		deferred.reject({
-			message : "File not found in the epub: " + url,
-			stack : new Error().stack
+		/**
+   * Flush all, as quickly as possible
+   * @return {Promise}
+   */
+
+	}, {
+		key: "flush",
+		value: function flush() {
+
+			if (this.running) {
+				return this.running;
+			}
+
+			if (this._q.length) {
+				this.running = this.dequeue().then(function () {
+					this.running = undefined;
+					return this.flush();
+				}.bind(this));
+
+				return this.running;
+			}
+		}
+
+		/**
+   * Clear all items in wait
+   */
+
+	}, {
+		key: "clear",
+		value: function clear() {
+			this._q = [];
+		}
+
+		/**
+   * Get the number of tasks in the queue
+   * @return {int} tasks
+   */
+
+	}, {
+		key: "length",
+		value: function length() {
+			return this._q.length;
+		}
+
+		/**
+   * Pause a running queue
+   */
+
+	}, {
+		key: "pause",
+		value: function pause() {
+			this.paused = true;
+		}
+
+		/**
+   * End the queue
+   */
+
+	}, {
+		key: "stop",
+		value: function stop() {
+			this._q = [];
+			this.running = false;
+			this.paused = true;
+		}
+	}]);
+
+	return Queue;
+}();
+
+/**
+ * Create a new task from a callback
+ * @class
+ * @private
+ * @param {function} task
+ * @param {array} args
+ * @param {scope} context
+ * @return {function} task
+ */
+
+
+var Task = function Task(task, args, context) {
+	_classCallCheck(this, Task);
+
+	return function () {
+		var _this2 = this;
+
+		var toApply = arguments || [];
+
+		return new Promise(function (resolve, reject) {
+			var callback = function callback(value, err) {
+				if (!value && err) {
+					reject(err);
+				} else {
+					resolve(value);
+				}
+			};
+			// Add the callback to the arguments list
+			toApply.push(callback);
+
+			// Apply all arguments to the functions
+			task.apply(context || _this2, toApply);
 		});
-		return deferred.promise;
+	};
+};
+
+exports.default = Queue;
+exports.Task = Task;
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Mapping = function () {
+	function Mapping(layout, dev) {
+		_classCallCheck(this, Mapping);
+
+		this.layout = layout;
+		this.horizontal = this.layout.flow === "paginated" ? true : false;
+		this._dev = dev;
 	}
 
-	if(url in this.urlCache) {
-		deferred.resolve(this.urlCache[url]);
-		return deferred.promise;
+	_createClass(Mapping, [{
+		key: "section",
+		value: function section(view) {
+			var ranges = this.findRanges(view);
+			var map = this.rangeListToCfiList(view.section.cfiBase, ranges);
+
+			return map;
+		}
+	}, {
+		key: "page",
+		value: function page(contents, cfiBase, start, end) {
+			var root = contents && contents.document ? contents.document.body : false;
+			var result;
+
+			if (!root) {
+				return;
+			}
+
+			result = this.rangePairToCfiPair(cfiBase, {
+				start: this.findStart(root, start, end),
+				end: this.findEnd(root, start, end)
+			});
+
+			if (this._dev === true) {
+				var doc = contents.document;
+				var startRange = new _epubcfi2.default(result.start).toRange(doc);
+				var endRange = new _epubcfi2.default(result.end).toRange(doc);
+
+				var selection = doc.defaultView.getSelection();
+				var r = doc.createRange();
+				selection.removeAllRanges();
+				r.setStart(startRange.startContainer, startRange.startOffset);
+				r.setEnd(endRange.endContainer, endRange.endOffset);
+				selection.addRange(r);
+			}
+
+			return result;
+		}
+	}, {
+		key: "walk",
+		value: function walk(root, func) {
+			//IE11 has strange issue, if root is text node IE throws exception on
+			//calling treeWalker.nextNode(), saying
+			//Unexpected call to method or property access instead of returing null value
+			if (root && root.nodeType === Node.TEXT_NODE) {
+				return;
+			}
+			//safeFilter is required so that it can work in IE as filter is a function for IE
+			// and for other browser filter is an object.
+			var filter = {
+				acceptNode: function acceptNode(node) {
+					if (node.data.trim().length > 0) {
+						return NodeFilter.FILTER_ACCEPT;
+					} else {
+						return NodeFilter.FILTER_REJECT;
+					}
+				}
+			};
+			var safeFilter = filter.acceptNode;
+			safeFilter.acceptNode = filter.acceptNode;
+			//var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT + NodeFilter.SHOW_TEXT, null, false);
+			var treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, safeFilter, false);
+			var node;
+			var result;
+			while (node = treeWalker.nextNode()) {
+				result = func(node);
+				if (result) break;
+			}
+
+			return result;
+		}
+	}, {
+		key: "findRanges",
+		value: function findRanges(view) {
+			var columns = [];
+			var scrollWidth = view.contents.scrollWidth();
+			var spreads = Math.ceil(scrollWidth / this.layout.spreadWidth);
+			var count = spreads * this.layout.divisor;
+			var columnWidth = this.layout.columnWidth;
+			var gap = this.layout.gap;
+			var start, end;
+
+			for (var i = 0; i < count.pages; i++) {
+				start = (columnWidth + gap) * i;
+				end = columnWidth * (i + 1) + gap * i;
+				columns.push({
+					start: this.findStart(view.document.body, start, end),
+					end: this.findEnd(view.document.body, start, end)
+				});
+			}
+
+			return columns;
+		}
+	}, {
+		key: "findStart",
+		value: function findStart(root, start, end) {
+			var _this = this;
+
+			var stack = [root];
+			var $el;
+			var found;
+			var $prev = root;
+
+			while (stack.length) {
+
+				$el = stack.shift();
+
+				found = this.walk($el, function (node) {
+					var left, right;
+					var elPos;
+					var elRange;
+
+					if (node.nodeType == Node.TEXT_NODE) {
+						elRange = document.createRange();
+						elRange.selectNodeContents(node);
+						elPos = elRange.getBoundingClientRect();
+					} else {
+						elPos = node.getBoundingClientRect();
+					}
+
+					left = _this.horizontal ? elPos.left : elPos.top;
+					right = _this.horizontal ? elPos.right : elPos.bottom;
+
+					if (left >= start && left <= end) {
+						return node;
+					} else if (right > start) {
+						return node;
+					} else {
+						$prev = node;
+						stack.push(node);
+					}
+				});
+
+				if (found) {
+					return this.findTextStartRange(found, start, end);
+				}
+			}
+
+			// Return last element
+			return this.findTextStartRange($prev, start, end);
+		}
+	}, {
+		key: "findEnd",
+		value: function findEnd(root, start, end) {
+			var _this2 = this;
+
+			var stack = [root];
+			var $el;
+			var $prev = root;
+			var found;
+
+			while (stack.length) {
+
+				$el = stack.shift();
+
+				found = this.walk($el, function (node) {
+
+					var left, right;
+					var elPos;
+					var elRange;
+
+					if (node.nodeType == Node.TEXT_NODE) {
+						elRange = document.createRange();
+						elRange.selectNodeContents(node);
+						elPos = elRange.getBoundingClientRect();
+					} else {
+						elPos = node.getBoundingClientRect();
+					}
+
+					left = Math.round(_this2.horizontal ? elPos.left : elPos.top);
+					right = Math.round(_this2.horizontal ? elPos.right : elPos.bottom);
+
+					if (left > end && $prev) {
+						return $prev;
+					} else if (right > end) {
+						return node;
+					} else {
+						$prev = node;
+						stack.push(node);
+					}
+				});
+
+				if (found) {
+					return this.findTextEndRange(found, start, end);
+				}
+			}
+
+			// end of chapter
+			return this.findTextEndRange($prev, start, end);
+		}
+	}, {
+		key: "findTextStartRange",
+		value: function findTextStartRange(node, start, end) {
+			var ranges = this.splitTextNodeIntoRanges(node);
+			var range;
+			var pos;
+			var left;
+
+			for (var i = 0; i < ranges.length; i++) {
+				range = ranges[i];
+
+				pos = range.getBoundingClientRect();
+				left = this.horizontal ? pos.left : pos.top;
+
+				if (left >= start) {
+					return range;
+				}
+
+				// prev = range;
+			}
+
+			return ranges[0];
+		}
+	}, {
+		key: "findTextEndRange",
+		value: function findTextEndRange(node, start, end) {
+			var ranges = this.splitTextNodeIntoRanges(node);
+			var prev;
+			var range;
+			var pos;
+			var left, right;
+
+			for (var i = 0; i < ranges.length; i++) {
+				range = ranges[i];
+
+				pos = range.getBoundingClientRect();
+				left = this.horizontal ? pos.left : pos.top;
+				right = this.horizontal ? pos.right : pos.bottom;
+
+				if (left > end && prev) {
+					return prev;
+				} else if (right > end) {
+					return range;
+				}
+
+				prev = range;
+			}
+
+			// Ends before limit
+			return ranges[ranges.length - 1];
+		}
+	}, {
+		key: "splitTextNodeIntoRanges",
+		value: function splitTextNodeIntoRanges(node, _splitter) {
+			var ranges = [];
+			var textContent = node.textContent || "";
+			var text = textContent.trim();
+			var range;
+			var doc = node.ownerDocument;
+			var splitter = _splitter || " ";
+
+			var pos = text.indexOf(splitter);
+
+			if (pos === -1 || node.nodeType != Node.TEXT_NODE) {
+				range = doc.createRange();
+				range.selectNodeContents(node);
+				return [range];
+			}
+
+			range = doc.createRange();
+			range.setStart(node, 0);
+			range.setEnd(node, pos);
+			ranges.push(range);
+			range = false;
+
+			while (pos != -1) {
+
+				pos = text.indexOf(splitter, pos + 1);
+				if (pos > 0) {
+
+					if (range) {
+						range.setEnd(node, pos);
+						ranges.push(range);
+					}
+
+					range = doc.createRange();
+					range.setStart(node, pos + 1);
+				}
+			}
+
+			if (range) {
+				range.setEnd(node, text.length);
+				ranges.push(range);
+			}
+
+			return ranges;
+		}
+	}, {
+		key: "rangePairToCfiPair",
+		value: function rangePairToCfiPair(cfiBase, rangePair) {
+
+			var startRange = rangePair.start;
+			var endRange = rangePair.end;
+
+			startRange.collapse(true);
+			endRange.collapse(false);
+
+			var startCfi = new _epubcfi2.default(startRange, cfiBase).toString();
+			var endCfi = new _epubcfi2.default(endRange, cfiBase).toString();
+
+			return {
+				start: startCfi,
+				end: endCfi
+			};
+		}
+	}, {
+		key: "rangeListToCfiList",
+		value: function rangeListToCfiList(cfiBase, columns) {
+			var map = [];
+			var cifPair;
+
+			for (var i = 0; i < columns.length; i++) {
+				cifPair = this.rangePairToCfiPair(cfiBase, columns[i]);
+
+				map.push(cifPair);
+			}
+
+			return map;
+		}
+	}]);
+
+	return Mapping;
+}();
+
+exports.default = Mapping;
+module.exports = exports["default"];
+
+/***/ }),
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _core = __webpack_require__(0);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _mapping = __webpack_require__(11);
+
+var _mapping2 = _interopRequireDefault(_mapping);
+
+var _replacements = __webpack_require__(6);
+
+var _marksPane = __webpack_require__(46);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+// Dom events to listen for
+var EVENTS = ["keydown", "keyup", "keypressed", "mouseup", "mousedown", "click", "touchend", "touchstart"];
+
+var isChrome = /Chrome/.test(navigator.userAgent);
+var isWebkit = !isChrome && /AppleWebKit/.test(navigator.userAgent);
+
+var ELEMENT_NODE = 1;
+var TEXT_NODE = 3;
+
+var Contents = function () {
+	function Contents(doc, content, cfiBase, sectionIndex) {
+		_classCallCheck(this, Contents);
+
+		// Blank Cfi for Parsing
+		this.epubcfi = new _epubcfi2.default();
+
+		this.document = doc;
+		this.documentElement = this.document.documentElement;
+		this.content = content || this.document.body;
+		this.window = this.document.defaultView;
+
+		this._size = {
+			width: 0,
+			height: 0
+		};
+
+		this.sectionIndex = sectionIndex || 0;
+		this.cfiBase = cfiBase || "";
+
+		this.pane = undefined;
+		this.highlights = {};
+		this.underlines = {};
+		this.marks = {};
+
+		this.listeners();
 	}
 
-	blob = new Blob([entry.asUint8Array()], {type : EPUBJS.core.getMimeType(entry.name)});
+	_createClass(Contents, [{
+		key: "width",
+		value: function width(w) {
+			// var frame = this.documentElement;
+			var frame = this.content;
 
-	tempUrl = _URL.createObjectURL(blob);
-	deferred.resolve(tempUrl);
-	unarchiver.urlCache[url] = tempUrl;
+			if (w && (0, _core.isNumber)(w)) {
+				w = w + "px";
+			}
 
-	return deferred.promise;
-};
+			if (w) {
+				frame.style.width = w;
+				// this.content.style.width = w;
+			}
 
-EPUBJS.Unarchiver.prototype.getText = function(url, encoding){
-	var unarchiver = this;
-	var deferred = new RSVP.defer();
-	var decodededUrl = window.decodeURIComponent(url);
-	var entry = this.zip.file(decodededUrl);
-	var text;
+			return this.window.getComputedStyle(frame)["width"];
+		}
+	}, {
+		key: "height",
+		value: function height(h) {
+			// var frame = this.documentElement;
+			var frame = this.content;
 
-	if(!entry) {
-		deferred.reject({
-			message : "File not found in the epub: " + url,
-			stack : new Error().stack
-		});
-		return deferred.promise;
-	}
+			if (h && (0, _core.isNumber)(h)) {
+				h = h + "px";
+			}
 
-	text = entry.asText();
-	deferred.resolve(text);
+			if (h) {
+				frame.style.height = h;
+				// this.content.style.height = h;
+			}
 
-	return deferred.promise;
-};
+			return this.window.getComputedStyle(frame)["height"];
+		}
+	}, {
+		key: "contentWidth",
+		value: function contentWidth(w) {
 
-EPUBJS.Unarchiver.prototype.revokeUrl = function(url){
-	var _URL = window.URL || window.webkitURL || window.mozURL;
-	var fromCache = this.urlCache[url];
-	if(fromCache) _URL.revokeObjectURL(fromCache);
-};
+			var content = this.content || this.document.body;
 
-EPUBJS.Unarchiver.prototype.failed = function(error){
-	console.error(error);
-};
+			if (w && (0, _core.isNumber)(w)) {
+				w = w + "px";
+			}
 
-EPUBJS.Unarchiver.prototype.afterSaved = function(error){
-	this.callback();
-};
+			if (w) {
+				content.style.width = w;
+			}
 
-EPUBJS.Unarchiver.prototype.toStorage = function(entries){
-	var timeout = 0,
-		delay = 20,
-		that = this,
-		count = entries.length;
+			return this.window.getComputedStyle(content)["width"];
+		}
+	}, {
+		key: "contentHeight",
+		value: function contentHeight(h) {
 
-	function callback(){
-		count--;
-		if(count === 0) that.afterSaved();
-	}
+			var content = this.content || this.document.body;
 
-	entries.forEach(function(entry){
+			if (h && (0, _core.isNumber)(h)) {
+				h = h + "px";
+			}
 
-		setTimeout(function(entry){
-			that.saveEntryFileToStorage(entry, callback);
-		}, timeout, entry);
+			if (h) {
+				content.style.height = h;
+			}
 
-		timeout += delay;
-	});
+			return this.window.getComputedStyle(content)["height"];
+		}
+	}, {
+		key: "textWidth",
+		value: function textWidth() {
+			var width = void 0;
+			var range = this.document.createRange();
+			var content = this.content || this.document.body;
+			var border = (0, _core.borders)(content);
 
-	console.log("time", timeout);
+			// Select the contents of frame
+			range.selectNodeContents(content);
 
-	//entries.forEach(this.saveEntryFileToStorage.bind(this));
-};
+			// get the width of the text content
+			width = range.getBoundingClientRect().width;
 
-// EPUBJS.Unarchiver.prototype.saveEntryFileToStorage = function(entry, callback){
-// 	var that = this;
-// 	entry.getData(new zip.BlobWriter(), function(blob) {
-// 		EPUBJS.storage.save(entry.filename, blob, callback);
-// 	});
-// };
+			if (border && border.width) {
+				width += border.width;
+			}
+
+			return Math.round(width);
+		}
+	}, {
+		key: "textHeight",
+		value: function textHeight() {
+			var height = void 0;
+			var range = this.document.createRange();
+			var content = this.content || this.document.body;
+			var border = (0, _core.borders)(content);
+
+			range.selectNodeContents(content);
+
+			height = range.getBoundingClientRect().height;
+
+			if (height && border.height) {
+				height += border.height;
+			}
+
+			return Math.round(height);
+		}
+	}, {
+		key: "scrollWidth",
+		value: function scrollWidth() {
+			var width = this.documentElement.scrollWidth;
+
+			return width;
+		}
+	}, {
+		key: "scrollHeight",
+		value: function scrollHeight() {
+			var height = this.documentElement.scrollHeight;
+
+			return height;
+		}
+	}, {
+		key: "overflow",
+		value: function overflow(_overflow) {
+
+			if (_overflow) {
+				this.documentElement.style.overflow = _overflow;
+			}
+
+			return this.window.getComputedStyle(this.documentElement)["overflow"];
+		}
+	}, {
+		key: "overflowX",
+		value: function overflowX(overflow) {
+
+			if (overflow) {
+				this.documentElement.style.overflowX = overflow;
+			}
+
+			return this.window.getComputedStyle(this.documentElement)["overflowX"];
+		}
+	}, {
+		key: "overflowY",
+		value: function overflowY(overflow) {
+
+			if (overflow) {
+				this.documentElement.style.overflowY = overflow;
+			}
+
+			return this.window.getComputedStyle(this.documentElement)["overflowY"];
+		}
+	}, {
+		key: "css",
+		value: function css(property, value, priority) {
+			var content = this.content || this.document.body;
+
+			if (value) {
+				content.style.setProperty(property, value, priority ? "important" : "");
+			}
+
+			return this.window.getComputedStyle(content)[property];
+		}
+	}, {
+		key: "viewport",
+		value: function viewport(options) {
+			var _width, _height, _scale, _minimum, _maximum, _scalable;
+			var width, height, scale, minimum, maximum, scalable;
+			var $viewport = this.document.querySelector("meta[name='viewport']");
+			var parsed = {
+				"width": undefined,
+				"height": undefined,
+				"scale": undefined,
+				"minimum": undefined,
+				"maximum": undefined,
+				"scalable": undefined
+			};
+			var newContent = [];
+
+			/*
+   * check for the viewport size
+   * <meta name="viewport" content="width=1024,height=697" />
+   */
+			if ($viewport && $viewport.hasAttribute("content")) {
+				var content = $viewport.getAttribute("content");
+				var _width2 = content.match(/width\s*=\s*([^,]*)/g);
+				var _height2 = content.match(/height\s*=\s*([^,]*)/g);
+				var _scale2 = content.match(/initial-scale\s*=\s*([^,]*)/g);
+				var _minimum2 = content.match(/minimum-scale\s*=\s*([^,]*)/g);
+				var _maximum2 = content.match(/maximum-scale\s*=\s*([^,]*)/g);
+				var _scalable2 = content.match(/user-scalable\s*=\s*([^,]*)/g);
+				if (_width2 && _width2.length && typeof _width2[1] !== "undefined") {
+					parsed.width = _width2[1];
+				}
+				if (_height2 && _height2.length && typeof _height2[1] !== "undefined") {
+					parsed.height = _height2[1];
+				}
+				if (_scale2 && _scale2.length && typeof _scale2[1] !== "undefined") {
+					parsed.scale = _scale2[1];
+				}
+				if (_minimum2 && _minimum2.length && typeof _minimum2[1] !== "undefined") {
+					parsed.minimum = _minimum2[1];
+				}
+				if (_maximum2 && _maximum2.length && typeof _maximum2[1] !== "undefined") {
+					parsed.maximum = _maximum2[1];
+				}
+				if (_scalable2 && _scalable2.length && typeof _scalable2[1] !== "undefined") {
+					parsed.scalable = _scalable2[1];
+				}
+			}
+
+			if (options) {
+				if (options.width || parsed.width) {
+					newContent.push("width=" + (options.width || parsed.width));
+				}
+
+				if (options.height || parsed.height) {
+					newContent.push("height=" + (options.height || parsed.height));
+				}
+
+				if (options.scale || parsed.scale) {
+					newContent.push("initial-scale=" + (options.scale || parsed.scale));
+				}
+				if (options.scalable || parsed.scalable) {
+					newContent.push("minimum-scale=" + (options.scale || parsed.minimum));
+					newContent.push("maximum-scale=" + (options.scale || parsed.maximum));
+					newContent.push("user-scalable=" + (options.scalable || parsed.scalable));
+				}
+
+				if (!$viewport) {
+					$viewport = this.document.createElement("meta");
+					$viewport.setAttribute("name", "viewport");
+					this.document.querySelector("head").appendChild($viewport);
+				}
+
+				$viewport.setAttribute("content", newContent.join(", "));
+
+				this.window.scrollTo(0, 0);
+			}
+
+			return {
+				width: parseInt(width),
+				height: parseInt(height)
+			};
+		}
+
+		// layout(layoutFunc) {
+		//
+		//   this.iframe.style.display = "inline-block";
+		//
+		//   // Reset Body Styles
+		//   this.content.style.margin = "0";
+		//   //this.document.body.style.display = "inline-block";
+		//   //this.document.documentElement.style.width = "auto";
+		//
+		//   if(layoutFunc){
+		//     layoutFunc(this);
+		//   }
+		//
+		//   this.onLayout(this);
+		//
+		// };
+		//
+		// onLayout(view) {
+		//   // stub
+		// };
+
+	}, {
+		key: "expand",
+		value: function expand() {
+			this.emit("expand");
+		}
+	}, {
+		key: "listeners",
+		value: function listeners() {
+
+			this.imageLoadListeners();
+
+			this.mediaQueryListeners();
+
+			// this.fontLoadListeners();
+
+			this.addEventListeners();
+
+			this.addSelectionListeners();
+
+			// this.transitionListeners();
+
+			this.resizeListeners();
+
+			// this.resizeObservers();
+
+			this.linksHandler();
+		}
+	}, {
+		key: "removeListeners",
+		value: function removeListeners() {
+
+			this.removeEventListeners();
+
+			this.removeSelectionListeners();
+
+			clearTimeout(this.expanding);
+		}
+	}, {
+		key: "resizeCheck",
+		value: function resizeCheck() {
+			var width = this.textWidth();
+			var height = this.textHeight();
+			if (width != this._size.width || height != this._size.height) {
+
+				this._size = {
+					width: width,
+					height: height
+				};
+
+				this.pane && this.pane.render();
+				this.onResize && this.onResize(this._size);
+				this.emit("resize", this._size);
+			}
+		}
+	}, {
+		key: "resizeListeners",
+		value: function resizeListeners() {
+			var width, height;
+			// Test size again
+			clearTimeout(this.expanding);
+
+			requestAnimationFrame(this.resizeCheck.bind(this));
+
+			this.expanding = setTimeout(this.resizeListeners.bind(this), 350);
+		}
+	}, {
+		key: "transitionListeners",
+		value: function transitionListeners() {
+			var body = this.content;
+
+			body.style['transitionProperty'] = "font, font-size, font-size-adjust, font-stretch, font-variation-settings, font-weight, width, height";
+			body.style['transitionDuration'] = "0.001ms";
+			body.style['transitionTimingFunction'] = "linear";
+			body.style['transitionDelay'] = "0";
+
+			this.document.addEventListener('transitionend', this.resizeCheck.bind(this));
+		}
+
+		//https://github.com/tylergaw/media-query-events/blob/master/js/mq-events.js
+
+	}, {
+		key: "mediaQueryListeners",
+		value: function mediaQueryListeners() {
+			var sheets = this.document.styleSheets;
+			var mediaChangeHandler = function (m) {
+				if (m.matches && !this._expanding) {
+					setTimeout(this.expand.bind(this), 1);
+					// this.expand();
+				}
+			}.bind(this);
+
+			for (var i = 0; i < sheets.length; i += 1) {
+				var rules;
+				// Firefox errors if we access cssRules cross-domain
+				try {
+					rules = sheets[i].cssRules;
+				} catch (e) {
+					return;
+				}
+				if (!rules) return; // Stylesheets changed
+				for (var j = 0; j < rules.length; j += 1) {
+					//if (rules[j].constructor === CSSMediaRule) {
+					if (rules[j].media) {
+						var mql = this.window.matchMedia(rules[j].media.mediaText);
+						mql.addListener(mediaChangeHandler);
+						//mql.onchange = mediaChangeHandler;
+					}
+				}
+			}
+		}
+	}, {
+		key: "resizeObservers",
+		value: function resizeObservers() {
+			var _this = this;
+
+			// create an observer instance
+			this.observer = new MutationObserver(function (mutations) {
+				_this.resizeCheck();
+			});
+
+			// configuration of the observer:
+			var config = { attributes: true, childList: true, characterData: true, subtree: true };
+
+			// pass in the target node, as well as the observer options
+			this.observer.observe(this.document, config);
+		}
+	}, {
+		key: "imageLoadListeners",
+		value: function imageLoadListeners(target) {
+			var images = this.document.querySelectorAll("img");
+			var img;
+			for (var i = 0; i < images.length; i++) {
+				img = images[i];
+
+				if (typeof img.naturalWidth !== "undefined" && img.naturalWidth === 0) {
+					img.onload = this.expand.bind(this);
+				}
+			}
+		}
+	}, {
+		key: "fontLoadListeners",
+		value: function fontLoadListeners(target) {
+			if (!this.document || !this.document.fonts) {
+				return;
+			}
+
+			this.document.fonts.ready.then(function () {
+				this.expand();
+			}.bind(this));
+		}
+	}, {
+		key: "root",
+		value: function root() {
+			if (!this.document) return null;
+			return this.document.documentElement;
+		}
+	}, {
+		key: "locationOf",
+		value: function locationOf(target, ignoreClass) {
+			var position;
+			var targetPos = { "left": 0, "top": 0 };
+
+			if (!this.document) return targetPos;
+
+			if (this.epubcfi.isCfiString(target)) {
+				var range = new _epubcfi2.default(target).toRange(this.document, ignoreClass);
+
+				if (range) {
+					if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+						position = range.startContainer.getBoundingClientRect();
+						targetPos.left = position.left;
+						targetPos.top = position.top;
+					} else {
+						// Webkit does not handle collapsed range bounds correctly
+						// https://bugs.webkit.org/show_bug.cgi?id=138949
+
+						// Construct a new non-collapsed range
+						if (isWebkit) {
+							var container = range.startContainer;
+							var newRange = new Range();
+							try {
+								if (container.nodeType === ELEMENT_NODE) {
+									position = container.getBoundingClientRect();
+								} else if (range.startOffset + 2 < container.length) {
+									newRange.setStart(container, range.startOffset);
+									newRange.setEnd(container, range.startOffset + 2);
+									position = newRange.getBoundingClientRect();
+								} else if (range.startOffset - 2 > 0) {
+									newRange.setStart(container, range.startOffset - 2);
+									newRange.setEnd(container, range.startOffset);
+									position = newRange.getBoundingClientRect();
+								} else {
+									// empty, return the parent element
+									position = container.parentNode.getBoundingClientRect();
+								}
+							} catch (e) {
+								console.error(e, e.stack);
+							}
+						} else {
+							position = range.getBoundingClientRect();
+						}
+					}
+				}
+			} else if (typeof target === "string" && target.indexOf("#") > -1) {
+
+				var id = target.substring(target.indexOf("#") + 1);
+				var el = this.document.getElementById(id);
+
+				if (el) {
+					position = el.getBoundingClientRect();
+				}
+			}
+
+			if (position) {
+				targetPos.left = position.left;
+				targetPos.top = position.top;
+			}
+
+			return targetPos;
+		}
+	}, {
+		key: "addStylesheet",
+		value: function addStylesheet(src) {
+			return new Promise(function (resolve, reject) {
+				var $stylesheet;
+				var ready = false;
+
+				if (!this.document) {
+					resolve(false);
+					return;
+				}
+
+				// Check if link already exists
+				$stylesheet = this.document.querySelector("link[href='" + src + "']");
+				if ($stylesheet) {
+					resolve(true);
+					return; // already present
+				}
+
+				$stylesheet = this.document.createElement("link");
+				$stylesheet.type = "text/css";
+				$stylesheet.rel = "stylesheet";
+				$stylesheet.href = src;
+				$stylesheet.onload = $stylesheet.onreadystatechange = function () {
+					var _this2 = this;
+
+					if (!ready && (!this.readyState || this.readyState == "complete")) {
+						ready = true;
+						// Let apply
+						setTimeout(function () {
+							_this2.pane && _this2.pane.render();
+							resolve(true);
+						}, 1);
+					}
+				};
+
+				this.document.head.appendChild($stylesheet);
+			}.bind(this));
+		}
+
+		// Array: https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleSheet/insertRule
+		// Object: https://github.com/desirable-objects/json-to-css
+
+	}, {
+		key: "addStylesheetRules",
+		value: function addStylesheetRules(rules) {
+			var styleEl;
+			var styleSheet;
+			var key = "epubjs-inserted-css";
+
+			if (!this.document || !rules || rules.length === 0) return;
+
+			// Check if link already exists
+			styleEl = this.document.getElementById("#" + key);
+			if (!styleEl) {
+				styleEl = this.document.createElement("style");
+				styleEl.id = key;
+			}
+
+			// Append style element to head
+			this.document.head.appendChild(styleEl);
+
+			// Grab style sheet
+			styleSheet = styleEl.sheet;
+
+			if (Object.prototype.toString.call(rules) === "[object Array]") {
+				for (var i = 0, rl = rules.length; i < rl; i++) {
+					var j = 1,
+					    rule = rules[i],
+					    selector = rules[i][0],
+					    propStr = "";
+					// If the second argument of a rule is an array of arrays, correct our variables.
+					if (Object.prototype.toString.call(rule[1][0]) === "[object Array]") {
+						rule = rule[1];
+						j = 0;
+					}
+
+					for (var pl = rule.length; j < pl; j++) {
+						var prop = rule[j];
+						propStr += prop[0] + ":" + prop[1] + (prop[2] ? " !important" : "") + ";\n";
+					}
+
+					// Insert CSS Rule
+					styleSheet.insertRule(selector + "{" + propStr + "}", styleSheet.cssRules.length);
+				}
+			} else {
+				var selectors = Object.keys(rules);
+				selectors.forEach(function (selector) {
+					var definition = rules[selector];
+					if (Array.isArray(definition)) {
+						definition.forEach(function (item) {
+							var _rules = Object.keys(item);
+							var result = _rules.map(function (rule) {
+								return rule + ":" + item[rule];
+							}).join(';');
+							styleSheet.insertRule(selector + "{" + result + "}", styleSheet.cssRules.length);
+						});
+					} else {
+						var _rules = Object.keys(definition);
+						var result = _rules.map(function (rule) {
+							return rule + ":" + definition[rule];
+						}).join(';');
+						styleSheet.insertRule(selector + "{" + result + "}", styleSheet.cssRules.length);
+					}
+				});
+			}
+			this.pane && this.pane.render();
+		}
+	}, {
+		key: "addScript",
+		value: function addScript(src) {
+
+			return new Promise(function (resolve, reject) {
+				var $script;
+				var ready = false;
+
+				if (!this.document) {
+					resolve(false);
+					return;
+				}
+
+				$script = this.document.createElement("script");
+				$script.type = "text/javascript";
+				$script.async = true;
+				$script.src = src;
+				$script.onload = $script.onreadystatechange = function () {
+					if (!ready && (!this.readyState || this.readyState == "complete")) {
+						ready = true;
+						setTimeout(function () {
+							resolve(true);
+						}, 1);
+					}
+				};
+
+				this.document.head.appendChild($script);
+			}.bind(this));
+		}
+	}, {
+		key: "addClass",
+		value: function addClass(className) {
+			var content;
+
+			if (!this.document) return;
+
+			content = this.content || this.document.body;
+
+			if (content) {
+				content.classList.add(className);
+			}
+		}
+	}, {
+		key: "removeClass",
+		value: function removeClass(className) {
+			var content;
+
+			if (!this.document) return;
+
+			content = this.content || this.document.body;
+
+			if (content) {
+				content.classList.remove(className);
+			}
+		}
+	}, {
+		key: "addEventListeners",
+		value: function addEventListeners() {
+			if (!this.document) {
+				return;
+			}
+
+			EVENTS.forEach(function (eventName) {
+				this.document.addEventListener(eventName, this.triggerEvent.bind(this), false);
+			}, this);
+		}
+	}, {
+		key: "removeEventListeners",
+		value: function removeEventListeners() {
+			if (!this.document) {
+				return;
+			}
+			EVENTS.forEach(function (eventName) {
+				this.document.removeEventListener(eventName, this.triggerEvent, false);
+			}, this);
+		}
+
+		// Pass browser events
+
+	}, {
+		key: "triggerEvent",
+		value: function triggerEvent(e) {
+			this.emit(e.type, e);
+		}
+	}, {
+		key: "addSelectionListeners",
+		value: function addSelectionListeners() {
+			if (!this.document) {
+				return;
+			}
+			this.document.addEventListener("selectionchange", this.onSelectionChange.bind(this), false);
+		}
+	}, {
+		key: "removeSelectionListeners",
+		value: function removeSelectionListeners() {
+			if (!this.document) {
+				return;
+			}
+			this.document.removeEventListener("selectionchange", this.onSelectionChange, false);
+		}
+	}, {
+		key: "onSelectionChange",
+		value: function onSelectionChange(e) {
+			if (this.selectionEndTimeout) {
+				clearTimeout(this.selectionEndTimeout);
+			}
+			this.selectionEndTimeout = setTimeout(function () {
+				var selection = this.window.getSelection();
+				this.triggerSelectedEvent(selection);
+			}.bind(this), 250);
+		}
+	}, {
+		key: "triggerSelectedEvent",
+		value: function triggerSelectedEvent(selection) {
+			var range, cfirange;
+
+			if (selection && selection.rangeCount > 0) {
+				range = selection.getRangeAt(0);
+				if (!range.collapsed) {
+					// cfirange = this.section.cfiFromRange(range);
+					cfirange = new _epubcfi2.default(range, this.cfiBase).toString();
+					this.emit("selected", cfirange);
+					this.emit("selectedRange", range);
+				}
+			}
+		}
+	}, {
+		key: "range",
+		value: function range(_cfi, ignoreClass) {
+			var cfi = new _epubcfi2.default(_cfi);
+			return cfi.toRange(this.document, ignoreClass);
+		}
+	}, {
+		key: "cfiFromRange",
+		value: function cfiFromRange(range, ignoreClass) {
+			return new _epubcfi2.default(range, this.cfiBase, ignoreClass).toString();
+		}
+	}, {
+		key: "cfiFromNode",
+		value: function cfiFromNode(node, ignoreClass) {
+			return new _epubcfi2.default(node, this.cfiBase, ignoreClass).toString();
+		}
+	}, {
+		key: "map",
+		value: function map(layout) {
+			var map = new _mapping2.default(layout);
+			return map.section();
+		}
+	}, {
+		key: "size",
+		value: function size(width, height) {
+			var viewport = { scale: 1.0, scalable: "no" };
+
+			if (width >= 0) {
+				this.width(width);
+				viewport.width = width;
+				this.css("padding", "0 " + width / 12 + "px", true);
+			}
+
+			if (height >= 0) {
+				this.height(height);
+				viewport.height = height;
+			}
+
+			this.css("margin", "0");
+			this.css("box-sizing", "border-box");
+
+			this.viewport(viewport);
+		}
+	}, {
+		key: "columns",
+		value: function columns(width, height, columnWidth, gap) {
+			var COLUMN_AXIS = (0, _core.prefixed)("column-axis");
+			var COLUMN_GAP = (0, _core.prefixed)("column-gap");
+			var COLUMN_WIDTH = (0, _core.prefixed)("column-width");
+			var COLUMN_FILL = (0, _core.prefixed)("column-fill");
+
+			this.width(width);
+			this.height(height);
+
+			// Deal with Mobile trying to scale to viewport
+			this.viewport({ width: width, height: height, scale: 1.0, scalable: "no" });
+
+			this.css("display", "inline-block"); // Fixes Safari column cut offs
+			this.css("overflow-y", "hidden");
+			this.css("margin", "0", true);
+
+			this.css("padding", "20px " + gap / 2 + "px", true);
+
+			this.css("box-sizing", "border-box");
+			this.css("max-width", "inherit");
+
+			this.css(COLUMN_AXIS, "horizontal");
+			this.css(COLUMN_FILL, "auto");
+
+			this.css(COLUMN_GAP, gap + "px");
+			this.css(COLUMN_WIDTH, columnWidth + "px");
+		}
+	}, {
+		key: "scaler",
+		value: function scaler(scale, offsetX, offsetY) {
+			var scaleStr = "scale(" + scale + ")";
+			var translateStr = "";
+			// this.css("position", "absolute"));
+			this.css("transform-origin", "top left");
+
+			if (offsetX >= 0 || offsetY >= 0) {
+				translateStr = " translate(" + (offsetX || 0) + "px, " + (offsetY || 0) + "px )";
+			}
+
+			this.css("transform", scaleStr + translateStr);
+		}
+	}, {
+		key: "fit",
+		value: function fit(width, height) {
+			var viewport = this.viewport();
+			var widthScale = width / viewport.width;
+			var heightScale = height / viewport.height;
+			var scale = widthScale < heightScale ? widthScale : heightScale;
+
+			var offsetY = (height - viewport.height * scale) / 2;
+
+			this.width(width);
+			this.height(height);
+			this.overflow("hidden");
+
+			// Deal with Mobile trying to scale to viewport
+			this.viewport({ width: width, height: height, scale: 1.0 });
+
+			// Scale to the correct size
+			this.scaler(scale, 0, offsetY);
+
+			this.css("background-color", "transparent");
+		}
+	}, {
+		key: "mapPage",
+		value: function mapPage(cfiBase, layout, start, end, dev) {
+			var mapping = new _mapping2.default(layout, dev);
+
+			return mapping.page(this, cfiBase, start, end);
+		}
+	}, {
+		key: "linksHandler",
+		value: function linksHandler() {
+			var _this3 = this;
+
+			(0, _replacements.replaceLinks)(this.content, function (href) {
+				_this3.emit("linkClicked", href);
+			});
+		}
+	}, {
+		key: "highlight",
+		value: function highlight(cfiRange) {
+			var _this4 = this;
+
+			var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+			var cb = arguments[2];
+
+			var range = this.range(cfiRange);
+			var emitter = function emitter() {
+				_this4.emit("markClicked", cfiRange, data);
+			};
+
+			data["epubcfi"] = cfiRange;
+
+			if (!this.pane) {
+				this.pane = new _marksPane.Pane(this.content, this.document.body);
+			}
+
+			var m = new _marksPane.Highlight(range, "epubjs-hl", data, { 'fill': 'yellow', 'fill-opacity': '0.3', 'mix-blend-mode': 'multiply' });
+			var h = this.pane.addMark(m);
+
+			this.highlights[cfiRange] = { "mark": h, "element": h.element, "listeners": [emitter, cb] };
+
+			h.element.addEventListener("click", emitter);
+
+			if (cb) {
+				h.element.addEventListener("click", cb);
+			}
+			return h;
+		}
+	}, {
+		key: "underline",
+		value: function underline(cfiRange) {
+			var _this5 = this;
+
+			var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+			var cb = arguments[2];
+
+			var range = this.range(cfiRange);
+			var emitter = function emitter() {
+				_this5.emit("markClicked", cfiRange, data);
+			};
+
+			data["epubcfi"] = cfiRange;
+
+			if (!this.pane) {
+				this.pane = new _marksPane.Pane(this.content, this.document.body);
+			}
+
+			var m = new _marksPane.Underline(range, "epubjs-ul", data, { 'stroke': 'black', 'stroke-opacity': '0.3', 'mix-blend-mode': 'multiply' });
+			var h = this.pane.addMark(m);
+
+			this.underlines[cfiRange] = { "mark": h, "element": h.element, "listeners": [emitter, cb] };
+
+			h.element.addEventListener("click", emitter);
+
+			if (cb) {
+				h.element.addEventListener("click", cb);
+			}
+			return h;
+		}
+
+		/*
+  mark(cfiRange, data={}, cb) {
+  	let range = this.range(cfiRange);
+  		let container = range.commonAncestorContainer;
+  	let parent = (container.nodeType === 1) ? container : container.parentNode;
+  	let emitter = () => {
+  		this.emit("markClicked", cfiRange, data);
+  	};
+  		parent.setAttribute("ref", "epubjs-mk");
+  		parent.dataset["epubcfi"] = cfiRange;
+  		if (data) {
+  		Object.keys(data).forEach((key) => {
+  			parent.dataset[key] = data[key];
+  		});
+  	}
+  		parent.addEventListener("click", emitter);
+  		if (cb) {
+  		parent.addEventListener("click", cb);
+  	}
+  		this.marks[cfiRange] = { "element": parent, "listeners": [emitter, cb] };
+  		return parent;
+  }
+  */
+
+	}, {
+		key: "mark",
+		value: function mark(cfiRange) {
+			var _this6 = this;
+
+			var data = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+			var cb = arguments[2];
+
+
+			if (cfiRange in this.marks) {
+				var item = this.marks[cfiRange];
+				return item;
+			}
+
+			var range = this.range(cfiRange);
+
+			var container = range.commonAncestorContainer;
+			var parent = container.nodeType === 1 ? container : container.parentNode;
+			var emitter = function emitter(e) {
+				_this6.emit("markClicked", cfiRange, data);
+			};
+
+			var pos = parent.getBoundingClientRect();
+			var mark = this.document.createElement('a');
+			mark.setAttribute("ref", "epubjs-mk");
+			mark.style.position = "absolute";
+			mark.style.top = pos.top + "px";
+			mark.style.left = pos.right + "px";
+
+			mark.dataset["epubcfi"] = cfiRange;
+
+			if (data) {
+				Object.keys(data).forEach(function (key) {
+					mark.dataset[key] = data[key];
+				});
+			}
+
+			if (cb) {
+				mark.addEventListener("click", cb);
+			}
+
+			mark.addEventListener("click", emitter);
+
+			this.content.appendChild(mark);
+
+			this.marks[cfiRange] = { "element": mark, "listeners": [emitter, cb] };
+
+			return parent;
+		}
+	}, {
+		key: "unhighlight",
+		value: function unhighlight(cfiRange) {
+			var item = void 0;
+			if (cfiRange in this.highlights) {
+				item = this.highlights[cfiRange];
+				this.pane.removeMark(item.mark);
+				item.listeners.forEach(function (l) {
+					if (l) {
+						item.element.removeEventListener("click", l);
+					};
+				});
+				delete this.highlights[cfiRange];
+			}
+		}
+	}, {
+		key: "ununderline",
+		value: function ununderline(cfiRange) {
+			var item = void 0;
+			if (cfiRange in this.underlines) {
+				item = this.underlines[cfiRange];
+				this.pane.removeMark(item.mark);
+				item.listeners.forEach(function (l) {
+					if (l) {
+						item.element.removeEventListener("click", l);
+					};
+				});
+				delete this.underlines[cfiRange];
+			}
+		}
+	}, {
+		key: "unmark",
+		value: function unmark(cfiRange) {
+			var item = void 0;
+			if (cfiRange in this.marks) {
+				item = this.marks[cfiRange];
+				this.content.removeChild(item.element);
+				item.listeners.forEach(function (l) {
+					if (l) {
+						item.element.removeEventListener("click", l);
+					};
+				});
+				delete this.marks[cfiRange];
+			}
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			// Stop observing
+			if (this.observer) {
+				this.observer.disconnect();
+			}
+
+			this.document.removeEventListener('transitionend', this.resizeCheck);
+
+			this.removeListeners();
+		}
+	}], [{
+		key: "listenedEvents",
+		get: function get() {
+			return EVENTS;
+		}
+	}]);
+
+	return Contents;
+}();
+
+(0, _eventEmitter2.default)(Contents.prototype);
+
+exports.default = Contents;
+module.exports = exports["default"];
+
+/***/ }),
+/* 13 */
+/***/ (function(module, exports) {
+
+module.exports = __WEBPACK_EXTERNAL_MODULE_13__;
+
+/***/ }),
+/* 14 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
 
 /*
  From Zip.js, by Gildas Lormeau
+edited down
  */
 
-(function() {
-	"use strict";
-	var table = {
-		"application" : {
-			"ecmascript" : [ "es", "ecma" ],
-			"javascript" : "js",
-			"ogg" : "ogx",
-			"pdf" : "pdf",
-			"postscript" : [ "ps", "ai", "eps", "epsi", "epsf", "eps2", "eps3" ],
-			"rdf+xml" : "rdf",
-			"smil" : [ "smi", "smil" ],
-			"xhtml+xml" : [ "xhtml", "xht" ],
-			"xml" : [ "xml", "xsl", "xsd", "opf", "ncx" ],
-			"zip" : "zip",
-			"x-httpd-eruby" : "rhtml",
-			"x-latex" : "latex",
-			"x-maker" : [ "frm", "maker", "frame", "fm", "fb", "book", "fbdoc" ],
-			"x-object" : "o",
-			"x-shockwave-flash" : [ "swf", "swfl" ],
-			"x-silverlight" : "scr",
-			"epub+zip" : "epub",
-			"font-tdpfr" : "pfr",
-			"inkml+xml" : [ "ink", "inkml" ],
-			"json" : "json",
-			"jsonml+json" : "jsonml",
-			"mathml+xml" : "mathml",
-			"metalink+xml" : "metalink",
-			"mp4" : "mp4s",
-			// "oebps-package+xml" : "opf",
-			"omdoc+xml" : "omdoc",
-			"oxps" : "oxps",
-			"vnd.amazon.ebook" : "azw",
-			"widget" : "wgt",
-			// "x-dtbncx+xml" : "ncx",
-			"x-dtbook+xml" : "dtb",
-			"x-dtbresource+xml" : "res",
-			"x-font-bdf" : "bdf",
-			"x-font-ghostscript" : "gsf",
-			"x-font-linux-psf" : "psf",
-			"x-font-otf" : "otf",
-			"x-font-pcf" : "pcf",
-			"x-font-snf" : "snf",
-			"x-font-ttf" : [ "ttf", "ttc" ],
-			"x-font-type1" : [ "pfa", "pfb", "pfm", "afm" ],
-			"x-font-woff" : "woff",
-			"x-mobipocket-ebook" : [ "prc", "mobi" ],
-			"x-mspublisher" : "pub",
-			"x-nzb" : "nzb",
-			"x-tgif" : "obj",
-			"xaml+xml" : "xaml",
-			"xml-dtd" : "dtd",
-			"xproc+xml" : "xpl",
-			"xslt+xml" : "xslt",
-			"internet-property-stream" : "acx",
-			"x-compress" : "z",
-			"x-compressed" : "tgz",
-			"x-gzip" : "gz",
-		},
-		"audio" : {
-			"flac" : "flac",
-			"midi" : [ "mid", "midi", "kar", "rmi" ],
-			"mpeg" : [ "mpga", "mpega", "mp2", "mp3", "m4a", "mp2a", "m2a", "m3a" ],
-			"mpegurl" : "m3u",
-			"ogg" : [ "oga", "ogg", "spx" ],
-			"x-aiff" : [ "aif", "aiff", "aifc" ],
-			"x-ms-wma" : "wma",
-			"x-wav" : "wav",
-			"adpcm" : "adp",
-			"mp4" : "mp4a",
-			"webm" : "weba",
-			"x-aac" : "aac",
-			"x-caf" : "caf",
-			"x-matroska" : "mka",
-			"x-pn-realaudio-plugin" : "rmp",
-			"xm" : "xm",
-			"mid" : [ "mid", "rmi" ]
-		},
-		"image" : {
-			"gif" : "gif",
-			"ief" : "ief",
-			"jpeg" : [ "jpeg", "jpg", "jpe" ],
-			"pcx" : "pcx",
-			"png" : "png",
-			"svg+xml" : [ "svg", "svgz" ],
-			"tiff" : [ "tiff", "tif" ],
-			"x-icon" : "ico",
-			"bmp" : "bmp",
-			"webp" : "webp",
-			"x-pict" : [ "pic", "pct" ],
-			"x-tga" : "tga",
-			"cis-cod" : "cod",
-		},
-		"message" : {
-			"rfc822" : [ "eml", "mime", "mht", "mhtml", "nws" ]
-		},
-		"text" : {
-			"cache-manifest" : [ "manifest", "appcache" ],
-			"calendar" : [ "ics", "icz", "ifb" ],
-			"css" : "css",
-			"csv" : "csv",
-			"h323" : "323",
-			"html" : [ "html", "htm", "shtml", "stm" ],
-			"iuls" : "uls",
-			"mathml" : "mml",
-			"plain" : [ "txt", "text", "brf", "conf", "def", "list", "log", "in", "bas" ],
-			"richtext" : "rtx",
-			"tab-separated-values" : "tsv",
-			"x-bibtex" : "bib",
-			"x-dsrc" : "d",
-			"x-diff" : [ "diff", "patch" ],
-			"x-haskell" : "hs",
-			"x-java" : "java",
-			"x-literate-haskell" : "lhs",
-			"x-moc" : "moc",
-			"x-pascal" : [ "p", "pas" ],
-			"x-pcs-gcd" : "gcd",
-			"x-perl" : [ "pl", "pm" ],
-			"x-python" : "py",
-			"x-scala" : "scala",
-			"x-setext" : "etx",
-			"x-tcl" : [ "tcl", "tk" ],
-			"x-tex" : [ "tex", "ltx", "sty", "cls" ],
-			"x-vcard" : "vcf",
-			"sgml" : [ "sgml", "sgm" ],
-			"x-c" : [ "c", "cc", "cxx", "cpp", "h", "hh", "dic" ],
-			"x-fortran" : [ "f", "for", "f77", "f90" ],
-			"x-opml" : "opml",
-			"x-nfo" : "nfo",
-			"x-sfv" : "sfv",
-			"x-uuencode" : "uu",
-			"webviewhtml" : "htt"
-		},
-		"video" : {
-			"mpeg" : [ "mpeg", "mpg", "mpe", "m1v", "m2v", "mp2", "mpa", "mpv2" ],
-			"mp4" : [ "mp4", "mp4v", "mpg4" ],
-			"quicktime" : [ "qt", "mov" ],
-			"ogg" : "ogv",
-			"vnd.mpegurl" : [ "mxu", "m4u" ],
-			"x-flv" : "flv",
-			"x-la-asf" : [ "lsf", "lsx" ],
-			"x-mng" : "mng",
-			"x-ms-asf" : [ "asf", "asx", "asr" ],
-			"x-ms-wm" : "wm",
-			"x-ms-wmv" : "wmv",
-			"x-ms-wmx" : "wmx",
-			"x-ms-wvx" : "wvx",
-			"x-msvideo" : "avi",
-			"x-sgi-movie" : "movie",
-			"x-matroska" : [ "mpv", "mkv", "mk3d", "mks" ],
-			"3gpp2" : "3g2",
-			"h261" : "h261",
-			"h263" : "h263",
-			"h264" : "h264",
-			"jpeg" : "jpgv",
-			"jpm" : [ "jpm", "jpgm" ],
-			"mj2" : [ "mj2", "mjp2" ],
-			"vnd.ms-playready.media.pyv" : "pyv",
-			"vnd.uvvu.mp4" : [ "uvu", "uvvu" ],
-			"vnd.vivo" : "viv",
-			"webm" : "webm",
-			"x-f4v" : "f4v",
-			"x-m4v" : "m4v",
-			"x-ms-vob" : "vob",
-			"x-smv" : "smv"
-		}
-	};
+var table = {
+	"application": {
+		"ecmascript": ["es", "ecma"],
+		"javascript": "js",
+		"ogg": "ogx",
+		"pdf": "pdf",
+		"postscript": ["ps", "ai", "eps", "epsi", "epsf", "eps2", "eps3"],
+		"rdf+xml": "rdf",
+		"smil": ["smi", "smil"],
+		"xhtml+xml": ["xhtml", "xht"],
+		"xml": ["xml", "xsl", "xsd", "opf", "ncx"],
+		"zip": "zip",
+		"x-httpd-eruby": "rhtml",
+		"x-latex": "latex",
+		"x-maker": ["frm", "maker", "frame", "fm", "fb", "book", "fbdoc"],
+		"x-object": "o",
+		"x-shockwave-flash": ["swf", "swfl"],
+		"x-silverlight": "scr",
+		"epub+zip": "epub",
+		"font-tdpfr": "pfr",
+		"inkml+xml": ["ink", "inkml"],
+		"json": "json",
+		"jsonml+json": "jsonml",
+		"mathml+xml": "mathml",
+		"metalink+xml": "metalink",
+		"mp4": "mp4s",
+		// "oebps-package+xml" : "opf",
+		"omdoc+xml": "omdoc",
+		"oxps": "oxps",
+		"vnd.amazon.ebook": "azw",
+		"widget": "wgt",
+		// "x-dtbncx+xml" : "ncx",
+		"x-dtbook+xml": "dtb",
+		"x-dtbresource+xml": "res",
+		"x-font-bdf": "bdf",
+		"x-font-ghostscript": "gsf",
+		"x-font-linux-psf": "psf",
+		"x-font-otf": "otf",
+		"x-font-pcf": "pcf",
+		"x-font-snf": "snf",
+		"x-font-ttf": ["ttf", "ttc"],
+		"x-font-type1": ["pfa", "pfb", "pfm", "afm"],
+		"x-font-woff": "woff",
+		"x-mobipocket-ebook": ["prc", "mobi"],
+		"x-mspublisher": "pub",
+		"x-nzb": "nzb",
+		"x-tgif": "obj",
+		"xaml+xml": "xaml",
+		"xml-dtd": "dtd",
+		"xproc+xml": "xpl",
+		"xslt+xml": "xslt",
+		"internet-property-stream": "acx",
+		"x-compress": "z",
+		"x-compressed": "tgz",
+		"x-gzip": "gz"
+	},
+	"audio": {
+		"flac": "flac",
+		"midi": ["mid", "midi", "kar", "rmi"],
+		"mpeg": ["mpga", "mpega", "mp2", "mp3", "m4a", "mp2a", "m2a", "m3a"],
+		"mpegurl": "m3u",
+		"ogg": ["oga", "ogg", "spx"],
+		"x-aiff": ["aif", "aiff", "aifc"],
+		"x-ms-wma": "wma",
+		"x-wav": "wav",
+		"adpcm": "adp",
+		"mp4": "mp4a",
+		"webm": "weba",
+		"x-aac": "aac",
+		"x-caf": "caf",
+		"x-matroska": "mka",
+		"x-pn-realaudio-plugin": "rmp",
+		"xm": "xm",
+		"mid": ["mid", "rmi"]
+	},
+	"image": {
+		"gif": "gif",
+		"ief": "ief",
+		"jpeg": ["jpeg", "jpg", "jpe"],
+		"pcx": "pcx",
+		"png": "png",
+		"svg+xml": ["svg", "svgz"],
+		"tiff": ["tiff", "tif"],
+		"x-icon": "ico",
+		"bmp": "bmp",
+		"webp": "webp",
+		"x-pict": ["pic", "pct"],
+		"x-tga": "tga",
+		"cis-cod": "cod"
+	},
+	"text": {
+		"cache-manifest": ["manifest", "appcache"],
+		"css": "css",
+		"csv": "csv",
+		"html": ["html", "htm", "shtml", "stm"],
+		"mathml": "mml",
+		"plain": ["txt", "text", "brf", "conf", "def", "list", "log", "in", "bas"],
+		"richtext": "rtx",
+		"tab-separated-values": "tsv",
+		"x-bibtex": "bib"
+	},
+	"video": {
+		"mpeg": ["mpeg", "mpg", "mpe", "m1v", "m2v", "mp2", "mpa", "mpv2"],
+		"mp4": ["mp4", "mp4v", "mpg4"],
+		"quicktime": ["qt", "mov"],
+		"ogg": "ogv",
+		"vnd.mpegurl": ["mxu", "m4u"],
+		"x-flv": "flv",
+		"x-la-asf": ["lsf", "lsx"],
+		"x-mng": "mng",
+		"x-ms-asf": ["asf", "asx", "asr"],
+		"x-ms-wm": "wm",
+		"x-ms-wmv": "wmv",
+		"x-ms-wmx": "wmx",
+		"x-ms-wvx": "wvx",
+		"x-msvideo": "avi",
+		"x-sgi-movie": "movie",
+		"x-matroska": ["mpv", "mkv", "mk3d", "mks"],
+		"3gpp2": "3g2",
+		"h261": "h261",
+		"h263": "h263",
+		"h264": "h264",
+		"jpeg": "jpgv",
+		"jpm": ["jpm", "jpgm"],
+		"mj2": ["mj2", "mjp2"],
+		"vnd.ms-playready.media.pyv": "pyv",
+		"vnd.uvvu.mp4": ["uvu", "uvvu"],
+		"vnd.vivo": "viv",
+		"webm": "webm",
+		"x-f4v": "f4v",
+		"x-m4v": "m4v",
+		"x-ms-vob": "vob",
+		"x-smv": "smv"
+	}
+};
 
-	var mimeTypes = (function() {
-		var type, subtype, val, index, mimeTypes = {};
-		for (type in table) {
-			if (table.hasOwnProperty(type)) {
-				for (subtype in table[type]) {
-					if (table[type].hasOwnProperty(subtype)) {
-						val = table[type][subtype];
-						if (typeof val == "string") {
-							mimeTypes[val] = type + "/" + subtype;
-						} else {
-							for (index = 0; index < val.length; index++) {
-								mimeTypes[val[index]] = type + "/" + subtype;
-							}
+var mimeTypes = function () {
+	var type,
+	    subtype,
+	    val,
+	    index,
+	    mimeTypes = {};
+	for (type in table) {
+		if (table.hasOwnProperty(type)) {
+			for (subtype in table[type]) {
+				if (table[type].hasOwnProperty(subtype)) {
+					val = table[type][subtype];
+					if (typeof val == "string") {
+						mimeTypes[val] = type + "/" + subtype;
+					} else {
+						for (index = 0; index < val.length; index++) {
+							mimeTypes[val[index]] = type + "/" + subtype;
 						}
 					}
 				}
 			}
 		}
-		return mimeTypes;
-	})();
+	}
+	return mimeTypes;
+}();
 
-	EPUBJS.core.getMimeType = function(filename) {
-		var defaultValue = "text/plain";//"application/octet-stream";
-		return filename && mimeTypes[filename.split(".").pop().toLowerCase()] || defaultValue;
+var defaultValue = "text/plain"; //"application/octet-stream";
+
+function lookup(filename) {
+	return filename && mimeTypes[filename.split(".").pop().toLowerCase()] || defaultValue;
+};
+
+module.exports = {
+	'lookup': lookup
+};
+
+/***/ }),
+/* 15 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _core = __webpack_require__(0);
+
+var _hook = __webpack_require__(8);
+
+var _hook2 = _interopRequireDefault(_hook);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _queue = __webpack_require__(10);
+
+var _queue2 = _interopRequireDefault(_queue);
+
+var _layout = __webpack_require__(44);
+
+var _layout2 = _interopRequireDefault(_layout);
+
+var _mapping = __webpack_require__(11);
+
+var _mapping2 = _interopRequireDefault(_mapping);
+
+var _themes = __webpack_require__(45);
+
+var _themes2 = _interopRequireDefault(_themes);
+
+var _contents = __webpack_require__(12);
+
+var _contents2 = _interopRequireDefault(_contents);
+
+var _annotations = __webpack_require__(49);
+
+var _annotations2 = _interopRequireDefault(_annotations);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * [Rendition description]
+ * @class
+ * @param {Book} book
+ * @param {object} options
+ * @param {int} options.width
+ * @param {int} options.height
+ * @param {string} options.ignoreClass
+ * @param {string} options.manager
+ * @param {string} options.view
+ * @param {string} options.layout
+ * @param {string} options.spread
+ * @param {int} options.minSpreadWidth overridden by spread: none (never) / both (always)
+ * @param {string} options.stylesheet url of stylesheet to be injected
+ */
+var Rendition = function () {
+	function Rendition(book, options) {
+		_classCallCheck(this, Rendition);
+
+		this.settings = (0, _core.extend)(this.settings || {}, {
+			width: null,
+			height: null,
+			ignoreClass: "",
+			manager: "default",
+			view: "iframe",
+			flow: null,
+			layout: null,
+			spread: null,
+			minSpreadWidth: 800,
+			stylesheet: null,
+			script: null
+		});
+
+		(0, _core.extend)(this.settings, options);
+
+		if (_typeof(this.settings.manager) === "object") {
+			this.manager = this.settings.manager;
+		}
+
+		this.viewSettings = {
+			ignoreClass: this.settings.ignoreClass
+		};
+
+		this.book = book;
+
+		this.views = null;
+
+		/**
+   * Adds Hook methods to the Rendition prototype
+   * @property {Hook} hooks
+   */
+		this.hooks = {};
+		this.hooks.display = new _hook2.default(this);
+		this.hooks.serialize = new _hook2.default(this);
+		/**
+   * @property {method} hooks.content
+   * @type {Hook}
+   */
+		this.hooks.content = new _hook2.default(this);
+		this.hooks.unloaded = new _hook2.default(this);
+		this.hooks.layout = new _hook2.default(this);
+		this.hooks.render = new _hook2.default(this);
+		this.hooks.show = new _hook2.default(this);
+
+		this.hooks.content.register(this.handleLinks.bind(this));
+		this.hooks.content.register(this.passEvents.bind(this));
+		this.hooks.content.register(this.adjustImages.bind(this));
+
+		this.book.spine.hooks.content.register(this.injectIdentifier.bind(this));
+
+		if (this.settings.stylesheet) {
+			this.book.spine.hooks.content.register(this.injectStylesheet.bind(this));
+		}
+
+		if (this.settings.script) {
+			this.book.spine.hooks.content.register(this.injectScript.bind(this));
+		}
+
+		// this.hooks.display.register(this.afterDisplay.bind(this));
+		this.themes = new _themes2.default(this);
+
+		this.annotations = new _annotations2.default(this);
+
+		this.epubcfi = new _epubcfi2.default();
+
+		this.q = new _queue2.default(this);
+
+		this.q.enqueue(this.book.opened);
+
+		// Block the queue until rendering is started
+		this.starting = new _core.defer();
+		this.started = this.starting.promise;
+		this.q.enqueue(this.start);
+	}
+
+	/**
+  * Set the manager function
+  * @param {function} manager
+  */
+
+
+	_createClass(Rendition, [{
+		key: "setManager",
+		value: function setManager(manager) {
+			this.manager = manager;
+		}
+
+		/**
+   * Require the manager from passed string, or as a function
+   * @param  {string|function} manager [description]
+   * @return {method}
+   */
+
+	}, {
+		key: "requireManager",
+		value: function requireManager(manager) {
+			var viewManager;
+
+			// If manager is a string, try to load from register managers,
+			// or require included managers directly
+			if (typeof manager === "string") {
+				// Use global or require
+				viewManager = typeof ePub != "undefined" ? ePub.ViewManagers[manager] : undefined; //require("./managers/"+manager);
+			} else {
+				// otherwise, assume we were passed a function
+				viewManager = manager;
+			}
+
+			return viewManager;
+		}
+
+		/**
+   * Require the view from passed string, or as a function
+   * @param  {string|function} view
+   * @return {view}
+   */
+
+	}, {
+		key: "requireView",
+		value: function requireView(view) {
+			var View;
+
+			if (typeof view == "string") {
+				View = typeof ePub != "undefined" ? ePub.Views[view] : undefined; //require("./views/"+view);
+			} else {
+				// otherwise, assume we were passed a function
+				View = view;
+			}
+
+			return View;
+		}
+
+		/**
+   * Start the rendering
+   * @return {Promise} rendering has started
+   */
+
+	}, {
+		key: "start",
+		value: function start() {
+
+			if (!this.manager) {
+				this.ViewManager = this.requireManager(this.settings.manager);
+				this.View = this.requireView(this.settings.view);
+
+				this.manager = new this.ViewManager({
+					view: this.View,
+					queue: this.q,
+					request: this.book.load.bind(this.book),
+					settings: this.settings
+				});
+			}
+
+			// Parse metadata to get layout props
+			this.settings.globalLayoutProperties = this.determineLayoutProperties(this.book.package.metadata);
+
+			this.flow(this.settings.globalLayoutProperties.flow);
+
+			this.layout(this.settings.globalLayoutProperties);
+
+			// Listen for displayed views
+			this.manager.on("added", this.afterDisplayed.bind(this));
+			this.manager.on("removed", this.afterRemoved.bind(this));
+
+			// Listen for resizing
+			this.manager.on("resized", this.onResized.bind(this));
+
+			// Listen for rotation
+			this.manager.on("orientationChange", this.onOrientationChange.bind(this));
+
+			// Listen for scroll changes
+			this.manager.on("scrolled", this.reportLocation.bind(this));
+
+			// Trigger that rendering has started
+			this.emit("started");
+
+			// Start processing queue
+			this.starting.resolve();
+		}
+
+		/**
+   * Call to attach the container to an element in the dom
+   * Container must be attached before rendering can begin
+   * @param  {element} element to attach to
+   * @return {Promise}
+   */
+
+	}, {
+		key: "attachTo",
+		value: function attachTo(element) {
+
+			return this.q.enqueue(function () {
+
+				// Start rendering
+				this.manager.render(element, {
+					"width": this.settings.width,
+					"height": this.settings.height
+				});
+
+				// Trigger Attached
+				this.emit("attached");
+			}.bind(this));
+		}
+
+		/**
+   * Display a point in the book
+   * The request will be added to the rendering Queue,
+   * so it will wait until book is opened, rendering started
+   * and all other rendering tasks have finished to be called.
+   * @param  {string} target Url or EpubCFI
+   * @return {Promise}
+   */
+
+	}, {
+		key: "display",
+		value: function display(target) {
+			if (this.displaying) {
+				this.displaying.resolve();
+			}
+			return this.q.enqueue(this._display, target);
+		}
+
+		/**
+   * Tells the manager what to display immediately
+   * @private
+   * @param  {string} target Url or EpubCFI
+   * @return {Promise}
+   */
+
+	}, {
+		key: "_display",
+		value: function _display(target) {
+			var _this = this;
+
+			if (!this.book) {
+				return;
+			}
+			var isCfiString = this.epubcfi.isCfiString(target);
+			var displaying = new _core.defer();
+			var displayed = displaying.promise;
+			var section;
+			var moveTo;
+
+			this.displaying = displaying;
+
+			// Check if this is a book percentage
+			if (this.book.locations.length && ((0, _core.isFloat)(target) || typeof target === "string" && target == parseFloat(target)) // Handle 1.0
+			) {
+					target = this.book.locations.cfiFromPercentage(parseFloat(target));
+				}
+
+			section = this.book.spine.get(target);
+
+			if (!section) {
+				displaying.reject(new Error("No Section Found"));
+				return displayed;
+			}
+
+			this.manager.display(section, target).then(function () {
+				displaying.resolve(section);
+				_this.displaying = undefined;
+
+				_this.emit("displayed", section);
+				_this.reportLocation();
+			});
+
+			return displayed;
+		}
+
+		/*
+  render(view, show) {
+  		// view.onLayout = this.layout.format.bind(this.layout);
+  	view.create();
+  		// Fit to size of the container, apply padding
+  	this.manager.resizeView(view);
+  		// Render Chain
+  	return view.section.render(this.book.request)
+  		.then(function(contents){
+  			return view.load(contents);
+  		}.bind(this))
+  		.then(function(doc){
+  			return this.hooks.content.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			this.layout.format(view.contents);
+  			return this.hooks.layout.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			return view.display();
+  		}.bind(this))
+  		.then(function(){
+  			return this.hooks.render.trigger(view, this);
+  		}.bind(this))
+  		.then(function(){
+  			if(show !== false) {
+  				this.q.enqueue(function(view){
+  					view.show();
+  				}, view);
+  			}
+  			// this.map = new Map(view, this.layout);
+  			this.hooks.show.trigger(view, this);
+  			this.trigger("rendered", view.section);
+  			}.bind(this))
+  		.catch(function(e){
+  			this.trigger("loaderror", e);
+  		}.bind(this));
+  	}
+  */
+
+		/**
+   * Report what has been displayed
+   * @private
+   * @param  {*} view
+   */
+
+	}, {
+		key: "afterDisplayed",
+		value: function afterDisplayed(view) {
+			var _this2 = this;
+
+			if (view.contents) {
+				this.hooks.content.trigger(view.contents, this).then(function () {
+					_this2.emit("rendered", view.section, view);
+				});
+			} else {
+				this.emit("rendered", view.section, view);
+			}
+
+			// this.reportLocation();
+		}
+
+		/**
+   * Report what has been removed
+   * @private
+   * @param  {*} view
+   */
+
+	}, {
+		key: "afterRemoved",
+		value: function afterRemoved(view) {
+			var _this3 = this;
+
+			this.hooks.unloaded.trigger(view, this).then(function () {
+				_this3.emit("removed", view.section, view);
+			});
+		}
+
+		/**
+   * Report resize events and display the last seen location
+   * @private
+   */
+
+	}, {
+		key: "onResized",
+		value: function onResized(size) {
+
+			this.emit("resized", {
+				width: size.width,
+				height: size.height
+			});
+
+			if (this.location && this.location.start) {
+				// this.manager.clear();
+				this.display(this.location.start.cfi);
+			}
+		}
+
+		/**
+   * Report orientation events and display the last seen location
+   * @private
+   */
+
+	}, {
+		key: "onOrientationChange",
+		value: function onOrientationChange(orientation) {
+			if (this.location) {
+				this.manager.clear();
+				this.display(this.location.start.cfi);
+			}
+
+			this.emit("orientationChange", orientation);
+		}
+
+		/**
+   * Move the Rendition to a specific offset
+   * Usually you would be better off calling display()
+   * @param {object} offset
+   */
+
+	}, {
+		key: "moveTo",
+		value: function moveTo(offset) {
+			this.manager.moveTo(offset);
+		}
+
+		/**
+   * Go to the next "page" in the rendition
+   * @return {Promise}
+   */
+
+	}, {
+		key: "next",
+		value: function next() {
+			return this.q.enqueue(this.manager.next.bind(this.manager)).then(this.reportLocation.bind(this));
+		}
+
+		/**
+   * Go to the previous "page" in the rendition
+   * @return {Promise}
+   */
+
+	}, {
+		key: "prev",
+		value: function prev() {
+			return this.q.enqueue(this.manager.prev.bind(this.manager)).then(this.reportLocation.bind(this));
+		}
+
+		//-- http://www.idpf.org/epub/301/spec/epub-publications.html#meta-properties-rendering
+		/**
+   * Determine the Layout properties from metadata and settings
+   * @private
+   * @param  {object} metadata
+   * @return {object} properties
+   */
+
+	}, {
+		key: "determineLayoutProperties",
+		value: function determineLayoutProperties(metadata) {
+			var properties;
+			var layout = this.settings.layout || metadata.layout || "reflowable";
+			var spread = this.settings.spread || metadata.spread || "auto";
+			var orientation = this.settings.orientation || metadata.orientation || "auto";
+			var flow = this.settings.flow || metadata.flow || "auto";
+			var viewport = metadata.viewport || "";
+			var minSpreadWidth = this.settings.minSpreadWidth || metadata.minSpreadWidth || 800;
+
+			if (this.settings.width >= 0 && this.settings.height >= 0) {
+				viewport = "width=" + this.settings.width + ", height=" + this.settings.height + "";
+			}
+
+			properties = {
+				layout: layout,
+				spread: spread,
+				orientation: orientation,
+				flow: flow,
+				viewport: viewport,
+				minSpreadWidth: minSpreadWidth
+			};
+
+			return properties;
+		}
+
+		// applyLayoutProperties(){
+		// 	var settings = this.determineLayoutProperties(this.book.package.metadata);
+		//
+		// 	this.flow(settings.flow);
+		//
+		// 	this.layout(settings);
+		// };
+
+		/**
+   * Adjust the flow of the rendition to paginated or scrolled
+   * (scrolled-continuous vs scrolled-doc are handled by different view managers)
+   * @param  {string} flow
+   */
+
+	}, {
+		key: "flow",
+		value: function flow(_flow2) {
+			var _flow = _flow2;
+			if (_flow2 === "scrolled" || _flow2 === "scrolled-doc" || _flow2 === "scrolled-continuous") {
+				_flow = "scrolled";
+			}
+
+			if (_flow2 === "auto" || _flow2 === "paginated") {
+				_flow = "paginated";
+			}
+
+			this.settings.flow = _flow2;
+
+			if (this._layout) {
+				this._layout.flow(_flow);
+			}
+
+			if (this.manager && this._layout) {
+				this.manager.applyLayout(this._layout);
+			}
+
+			if (this.manager) {
+				this.manager.updateFlow(_flow);
+			}
+
+			if (this.location) {
+				this.manager.clear();
+				this.display(this.location.start.cfi);
+			}
+		}
+
+		/**
+   * Adjust the layout of the rendition to reflowable or pre-paginated
+   * @param  {object} settings
+   */
+
+	}, {
+		key: "layout",
+		value: function layout(settings) {
+			if (settings) {
+				this._layout = new _layout2.default(settings);
+				this._layout.spread(settings.spread, this.settings.minSpreadWidth);
+
+				this.mapping = new _mapping2.default(this._layout.props);
+			}
+
+			if (this.manager && this._layout) {
+				this.manager.applyLayout(this._layout);
+			}
+
+			return this._layout;
+		}
+
+		/**
+   * Adjust if the rendition uses spreads
+   * @param  {string} spread none | auto (TODO: implement landscape, portrait, both)
+   * @param  {int} min min width to use spreads at
+   */
+
+	}, {
+		key: "spread",
+		value: function spread(_spread, min) {
+
+			this._layout.spread(_spread, min);
+
+			if (this.manager.isRendered()) {
+				this.manager.updateLayout();
+			}
+		}
+
+		/**
+   * Report the current location
+   * @private
+   */
+
+	}, {
+		key: "reportLocation",
+		value: function reportLocation() {
+			return this.q.enqueue(function reportedLocation() {
+				var location = this.manager.currentLocation();
+				if (location && location.then && typeof location.then === "function") {
+					location.then(function (result) {
+						var located = this.located(result);
+
+						if (!located || !located.start || !located.end) {
+							return;
+						}
+
+						this.location = located;
+
+						this.emit("locationChanged", {
+							index: this.location.start.index,
+							href: this.location.start.href,
+							start: this.location.start.cfi,
+							end: this.location.end.cfi,
+							percentage: this.location.start.percentage
+						});
+
+						this.emit("relocated", this.location);
+					}.bind(this));
+				} else if (location) {
+					var located = this.located(location);
+
+					if (!located || !located.start || !located.end) {
+						return;
+					}
+
+					this.location = located;
+
+					this.emit("locationChanged", {
+						index: this.location.start.index,
+						href: this.location.start.href,
+						start: this.location.start.cfi,
+						end: this.location.end.cfi,
+						percentage: this.location.start.percentage
+					});
+
+					this.emit("relocated", this.location);
+				}
+			}.bind(this));
+		}
+
+		/**
+   * Get the Current Location CFI
+   * @return {EpubCFI} location (may be a promise)
+   */
+
+	}, {
+		key: "currentLocation",
+		value: function currentLocation() {
+			var location = this.manager.currentLocation();
+			if (location && location.then && typeof location.then === "function") {
+				location.then(function (result) {
+					var located = this.located(result);
+					return located;
+				}.bind(this));
+			} else if (location) {
+				var located = this.located(location);
+				return located;
+			}
+		}
+	}, {
+		key: "located",
+		value: function located(location) {
+			if (!location.length) {
+				return {};
+			}
+			var start = location[0];
+			var end = location[location.length - 1];
+
+			var located = {
+				start: {
+					index: start.index,
+					href: start.href,
+					cfi: start.mapping.start,
+					displayed: {
+						page: start.pages[0] || 1,
+						total: start.totalPages
+					}
+				},
+				end: {
+					index: end.index,
+					href: end.href,
+					cfi: end.mapping.end,
+					displayed: {
+						page: end.pages[end.pages.length - 1] || 1,
+						total: end.totalPages
+					}
+				}
+			};
+
+			var locationStart = this.book.locations.locationFromCfi(start.mapping.start);
+			var locationEnd = this.book.locations.locationFromCfi(end.mapping.end);
+
+			if (locationStart != null) {
+				located.start.location = locationStart;
+				located.start.percentage = this.book.locations.percentageFromLocation(locationStart);
+			}
+			if (locationEnd != null) {
+				located.end.location = locationEnd;
+				located.end.percentage = this.book.locations.percentageFromLocation(locationEnd);
+			}
+
+			var pageStart = this.book.pageList.pageFromCfi(start.mapping.start);
+			var pageEnd = this.book.pageList.pageFromCfi(end.mapping.end);
+
+			if (pageStart != -1) {
+				located.start.page = pageStart;
+			}
+			if (pageEnd != -1) {
+				located.end.page = pageEnd;
+			}
+
+			if (end.index === this.book.spine.last().index && located.end.displayed.page >= located.end.displayed.total) {
+				located.atEnd = true;
+			}
+
+			if (start.index === this.book.spine.first().index && located.start.displayed.page === 1) {
+				located.atStart = true;
+			}
+
+			return located;
+		}
+
+		/**
+   * Remove and Clean Up the Rendition
+   */
+
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			// Clear the queue
+			// this.q.clear();
+			// this.q = undefined;
+
+			this.manager && this.manager.destroy();
+
+			this.book = undefined;
+
+			this.views = null;
+
+			// this.hooks.display.clear();
+			// this.hooks.serialize.clear();
+			// this.hooks.content.clear();
+			// this.hooks.layout.clear();
+			// this.hooks.render.clear();
+			// this.hooks.show.clear();
+			// this.hooks = {};
+
+			// this.themes.destroy();
+			// this.themes = undefined;
+
+			// this.epubcfi = undefined;
+
+			// this.starting = undefined;
+			// this.started = undefined;
+
+		}
+
+		/**
+   * Pass the events from a view
+   * @private
+   * @param  {View} view
+   */
+
+	}, {
+		key: "passEvents",
+		value: function passEvents(contents) {
+			var _this4 = this;
+
+			var listenedEvents = _contents2.default.listenedEvents;
+
+			listenedEvents.forEach(function (e) {
+				contents.on(e, function (ev) {
+					return _this4.triggerViewEvent(ev, contents);
+				});
+			});
+
+			contents.on("selected", function (e) {
+				return _this4.triggerSelectedEvent(e, contents);
+			});
+			contents.on("markClicked", function (cfiRange, data) {
+				return _this4.triggerMarkEvent(cfiRange, data, contents);
+			});
+		}
+
+		/**
+   * Emit events passed by a view
+   * @private
+   * @param  {event} e
+   */
+
+	}, {
+		key: "triggerViewEvent",
+		value: function triggerViewEvent(e, contents) {
+			this.emit(e.type, e, contents);
+		}
+
+		/**
+   * Emit a selection event's CFI Range passed from a a view
+   * @private
+   * @param  {EpubCFI} cfirange
+   */
+
+	}, {
+		key: "triggerSelectedEvent",
+		value: function triggerSelectedEvent(cfirange, contents) {
+			this.emit("selected", cfirange, contents);
+		}
+
+		/**
+   * Emit a markClicked event with the cfiRange and data from a mark
+   * @private
+   * @param  {EpubCFI} cfirange
+   */
+
+	}, {
+		key: "triggerMarkEvent",
+		value: function triggerMarkEvent(cfiRange, data, contents) {
+			this.emit("markClicked", cfiRange, data, contents);
+		}
+
+		/**
+   * Get a Range from a Visible CFI
+   * @param  {string} cfi EpubCfi String
+   * @param  {string} ignoreClass
+   * @return {range}
+   */
+
+	}, {
+		key: "getRange",
+		value: function getRange(cfi, ignoreClass) {
+			var _cfi = new _epubcfi2.default(cfi);
+			var found = this.manager.visible().filter(function (view) {
+				if (_cfi.spinePos === view.index) return true;
+			});
+
+			// Should only every return 1 item
+			if (found.length) {
+				return found[0].contents.range(_cfi, ignoreClass);
+			}
+		}
+
+		/**
+   * Hook to adjust images to fit in columns
+   * @param  {View} view
+   */
+
+	}, {
+		key: "adjustImages",
+		value: function adjustImages(contents) {
+
+			if (this._layout.name === "pre-paginated") {
+				return new Promise(function (resolve) {
+					resolve();
+				});
+			}
+
+			contents.addStylesheetRules({
+				"img": {
+					"max-width": (this._layout.columnWidth ? this._layout.columnWidth + "px" : "100%") + "!important",
+					"max-height": (this._layout.height ? this._layout.height * 0.6 + "px" : "60%") + "!important",
+					"object-fit": "contain",
+					"page-break-inside": "avoid"
+				}
+			});
+
+			return new Promise(function (resolve, reject) {
+				// Wait to apply
+				setTimeout(function () {
+					resolve();
+				}, 1);
+			});
+		}
+	}, {
+		key: "getContents",
+		value: function getContents() {
+			return this.manager ? this.manager.getContents() : [];
+		}
+	}, {
+		key: "handleLinks",
+		value: function handleLinks(contents) {
+			var _this5 = this;
+
+			if (contents) {
+				contents.on("link", function (href) {
+					var relative = _this5.book.path.relative(href);
+					_this5.display(relative);
+				});
+			}
+		}
+	}, {
+		key: "injectStylesheet",
+		value: function injectStylesheet(doc, section) {
+			var style = doc.createElement("link");
+			style.setAttribute("type", "text/css");
+			style.setAttribute("rel", "stylesheet");
+			style.setAttribute("href", this.settings.stylesheet);
+			doc.getElementsByTagName("head")[0].appendChild(style);
+		}
+	}, {
+		key: "injectScript",
+		value: function injectScript(doc, section) {
+			var script = doc.createElement("script");
+			script.setAttribute("type", "text/javascript");
+			script.setAttribute("src", this.settings.script);
+			script.textContent = " "; // Needed to prevent self closing tag
+			doc.getElementsByTagName("head")[0].appendChild(script);
+		}
+	}, {
+		key: "injectIdentifier",
+		value: function injectIdentifier(doc, section) {
+			var ident = this.book.package.metadata.identifier;
+			var meta = doc.createElement("meta");
+			meta.setAttribute("name", "dc.relation.ispartof");
+			if (ident) {
+				meta.setAttribute("content", ident);
+			}
+			doc.getElementsByTagName("head")[0].appendChild(meta);
+		}
+	}]);
+
+	return Rendition;
+}();
+
+//-- Enable binding events to Renderer
+
+
+(0, _eventEmitter2.default)(Rendition.prototype);
+
+exports.default = Rendition;
+module.exports = exports["default"];
+
+/***/ }),
+/* 16 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _core = __webpack_require__(0);
+
+var _mapping = __webpack_require__(11);
+
+var _mapping2 = _interopRequireDefault(_mapping);
+
+var _queue = __webpack_require__(10);
+
+var _queue2 = _interopRequireDefault(_queue);
+
+var _stage = __webpack_require__(55);
+
+var _stage2 = _interopRequireDefault(_stage);
+
+var _views = __webpack_require__(56);
+
+var _views2 = _interopRequireDefault(_views);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var DefaultViewManager = function () {
+	function DefaultViewManager(options) {
+		_classCallCheck(this, DefaultViewManager);
+
+		this.name = "default";
+		this.View = options.view;
+		this.request = options.request;
+		this.renditionQueue = options.queue;
+		this.q = new _queue2.default(this);
+
+		this.settings = (0, _core.extend)(this.settings || {}, {
+			infinite: true,
+			hidden: false,
+			width: undefined,
+			height: undefined,
+			// globalLayoutProperties : { layout: "reflowable", spread: "auto", orientation: "auto"},
+			// layout: null,
+			axis: "vertical",
+			ignoreClass: ""
+		});
+
+		(0, _core.extend)(this.settings, options.settings || {});
+
+		this.viewSettings = {
+			ignoreClass: this.settings.ignoreClass,
+			axis: this.settings.axis,
+			layout: this.layout,
+			width: 0,
+			height: 0
+		};
+	}
+
+	_createClass(DefaultViewManager, [{
+		key: "render",
+		value: function render(element, size) {
+			var tag = element.tagName;
+
+			if (tag && (tag.toLowerCase() == "body" || tag.toLowerCase() == "html")) {
+				this.fullsize = true;
+			}
+
+			if (this.fullsize) {
+				this.settings.overflow = "visible";
+				this.overflow = this.settings.overflow;
+			}
+
+			this.settings.size = size;
+
+			// Save the stage
+			this.stage = new _stage2.default({
+				width: size.width,
+				height: size.height,
+				overflow: this.overflow,
+				hidden: this.settings.hidden,
+				axis: this.settings.axis,
+				fullsize: this.fullsize
+			});
+
+			this.stage.attachTo(element);
+
+			// Get this stage container div
+			this.container = this.stage.getContainer();
+
+			// Views array methods
+			this.views = new _views2.default(this.container);
+
+			// Calculate Stage Size
+			this._bounds = this.bounds();
+			this._stageSize = this.stage.size();
+
+			// Set the dimensions for views
+			this.viewSettings.width = this._stageSize.width;
+			this.viewSettings.height = this._stageSize.height;
+
+			// Function to handle a resize event.
+			// Will only attach if width and height are both fixed.
+			this.stage.onResize(this.onResized.bind(this));
+
+			// Add Event Listeners
+			this.addEventListeners();
+
+			// Add Layout method
+			// this.applyLayoutMethod();
+			if (this.layout) {
+				this.updateLayout();
+			}
+		}
+	}, {
+		key: "addEventListeners",
+		value: function addEventListeners() {
+			var scroller;
+
+			window.addEventListener("unload", function (e) {
+				this.destroy();
+			}.bind(this));
+
+			if (!this.fullsize) {
+				scroller = this.container;
+			} else {
+				scroller = window;
+			}
+
+			scroller.addEventListener("scroll", this.onScroll.bind(this));
+		}
+	}, {
+		key: "removeEventListeners",
+		value: function removeEventListeners() {
+			var scroller;
+
+			if (!this.fullsize) {
+				scroller = this.container;
+			} else {
+				scroller = window;
+			}
+
+			scroller.removeEventListener("scroll", this.onScroll.bind(this));
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+
+			this.removeEventListeners();
+
+			if (this.views) {
+				this.views.each(function (view) {
+					if (view) {
+						view.destroy();
+					}
+				});
+			}
+
+			this.stage.destroy();
+
+			/*
+   		clearTimeout(this.trimTimeout);
+   	if(this.settings.hidden) {
+   		this.element.removeChild(this.wrapper);
+   	} else {
+   		this.element.removeChild(this.container);
+   	}
+   */
+		}
+	}, {
+		key: "onOrientationChange",
+		value: function onOrientationChange(e) {
+			var _window = window,
+			    orientation = _window.orientation;
+
+
+			this._stageSize = this.stage.size();
+			this._bounds = this.bounds();
+			// Update for new views
+			this.viewSettings.width = this._stageSize.width;
+			this.viewSettings.height = this._stageSize.height;
+
+			this.updateLayout();
+
+			// Update for existing views
+			// this.views.each(function(view) {
+			// 	view.size(this._stageSize.width, this._stageSize.height);
+			// }.bind(this));
+
+			this.emit("orientationChange", orientation);
+		}
+	}, {
+		key: "onResized",
+		value: function onResized(e) {
+			clearTimeout(this.resizeTimeout);
+			this.resizeTimeout = setTimeout(function () {
+				this.resize();
+			}.bind(this), 150);
+		}
+	}, {
+		key: "resize",
+		value: function resize(width, height) {
+			// Clear the queue
+			this.q.clear();
+
+			this._stageSize = this.stage.size(width, height);
+
+			this._bounds = this.bounds();
+
+			// Update for new views
+			this.viewSettings.width = this._stageSize.width;
+			this.viewSettings.height = this._stageSize.height;
+
+			this.updateLayout();
+
+			// Update for existing views
+			// TODO: this is not updating correctly, just clear and rerender for now
+			/*
+   this.views.each(function(view) {
+   	view.reset();
+   	view.size(this._stageSize.width, this._stageSize.height);
+   }.bind(this));
+   */
+			this.clear();
+
+			this.emit("resized", {
+				width: this._stageSize.width,
+				height: this._stageSize.height
+			});
+		}
+	}, {
+		key: "createView",
+		value: function createView(section) {
+			return new this.View(section, this.viewSettings);
+		}
+	}, {
+		key: "display",
+		value: function display(section, target) {
+
+			var displaying = new _core.defer();
+			var displayed = displaying.promise;
+
+			// Check if moving to target is needed
+			if (target === section.href || parseInt(target)) {
+				target = undefined;
+			}
+
+			// Check to make sure the section we want isn't already shown
+			var visible = this.views.find(section);
+
+			// View is already shown, just move to correct location in view
+			if (visible && section) {
+				var offset = visible.offset();
+				this.scrollTo(offset.left, offset.top, true);
+
+				if (target) {
+					var _offset = visible.locationOf(target);
+					this.moveTo(_offset);
+				}
+
+				displaying.resolve();
+				return displayed;
+			}
+
+			// Hide all current views
+			this.clear();
+
+			this.add(section).then(function (view) {
+
+				// Move to correct place within the section, if needed
+				if (target) {
+					var _offset2 = view.locationOf(target);
+					this.moveTo(_offset2);
+				}
+			}.bind(this)).then(function () {
+				var next;
+				if (this.layout.name === "pre-paginated" && this.layout.divisor > 1) {
+					next = section.next();
+					if (next) {
+						return this.add(next);
+					}
+				}
+			}.bind(this)).then(function () {
+
+				this.views.show();
+
+				displaying.resolve();
+			}.bind(this));
+			// .then(function(){
+			// 	return this.hooks.display.trigger(view);
+			// }.bind(this))
+			// .then(function(){
+			// 	this.views.show();
+			// }.bind(this));
+			return displayed;
+		}
+	}, {
+		key: "afterDisplayed",
+		value: function afterDisplayed(view) {
+			this.emit("added", view);
+		}
+	}, {
+		key: "afterResized",
+		value: function afterResized(view) {
+			this.emit("resize", view.section);
+		}
+
+		// moveTo(offset){
+		// 	this.scrollTo(offset.left, offset.top);
+		// };
+
+	}, {
+		key: "moveTo",
+		value: function moveTo(offset) {
+			var distX = 0,
+			    distY = 0;
+
+			if (this.settings.axis === "vertical") {
+				distY = offset.top;
+			} else {
+				distX = Math.floor(offset.left / this.layout.delta) * this.layout.delta;
+
+				if (distX + this.layout.delta > this.container.scrollWidth) {
+					distX = this.container.scrollWidth - this.layout.delta;
+				}
+			}
+			this.scrollTo(distX, distY, true);
+		}
+	}, {
+		key: "add",
+		value: function add(section) {
+			var view = this.createView(section);
+
+			this.views.append(view);
+
+			// view.on("shown", this.afterDisplayed.bind(this));
+			view.onDisplayed = this.afterDisplayed.bind(this);
+			view.onResize = this.afterResized.bind(this);
+
+			return view.display(this.request);
+		}
+	}, {
+		key: "append",
+		value: function append(section) {
+			var view = this.createView(section);
+			this.views.append(view);
+
+			view.onDisplayed = this.afterDisplayed.bind(this);
+			view.onResize = this.afterResized.bind(this);
+
+			return view.display(this.request);
+		}
+	}, {
+		key: "prepend",
+		value: function prepend(section) {
+			var view = this.createView(section);
+
+			this.views.prepend(view);
+
+			view.onDisplayed = this.afterDisplayed.bind(this);
+			view.onResize = this.afterResized.bind(this);
+
+			return view.display(this.request);
+		}
+		// resizeView(view) {
+		//
+		// 	if(this.settings.globalLayoutProperties.layout === "pre-paginated") {
+		// 		view.lock("both", this.bounds.width, this.bounds.height);
+		// 	} else {
+		// 		view.lock("width", this.bounds.width, this.bounds.height);
+		// 	}
+		//
+		// };
+
+	}, {
+		key: "next",
+		value: function next() {
+			var next;
+			var left;
+
+			if (!this.views.length) return;
+
+			if (this.settings.axis === "horizontal") {
+
+				this.scrollLeft = this.container.scrollLeft;
+
+				left = this.container.scrollLeft + this.container.offsetWidth + this.layout.delta;
+
+				if (left < this.container.scrollWidth) {
+					this.scrollBy(this.layout.delta, 0, true);
+				} else if (left - this.layout.columnWidth === this.container.scrollWidth) {
+					this.scrollTo(this.container.scrollWidth - this.layout.delta, 0, true);
+					next = this.views.last().section.next();
+				} else {
+					next = this.views.last().section.next();
+				}
+			} else {
+				next = this.views.last().section.next();
+			}
+
+			if (next) {
+				this.clear();
+
+				return this.append(next).then(function () {
+					var right;
+					if (this.layout.name === "pre-paginated" && this.layout.divisor > 1) {
+						right = next.next();
+						if (right) {
+							return this.append(right);
+						}
+					}
+				}.bind(this)).then(function () {
+					this.views.show();
+				}.bind(this));
+			}
+		}
+	}, {
+		key: "prev",
+		value: function prev() {
+			var prev;
+			var left;
+
+			if (!this.views.length) return;
+
+			if (this.settings.axis === "horizontal") {
+
+				this.scrollLeft = this.container.scrollLeft;
+
+				left = this.container.scrollLeft;
+
+				if (left > 0) {
+					this.scrollBy(-this.layout.delta, 0, true);
+				} else {
+					prev = this.views.first().section.prev();
+				}
+			} else {
+
+				prev = this.views.first().section.prev();
+			}
+
+			if (prev) {
+				this.clear();
+
+				return this.prepend(prev).then(function () {
+					var left;
+					if (this.layout.name === "pre-paginated" && this.layout.divisor > 1) {
+						left = prev.prev();
+						if (left) {
+							return this.prepend(left);
+						}
+					}
+				}.bind(this)).then(function () {
+					if (this.settings.axis === "horizontal") {
+						this.scrollTo(this.container.scrollWidth - this.layout.delta, 0, true);
+					}
+					this.views.show();
+				}.bind(this));
+			}
+		}
+	}, {
+		key: "current",
+		value: function current() {
+			var visible = this.visible();
+			if (visible.length) {
+				// Current is the last visible view
+				return visible[visible.length - 1];
+			}
+			return null;
+		}
+	}, {
+		key: "clear",
+		value: function clear() {
+			this.q.clear();
+
+			if (this.views) {
+				this.views.hide();
+				this.scrollTo(0, 0, true);
+				this.views.clear();
+			}
+		}
+	}, {
+		key: "currentLocation",
+		value: function currentLocation() {
+
+			if (this.settings.axis === "vertical") {
+				this.location = this.scrolledLocation();
+			} else {
+				this.location = this.paginatedLocation();
+			}
+			return this.location;
+		}
+	}, {
+		key: "scrolledLocation",
+		value: function scrolledLocation() {
+			var _this = this;
+
+			var visible = this.visible();
+			var container = this.container.getBoundingClientRect();
+			var pageHeight = container.height < window.innerHeight ? container.height : window.innerHeight;
+
+			var offset = 0;
+			var used = 0;
+
+			if (this.fullsize) {
+				offset = window.scrollY;
+			}
+
+			var sections = visible.map(function (view) {
+				var _view$section = view.section,
+				    index = _view$section.index,
+				    href = _view$section.href;
+
+				var position = view.position();
+				var height = view.height();
+
+				var startPos = offset + container.top - position.top + used;
+				var endPos = startPos + pageHeight - used;
+				if (endPos > height) {
+					endPos = height;
+					used = endPos - startPos;
+				}
+
+				var totalPages = _this.layout.count(view._height, pageHeight).pages;
+				var currPage = Math.ceil(startPos / pageHeight);
+				var pages = [];
+				var endPage = Math.ceil(endPos / pageHeight);
+
+				pages = [currPage];
+				for (var i = currPage; i <= endPage; i++) {
+					var pg = i;
+					pages.push(pg);
+				}
+
+				var mapping = _this.mapping.page(view.contents, view.section.cfiBase, startPos, endPos);
+
+				return {
+					index: index,
+					href: href,
+					pages: pages,
+					totalPages: totalPages,
+					mapping: mapping
+				};
+			});
+
+			return sections;
+		}
+	}, {
+		key: "paginatedLocation",
+		value: function paginatedLocation() {
+			var _this2 = this;
+
+			var visible = this.visible();
+			var container = this.container.getBoundingClientRect();
+
+			var left = 0;
+			var used = 0;
+
+			if (this.fullsize) {
+				left = window.scrollX;
+			}
+
+			var sections = visible.map(function (view) {
+				var _view$section2 = view.section,
+				    index = _view$section2.index,
+				    href = _view$section2.href;
+
+				var offset = view.offset().left;
+				var position = view.position().left;
+				var width = view.width();
+
+				// Find mapping
+				var start = left + container.left - position + used;
+				var end = start + _this2.layout.width - used;
+
+				var mapping = _this2.mapping.page(view.contents, view.section.cfiBase, start, end);
+
+				// Find displayed pages
+				var startPos = left + used;
+				var endPos = startPos + _this2.layout.spreadWidth - used;
+				if (endPos > offset + width) {
+					endPos = offset + width;
+					used = _this2.layout.pageWidth;
+				}
+
+				var totalPages = _this2.layout.count(width).pages;
+				var currPage = Math.ceil((startPos + _this2.layout.gap - offset) / _this2.layout.pageWidth);
+				var pages = [];
+				var endPage = Math.ceil((endPos - _this2.layout.gap - offset) / _this2.layout.pageWidth);
+
+				pages = [currPage];
+				for (var i = currPage; i <= endPage; i++) {
+					var pg = i;
+					pages.push(pg);
+				}
+
+				return {
+					index: index,
+					href: href,
+					pages: pages,
+					totalPages: totalPages,
+					mapping: mapping
+				};
+			});
+
+			return sections;
+		}
+	}, {
+		key: "isVisible",
+		value: function isVisible(view, offsetPrev, offsetNext, _container) {
+			var position = view.position();
+			var container = _container || this.bounds();
+
+			if (this.settings.axis === "horizontal" && position.right > container.left - offsetPrev && position.left < container.right + offsetNext) {
+
+				return true;
+			} else if (this.settings.axis === "vertical" && position.bottom > container.top - offsetPrev && position.top < container.bottom + offsetNext) {
+
+				return true;
+			}
+
+			return false;
+		}
+	}, {
+		key: "visible",
+		value: function visible() {
+			var container = this.bounds();
+			var views = this.views.displayed();
+			var viewsLength = views.length;
+			var visible = [];
+			var isVisible;
+			var view;
+
+			for (var i = 0; i < viewsLength; i++) {
+				view = views[i];
+				isVisible = this.isVisible(view, 0, 0, container);
+
+				if (isVisible === true) {
+					visible.push(view);
+				}
+			}
+			return visible;
+		}
+	}, {
+		key: "scrollBy",
+		value: function scrollBy(x, y, silent) {
+			if (silent) {
+				this.ignore = true;
+			}
+
+			if (!this.fullsize) {
+				if (x) this.container.scrollLeft += x;
+				if (y) this.container.scrollTop += y;
+			} else {
+				window.scrollBy(x, y);
+			}
+			this.scrolled = true;
+		}
+	}, {
+		key: "scrollTo",
+		value: function scrollTo(x, y, silent) {
+			if (silent) {
+				this.ignore = true;
+			}
+
+			if (!this.fullsize) {
+				this.container.scrollLeft = x;
+				this.container.scrollTop = y;
+			} else {
+				window.scrollTo(x, y);
+			}
+			this.scrolled = true;
+		}
+	}, {
+		key: "onScroll",
+		value: function onScroll() {
+			var scrollTop = void 0;
+			var scrollLeft = void 0;
+
+			if (!this.fullsize) {
+				scrollTop = this.container.scrollTop;
+				scrollLeft = this.container.scrollLeft;
+			} else {
+				scrollTop = window.scrollY;
+				scrollLeft = window.scrollX;
+			}
+
+			this.scrollTop = scrollTop;
+			this.scrollLeft = scrollLeft;
+
+			if (!this.ignore) {
+				this.emit("scroll", {
+					top: scrollTop,
+					left: scrollLeft
+				});
+
+				clearTimeout(this.afterScrolled);
+				this.afterScrolled = setTimeout(function () {
+					this.emit("scrolled", {
+						top: this.scrollTop,
+						left: this.scrollLeft
+					});
+				}.bind(this), 20);
+			} else {
+				this.ignore = false;
+			}
+		}
+	}, {
+		key: "bounds",
+		value: function bounds() {
+			var bounds;
+
+			bounds = this.stage.bounds();
+
+			return bounds;
+		}
+	}, {
+		key: "applyLayout",
+		value: function applyLayout(layout) {
+
+			this.layout = layout;
+			this.updateLayout();
+
+			this.mapping = new _mapping2.default(this.layout.props);
+
+			// this.manager.layout(this.layout.format);
+		}
+	}, {
+		key: "updateLayout",
+		value: function updateLayout() {
+			if (!this.stage) {
+				return;
+			}
+
+			this._stageSize = this.stage.size();
+
+			if (this.settings.axis === "vertical") {
+				this.layout.calculate(this._stageSize.width, this._stageSize.height);
+			} else {
+				this.layout.calculate(this._stageSize.width, this._stageSize.height, this.settings.gap);
+
+				// Set the look ahead offset for what is visible
+				this.settings.offset = this.layout.delta;
+
+				// this.stage.addStyleRules("iframe", [{"margin-right" : this.layout.gap + "px"}]);
+			}
+
+			// Set the dimensions for views
+			this.viewSettings.width = this.layout.width;
+			this.viewSettings.height = this.layout.height;
+
+			this.setLayout(this.layout);
+		}
+	}, {
+		key: "setLayout",
+		value: function setLayout(layout) {
+
+			this.viewSettings.layout = layout;
+
+			if (this.views) {
+
+				this.views.each(function (view) {
+					if (view) {
+						view.setLayout(layout);
+					}
+				});
+			}
+		}
+	}, {
+		key: "updateFlow",
+		value: function updateFlow(flow) {
+			var axis = flow === "paginated" ? "horizontal" : "vertical";
+
+			this.settings.axis = axis;
+
+			this.stage && this.stage.axis(axis);
+
+			this.viewSettings.axis = axis;
+
+			if (!this.settings.overflow) {
+				this.overflow = flow === "paginated" ? "hidden" : "auto";
+			} else {
+				this.overflow = this.settings.overflow;
+			}
+			// this.views.each(function(view){
+			// 	view.setAxis(axis);
+			// });
+
+			this.updateLayout();
+		}
+	}, {
+		key: "getContents",
+		value: function getContents() {
+			var contents = [];
+			if (!this.views) {
+				return contents;
+			}
+			this.views.each(function (view) {
+				var viewContents = view && view.contents;
+				if (viewContents) {
+					contents.push(viewContents);
+				}
+			});
+			return contents;
+		}
+	}]);
+
+	return DefaultViewManager;
+}();
+
+//-- Enable binding events to Manager
+
+
+(0, _eventEmitter2.default)(DefaultViewManager.prototype);
+
+exports.default = DefaultViewManager;
+module.exports = exports["default"];
+
+/***/ }),
+/* 17 */
+/***/ (function(module, exports) {
+
+/**
+ * Checks if `value` is the
+ * [language type](http://www.ecma-international.org/ecma-262/7.0/#sec-ecmascript-language-types)
+ * of `Object`. (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(_.noop);
+ * // => true
+ *
+ * _.isObject(null);
+ * // => false
+ */
+function isObject(value) {
+  var type = typeof value;
+  return value != null && (type == 'object' || type == 'function');
+}
+
+module.exports = isObject;
+
+
+/***/ }),
+/* 18 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var freeGlobal = __webpack_require__(60);
+
+/** Detect free variable `self`. */
+var freeSelf = typeof self == 'object' && self && self.Object === Object && self;
+
+/** Used as a reference to the global object. */
+var root = freeGlobal || freeSelf || Function('return this')();
+
+module.exports = root;
+
+
+/***/ }),
+/* 19 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var root = __webpack_require__(18);
+
+/** Built-in value references. */
+var Symbol = root.Symbol;
+
+module.exports = Symbol;
+
+
+/***/ }),
+/* 20 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global) {
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _book = __webpack_require__(21);
+
+var _book2 = _interopRequireDefault(_book);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _rendition = __webpack_require__(15);
+
+var _rendition2 = _interopRequireDefault(_rendition);
+
+var _contents = __webpack_require__(12);
+
+var _contents2 = _interopRequireDefault(_contents);
+
+var _core = __webpack_require__(0);
+
+var core = _interopRequireWildcard(_core);
+
+__webpack_require__(52);
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * Creates a new Book
+ * @param {string|ArrayBuffer} url URL, Path or ArrayBuffer
+ * @param {object} options to pass to the book
+ * @returns {Book} a new Book object
+ * @example ePub("/path/to/book.epub", {})
+ */
+function ePub(url, options) {
+	return new _book2.default(url, options);
+}
+
+ePub.VERSION = "0.3";
+
+if (typeof global !== "undefined") {
+	global.EPUBJS_VERSION = ePub.VERSION;
+}
+
+ePub.CFI = _epubcfi2.default;
+ePub.Rendition = _rendition2.default;
+ePub.Contents = _contents2.default;
+ePub.utils = core;
+
+ePub.ViewManagers = {};
+ePub.Views = {};
+/**
+ * register plugins
+ */
+ePub.register = {
+	/**
+  * register a new view manager
+  */
+	manager: function manager(name, _manager) {
+		return ePub.ViewManagers[name] = _manager;
+	},
+	/**
+  * register a new view
+  */
+	view: function view(name, _view) {
+		return ePub.Views[name] = _view;
+	}
+};
+
+// Default Views
+ePub.register.view("iframe", __webpack_require__(54));
+
+// Default View Managers
+ePub.register.manager("default", __webpack_require__(16));
+ePub.register.manager("continuous", __webpack_require__(57));
+
+exports.default = ePub;
+module.exports = exports["default"];
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
+
+/***/ }),
+/* 21 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+// import path from "path";
+
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _core = __webpack_require__(0);
+
+var _url = __webpack_require__(4);
+
+var _url2 = _interopRequireDefault(_url);
+
+var _path = __webpack_require__(3);
+
+var _path2 = _interopRequireDefault(_path);
+
+var _spine = __webpack_require__(36);
+
+var _spine2 = _interopRequireDefault(_spine);
+
+var _locations = __webpack_require__(38);
+
+var _locations2 = _interopRequireDefault(_locations);
+
+var _container = __webpack_require__(39);
+
+var _container2 = _interopRequireDefault(_container);
+
+var _packaging = __webpack_require__(40);
+
+var _packaging2 = _interopRequireDefault(_packaging);
+
+var _navigation = __webpack_require__(41);
+
+var _navigation2 = _interopRequireDefault(_navigation);
+
+var _resources = __webpack_require__(42);
+
+var _resources2 = _interopRequireDefault(_resources);
+
+var _pagelist = __webpack_require__(43);
+
+var _pagelist2 = _interopRequireDefault(_pagelist);
+
+var _rendition = __webpack_require__(15);
+
+var _rendition2 = _interopRequireDefault(_rendition);
+
+var _archive = __webpack_require__(50);
+
+var _archive2 = _interopRequireDefault(_archive);
+
+var _request2 = __webpack_require__(9);
+
+var _request3 = _interopRequireDefault(_request2);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var CONTAINER_PATH = "META-INF/container.xml";
+var EPUBJS_VERSION = "0.3";
+
+/**
+ * Creates a new Book
+ * @class
+ * @param {string} url
+ * @param {object} options
+ * @param {method} options.requestMethod a request function to use instead of the default
+ * @param {boolean} [options.requestCredentials=undefined] send the xhr request withCredentials
+ * @param {object} [options.requestHeaders=undefined] send the xhr request headers
+ * @param {string} [options.encoding=binary] optional to pass 'binary' or base64' for archived Epubs
+ * @param {string} [options.replacements=none] use base64, blobUrl, or none for replacing assets in archived Epubs
+ * @returns {Book}
+ * @example new Book("/path/to/book.epub", {})
+ * @example new Book({ replacements: "blobUrl" })
+ */
+
+var Book = function () {
+	function Book(url, options) {
+		var _this = this;
+
+		_classCallCheck(this, Book);
+
+		// Allow passing just options to the Book
+		if (typeof options === "undefined" && (typeof url === "undefined" ? "undefined" : _typeof(url)) === "object") {
+			options = url;
+			url = undefined;
+		}
+
+		this.settings = (0, _core.extend)(this.settings || {}, {
+			requestMethod: undefined,
+			requestCredentials: undefined,
+			requestHeaders: undefined,
+			encoding: undefined,
+			replacements: undefined
+		});
+
+		(0, _core.extend)(this.settings, options);
+
+		// Promises
+		this.opening = new _core.defer();
+		/**
+   * @property {promise} opened returns after the book is loaded
+   */
+		this.opened = this.opening.promise;
+		this.isOpen = false;
+
+		this.loading = {
+			manifest: new _core.defer(),
+			spine: new _core.defer(),
+			metadata: new _core.defer(),
+			cover: new _core.defer(),
+			navigation: new _core.defer(),
+			pageList: new _core.defer(),
+			resources: new _core.defer()
+		};
+
+		this.loaded = {
+			manifest: this.loading.manifest.promise,
+			spine: this.loading.spine.promise,
+			metadata: this.loading.metadata.promise,
+			cover: this.loading.cover.promise,
+			navigation: this.loading.navigation.promise,
+			pageList: this.loading.pageList.promise,
+			resources: this.loading.resources.promise
+		};
+
+		// this.ready = RSVP.hash(this.loaded);
+		/**
+   * @property {promise} ready returns after the book is loaded and parsed
+   * @private
+   */
+		this.ready = Promise.all([this.loaded.manifest, this.loaded.spine, this.loaded.metadata, this.loaded.cover, this.loaded.navigation, this.loaded.resources]);
+
+		// Queue for methods used before opening
+		this.isRendered = false;
+		// this._q = queue(this);
+
+		/**
+   * @property {method} request
+   * @private
+   */
+		this.request = this.settings.requestMethod || _request3.default;
+
+		/**
+   * @property {Spine} spine
+   */
+		this.spine = new _spine2.default();
+
+		/**
+   * @property {Locations} locations
+   */
+		this.locations = new _locations2.default(this.spine, this.load.bind(this));
+
+		/**
+   * @property {Navigation} navigation
+   */
+		this.navigation = undefined;
+
+		/**
+   * @property {PageList} pagelist
+   */
+		this.pageList = new _pagelist2.default();
+
+		/**
+   * @property {Url} url
+   * @private
+   */
+		this.url = undefined;
+
+		/**
+   * @property {Path} path
+   * @private
+   */
+		this.path = undefined;
+
+		/**
+   * @property {boolean} archived
+   * @private
+   */
+		this.archived = false;
+
+		/**
+   * @property {Archive} archive
+   * @private
+   */
+		this.archive = undefined;
+
+		/**
+   * @property {Resources} resources
+   * @private
+   */
+		this.resources = undefined;
+
+		/**
+   * @property {Rendition} rendition
+   * @private
+   */
+		this.rendition = undefined;
+
+		this.container = undefined;
+		this.packaging = undefined;
+		this.toc = undefined;
+
+		if (url) {
+			this.open(url).catch(function (error) {
+				var err = new Error("Cannot load book at " + url);
+				// console.error(err);
+				_this.emit("openFailed", err);
+			});
+		}
+	}
+
+	/**
+  * Open a epub or url
+  * @param {string} input URL, Path or ArrayBuffer
+  * @param {string} [what] to force opening
+  * @returns {Promise} of when the book has been loaded
+  * @example book.open("/path/to/book.epub")
+  */
+
+
+	_createClass(Book, [{
+		key: "open",
+		value: function open(input, what) {
+			var opening;
+			var type = what || this.determineType(input);
+
+			if (type === "binary") {
+				this.archived = true;
+				this.url = new _url2.default("/", "");
+				opening = this.openEpub(input);
+			} else if (type === "base64") {
+				this.archived = true;
+				this.url = new _url2.default("/", "");
+				opening = this.openEpub(input, type);
+			} else if (type === "epub") {
+				this.archived = true;
+				this.url = new _url2.default("/", "");
+				opening = this.request(input, "binary").then(this.openEpub.bind(this));
+			} else if (type == "opf") {
+				this.url = new _url2.default(input);
+				opening = this.openPackaging(this.url.Path.toString());
+			} else if (type == "json") {
+				this.url = new _url2.default(input);
+				opening = this.openManifest(this.url.Path.toString());
+			} else {
+				this.url = new _url2.default(input);
+				opening = this.openContainer(CONTAINER_PATH).then(this.openPackaging.bind(this));
+			}
+
+			return opening;
+		}
+
+		/**
+   * Open an archived epub
+   * @private
+   * @param  {binary} data
+   * @param  {[string]} encoding
+   * @return {Promise}
+   */
+
+	}, {
+		key: "openEpub",
+		value: function openEpub(data, encoding) {
+			var _this2 = this;
+
+			return this.unarchive(data, encoding || this.settings.encoding).then(function () {
+				return _this2.openContainer(CONTAINER_PATH);
+			}).then(function (packagePath) {
+				return _this2.openPackaging(packagePath);
+			});
+		}
+
+		/**
+   * Open the epub container
+   * @private
+   * @param  {string} url
+   * @return {string} packagePath
+   */
+
+	}, {
+		key: "openContainer",
+		value: function openContainer(url) {
+			var _this3 = this;
+
+			return this.load(url).then(function (xml) {
+				_this3.container = new _container2.default(xml);
+				return _this3.resolve(_this3.container.packagePath);
+			});
+		}
+
+		/**
+   * Open the Open Packaging Format Xml
+   * @private
+   * @param  {string} url
+   * @return {Promise}
+   */
+
+	}, {
+		key: "openPackaging",
+		value: function openPackaging(url) {
+			var _this4 = this;
+
+			this.path = new _path2.default(url);
+			return this.load(url).then(function (xml) {
+				_this4.packaging = new _packaging2.default(xml);
+				return _this4.unpack(_this4.packaging);
+			});
+		}
+
+		/**
+   * Open the manifest JSON
+   * @private
+   * @param  {string} url
+   * @return {Promise}
+   */
+
+	}, {
+		key: "openManifest",
+		value: function openManifest(url) {
+			var _this5 = this;
+
+			this.path = new _path2.default(url);
+			return this.load(url).then(function (json) {
+				_this5.packaging = new _packaging2.default();
+				_this5.packaging.load(json);
+				return _this5.unpack(_this5.packaging);
+			});
+		}
+
+		/**
+   * Load a resource from the Book
+   * @param  {string} path path to the resource to load
+   * @return {Promise}     returns a promise with the requested resource
+   */
+
+	}, {
+		key: "load",
+		value: function load(path) {
+			var resolved;
+
+			if (this.archived) {
+				resolved = this.resolve(path);
+				return this.archive.request(resolved);
+			} else {
+				resolved = this.resolve(path);
+				return this.request(resolved, null, this.settings.requestCredentials, this.settings.requestHeaders);
+			}
+		}
+
+		/**
+   * Resolve a path to it's absolute position in the Book
+   * @param  {string} path
+   * @param  {[boolean]} absolute force resolving the full URL
+   * @return {string}          the resolved path string
+   */
+
+	}, {
+		key: "resolve",
+		value: function resolve(path, absolute) {
+			if (!path) {
+				return;
+			}
+			var resolved = path;
+			var isAbsolute = path.indexOf("://") > -1;
+
+			if (isAbsolute) {
+				return path;
+			}
+
+			if (this.path) {
+				resolved = this.path.resolve(path);
+			}
+
+			if (absolute != false && this.url) {
+				resolved = this.url.resolve(resolved);
+			}
+
+			return resolved;
+		}
+
+		/**
+   * Determine the type of they input passed to open
+   * @private
+   * @param  {string} input
+   * @return {string}  binary | directory | epub | opf
+   */
+
+	}, {
+		key: "determineType",
+		value: function determineType(input) {
+			var url;
+			var path;
+			var extension;
+
+			if (this.settings.encoding === "base64") {
+				return "base64";
+			}
+
+			if (typeof input != "string") {
+				return "binary";
+			}
+
+			url = new _url2.default(input);
+			path = url.path();
+			extension = path.extension;
+
+			if (!extension) {
+				return "directory";
+			}
+
+			if (extension === "epub") {
+				return "epub";
+			}
+
+			if (extension === "opf") {
+				return "opf";
+			}
+
+			if (extension === "json") {
+				return "json";
+			}
+		}
+
+		/**
+   * unpack the contents of the Books packageXml
+   * @private
+   * @param {document} packageXml XML Document
+   */
+
+	}, {
+		key: "unpack",
+		value: function unpack(opf) {
+			var _this6 = this;
+
+			this.package = opf;
+
+			this.spine.unpack(this.package, this.resolve.bind(this));
+
+			this.resources = new _resources2.default(this.package.manifest, {
+				archive: this.archive,
+				resolver: this.resolve.bind(this),
+				request: this.request.bind(this),
+				replacements: this.settings.replacements || "base64"
+			});
+
+			this.loadNavigation(this.package).then(function () {
+				_this6.toc = _this6.navigation.toc;
+				_this6.loading.navigation.resolve(_this6.navigation);
+			});
+
+			if (this.package.coverPath) {
+				this.cover = this.resolve(this.package.coverPath);
+			}
+			// Resolve promises
+			this.loading.manifest.resolve(this.package.manifest);
+			this.loading.metadata.resolve(this.package.metadata);
+			this.loading.spine.resolve(this.spine);
+			this.loading.cover.resolve(this.cover);
+			this.loading.resources.resolve(this.resources);
+			this.loading.pageList.resolve(this.pageList);
+
+			this.isOpen = true;
+
+			if (this.archived || this.settings.replacements && this.settings.replacements != "none") {
+				this.replacements().then(function () {
+					_this6.opening.resolve(_this6);
+				}).catch(function (err) {
+					console.error(err);
+				});
+			} else {
+				// Resolve book opened promise
+				this.opening.resolve(this);
+			}
+		}
+
+		/**
+   * Load Navigation and PageList from package
+   * @private
+   * @param {document} opf XML Document
+   */
+
+	}, {
+		key: "loadNavigation",
+		value: function loadNavigation(opf) {
+			var _this7 = this;
+
+			var navPath = opf.navPath || opf.ncxPath;
+			var toc = opf.toc;
+
+			if (toc) {
+				return new Promise(function (resolve, reject) {
+					_this7.navigation = new _navigation2.default(toc);
+
+					_this7.pageList = new _pagelist2.default(); // TODO: handle page lists
+
+					resolve(_this7.navigation);
+				});
+			}
+
+			if (!navPath) {
+				return new Promise(function (resolve, reject) {
+					_this7.navigation = new _navigation2.default();
+					_this7.pageList = new _pagelist2.default();
+
+					resolve(_this7.navigation);
+				});
+			}
+
+			return this.load(navPath, "xml").then(function (xml) {
+				_this7.navigation = new _navigation2.default(xml);
+				_this7.pageList = new _pagelist2.default(xml);
+				return _this7.navigation;
+			});
+		}
+
+		/**
+   * Alias for book.spine.get
+   * @param {string} target
+   */
+
+	}, {
+		key: "section",
+		value: function section(target) {
+			return this.spine.get(target);
+		}
+
+		/**
+   * Sugar to render a book
+   * @param  {element} element element to add the views to
+   * @param  {[object]} options
+   * @return {Rendition}
+   */
+
+	}, {
+		key: "renderTo",
+		value: function renderTo(element, options) {
+			// var renderMethod = (options && options.method) ?
+			//     options.method :
+			//     "single";
+
+			this.rendition = new _rendition2.default(this, options);
+			this.rendition.attachTo(element);
+
+			return this.rendition;
+		}
+
+		/**
+   * Set if request should use withCredentials
+   * @param {boolean} credentials
+   */
+
+	}, {
+		key: "setRequestCredentials",
+		value: function setRequestCredentials(credentials) {
+			this.settings.requestCredentials = credentials;
+		}
+
+		/**
+   * Set headers request should use
+   * @param {object} headers
+   */
+
+	}, {
+		key: "setRequestHeaders",
+		value: function setRequestHeaders(headers) {
+			this.settings.requestHeaders = headers;
+		}
+
+		/**
+   * Unarchive a zipped epub
+   * @private
+   * @param  {binary} input epub data
+   * @param  {[string]} encoding
+   * @return {Archive}
+   */
+
+	}, {
+		key: "unarchive",
+		value: function unarchive(input, encoding) {
+			this.archive = new _archive2.default();
+			return this.archive.open(input, encoding);
+		}
+
+		/**
+   * Get the cover url
+   * @return {string} coverUrl
+   */
+
+	}, {
+		key: "coverUrl",
+		value: function coverUrl() {
+			var _this8 = this;
+
+			var retrieved = this.loaded.cover.then(function (url) {
+				if (_this8.archived) {
+					// return this.archive.createUrl(this.cover);
+					return _this8.resources.get(_this8.cover);
+				} else {
+					return _this8.cover;
+				}
+			});
+
+			return retrieved;
+		}
+
+		/**
+   * load replacement urls
+   * @private
+   * @return {Promise} completed loading urls
+   */
+
+	}, {
+		key: "replacements",
+		value: function replacements() {
+			var _this9 = this;
+
+			this.spine.hooks.serialize.register(function (output, section) {
+				section.output = _this9.resources.substitute(output, section.url);
+			});
+
+			return this.resources.replacements().then(function () {
+				return _this9.resources.replaceCss();
+			});
+		}
+
+		/**
+   * Find a DOM Range for a given CFI Range
+   * @param  {EpubCFI} cfiRange a epub cfi range
+   * @return {Range}
+   */
+
+	}, {
+		key: "getRange",
+		value: function getRange(cfiRange) {
+			var cfi = new _epubcfi2.default(cfiRange);
+			var item = this.spine.get(cfi.spinePos);
+			var _request = this.load.bind(this);
+			if (!item) {
+				return new Promise(function (resolve, reject) {
+					reject("CFI could not be found");
+				});
+			}
+			return item.load(_request).then(function (contents) {
+				var range = cfi.toRange(item.document);
+				return range;
+			});
+		}
+
+		/**
+   * Generates the Book Key using the identifer in the manifest or other string provided
+   * @param  {[string]} identifier to use instead of metadata identifier
+   * @return {string} key
+   */
+
+	}, {
+		key: "key",
+		value: function key(identifier) {
+			var ident = identifier || this.package.metadata.identifier || this.url.filename;
+			return "epubjs:" + EPUBJS_VERSION + ":" + ident;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.opened = undefined;
+			this.loading = undefined;
+			this.loaded = undefined;
+			this.ready = undefined;
+
+			this.isOpen = false;
+			this.isRendered = false;
+
+			this.spine && this.spine.destroy();
+			this.locations && this.locations.destroy();
+			this.pageList && this.pageList.destroy();
+			this.archive && this.archive.destroy();
+			this.resources && this.resources.destroy();
+			this.container && this.container.destroy();
+			this.packaging && this.packaging.destroy();
+			this.rendition && this.rendition.destroy();
+
+			this.spine = undefined;
+			this.locations = undefined;
+			this.pageList = undefined;
+			this.archive = undefined;
+			this.resources = undefined;
+			this.container = undefined;
+			this.packaging = undefined;
+			this.rendition = undefined;
+
+			this.navigation = undefined;
+			this.url = undefined;
+			this.path = undefined;
+			this.archived = false;
+			this.toc = undefined;
+		}
+	}]);
+
+	return Book;
+}();
+
+//-- Enable binding events to book
+
+
+(0, _eventEmitter2.default)(Book.prototype);
+
+exports.default = Book;
+module.exports = exports["default"];
+
+/***/ }),
+/* 22 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var assign        = __webpack_require__(23)
+  , normalizeOpts = __webpack_require__(30)
+  , isCallable    = __webpack_require__(31)
+  , contains      = __webpack_require__(32)
+
+  , d;
+
+d = module.exports = function (dscr, value/*, options*/) {
+	var c, e, w, options, desc;
+	if ((arguments.length < 2) || (typeof dscr !== 'string')) {
+		options = value;
+		value = dscr;
+		dscr = null;
+	} else {
+		options = arguments[2];
+	}
+	if (dscr == null) {
+		c = w = true;
+		e = false;
+	} else {
+		c = contains.call(dscr, 'c');
+		e = contains.call(dscr, 'e');
+		w = contains.call(dscr, 'w');
+	}
+
+	desc = { value: value, configurable: c, enumerable: e, writable: w };
+	return !options ? desc : assign(normalizeOpts(options), desc);
+};
+
+d.gs = function (dscr, get, set/*, options*/) {
+	var c, e, options, desc;
+	if (typeof dscr !== 'string') {
+		options = set;
+		set = get;
+		get = dscr;
+		dscr = null;
+	} else {
+		options = arguments[3];
+	}
+	if (get == null) {
+		get = undefined;
+	} else if (!isCallable(get)) {
+		options = get;
+		get = set = undefined;
+	} else if (set == null) {
+		set = undefined;
+	} else if (!isCallable(set)) {
+		options = set;
+		set = undefined;
+	}
+	if (dscr == null) {
+		c = true;
+		e = false;
+	} else {
+		c = contains.call(dscr, 'c');
+		e = contains.call(dscr, 'e');
+	}
+
+	desc = { get: get, set: set, configurable: c, enumerable: e };
+	return !options ? desc : assign(normalizeOpts(options), desc);
+};
+
+
+/***/ }),
+/* 23 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = __webpack_require__(24)()
+	? Object.assign
+	: __webpack_require__(25);
+
+
+/***/ }),
+/* 24 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function () {
+	var assign = Object.assign, obj;
+	if (typeof assign !== 'function') return false;
+	obj = { foo: 'raz' };
+	assign(obj, { bar: 'dwa' }, { trzy: 'trzy' });
+	return (obj.foo + obj.bar + obj.trzy) === 'razdwatrzy';
+};
+
+
+/***/ }),
+/* 25 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var keys  = __webpack_require__(26)
+  , value = __webpack_require__(29)
+
+  , max = Math.max;
+
+module.exports = function (dest, src/*, …srcn*/) {
+	var error, i, l = max(arguments.length, 2), assign;
+	dest = Object(value(dest));
+	assign = function (key) {
+		try { dest[key] = src[key]; } catch (e) {
+			if (!error) error = e;
+		}
 	};
+	for (i = 1; i < l; ++i) {
+		src = arguments[i];
+		keys(src).forEach(assign);
+	}
+	if (error !== undefined) throw error;
+	return dest;
+};
 
-})();
 
+/***/ }),
+/* 26 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = __webpack_require__(27)()
+	? Object.keys
+	: __webpack_require__(28);
+
+
+/***/ }),
+/* 27 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function () {
+	try {
+		Object.keys('primitive');
+		return true;
+	} catch (e) { return false; }
+};
+
+
+/***/ }),
+/* 28 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var keys = Object.keys;
+
+module.exports = function (object) {
+	return keys(object == null ? object : Object(object));
+};
+
+
+/***/ }),
+/* 29 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function (value) {
+	if (value == null) throw new TypeError("Cannot use null or undefined");
+	return value;
+};
+
+
+/***/ }),
+/* 30 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var forEach = Array.prototype.forEach, create = Object.create;
+
+var process = function (src, obj) {
+	var key;
+	for (key in src) obj[key] = src[key];
+};
+
+module.exports = function (options/*, …options*/) {
+	var result = create(null);
+	forEach.call(arguments, function (options) {
+		if (options == null) return;
+		process(Object(options), result);
+	});
+	return result;
+};
+
+
+/***/ }),
+/* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// Deprecated
+
+
+
+module.exports = function (obj) { return typeof obj === 'function'; };
+
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = __webpack_require__(33)()
+	? String.prototype.contains
+	: __webpack_require__(34);
+
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var str = 'razdwatrzy';
+
+module.exports = function () {
+	if (typeof str.contains !== 'function') return false;
+	return ((str.contains('dwa') === true) && (str.contains('foo') === false));
+};
+
+
+/***/ }),
+/* 34 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var indexOf = String.prototype.indexOf;
+
+module.exports = function (searchString/*, position*/) {
+	return indexOf.call(this, searchString, arguments[1]) > -1;
+};
+
+
+/***/ }),
+/* 35 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function (fn) {
+	if (typeof fn !== 'function') throw new TypeError(fn + " is not a function");
+	return fn;
+};
+
+
+/***/ }),
+/* 36 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _hook = __webpack_require__(8);
+
+var _hook2 = _interopRequireDefault(_hook);
+
+var _section = __webpack_require__(37);
+
+var _section2 = _interopRequireDefault(_section);
+
+var _replacements = __webpack_require__(6);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * A collection of Spine Items
+ */
+var Spine = function () {
+	function Spine() {
+		_classCallCheck(this, Spine);
+
+		this.spineItems = [];
+		this.spineByHref = {};
+		this.spineById = {};
+
+		this.hooks = {};
+		this.hooks.serialize = new _hook2.default();
+		this.hooks.content = new _hook2.default();
+
+		// Register replacements
+		this.hooks.content.register(_replacements.replaceBase);
+		this.hooks.content.register(_replacements.replaceCanonical);
+		this.hooks.content.register(_replacements.replaceMeta);
+
+		this.epubcfi = new _epubcfi2.default();
+
+		this.loaded = false;
+
+		this.items = undefined;
+		this.manifest = undefined;
+		this.spineNodeIndex = undefined;
+		this.baseUrl = undefined;
+		this.length = undefined;
+	}
+
+	/**
+  * Unpack items from a opf into spine items
+  * @param  {Package} _package
+  * @param  {method} resolver URL resolver
+  */
+
+
+	_createClass(Spine, [{
+		key: "unpack",
+		value: function unpack(_package, resolver) {
+			var _this = this;
+
+			this.items = _package.spine;
+			this.manifest = _package.manifest;
+			this.spineNodeIndex = _package.spineNodeIndex;
+			this.baseUrl = _package.baseUrl || _package.basePath || "";
+			this.length = this.items.length;
+
+			this.items.forEach(function (item, index) {
+				var manifestItem = _this.manifest[item.idref];
+				var spineItem;
+
+				item.index = index;
+				item.cfiBase = _this.epubcfi.generateChapterComponent(_this.spineNodeIndex, item.index, item.idref);
+
+				if (item.href) {
+					item.url = resolver(item.href, true);
+				}
+
+				if (manifestItem) {
+					item.href = manifestItem.href;
+					item.url = resolver(item.href, true);
+					if (manifestItem.properties.length) {
+						item.properties.push.apply(item.properties, manifestItem.properties);
+					}
+				}
+
+				if (item.linear === "yes") {
+					item.prev = function () {
+						var prevIndex = item.index;
+						while (prevIndex > 0) {
+							var prev = this.get(prevIndex - 1);
+							if (prev && prev.linear) {
+								return prev;
+							}
+							prevIndex -= 1;
+						}
+						return;
+					}.bind(_this);
+					item.next = function () {
+						var nextIndex = item.index;
+						while (nextIndex < this.spineItems.length - 1) {
+							var next = this.get(nextIndex + 1);
+							if (next && next.linear) {
+								return next;
+							}
+							nextIndex += 1;
+						}
+						return;
+					}.bind(_this);
+				} else {
+					item.prev = function () {
+						return;
+					};
+					item.next = function () {
+						return;
+					};
+				}
+
+				spineItem = new _section2.default(item, _this.hooks);
+
+				_this.append(spineItem);
+			});
+
+			this.loaded = true;
+		}
+
+		/**
+   * Get an item from the spine
+   * @param  {[string|int]} target
+   * @return {Section} section
+   * @example spine.get();
+   * @example spine.get(1);
+   * @example spine.get("chap1.html");
+   * @example spine.get("#id1234");
+   */
+
+	}, {
+		key: "get",
+		value: function get(target) {
+			var index = 0;
+
+			if (typeof target === "undefined") {
+				while (index < this.spineItems.length) {
+					var next = this.spineItems[index];
+					if (next && next.linear) {
+						break;
+					}
+					index += 1;
+				}
+			} else if (this.epubcfi.isCfiString(target)) {
+				var cfi = new _epubcfi2.default(target);
+				index = cfi.spinePos;
+			} else if (typeof target === "number" || isNaN(target) === false) {
+				index = target;
+			} else if (typeof target === "string" && target.indexOf("#") === 0) {
+				index = this.spineById[target.substring(1)];
+			} else if (typeof target === "string") {
+				// Remove fragments
+				target = target.split("#")[0];
+				index = this.spineByHref[target];
+			}
+
+			return this.spineItems[index] || null;
+		}
+
+		/**
+   * Append a Section to the Spine
+   * @private
+   * @param  {Section} section
+   */
+
+	}, {
+		key: "append",
+		value: function append(section) {
+			var index = this.spineItems.length;
+			section.index = index;
+
+			this.spineItems.push(section);
+
+			this.spineByHref[section.href] = index;
+			this.spineById[section.idref] = index;
+
+			return index;
+		}
+
+		/**
+   * Prepend a Section to the Spine
+   * @private
+   * @param  {Section} section
+   */
+
+	}, {
+		key: "prepend",
+		value: function prepend(section) {
+			// var index = this.spineItems.unshift(section);
+			this.spineByHref[section.href] = 0;
+			this.spineById[section.idref] = 0;
+
+			// Re-index
+			this.spineItems.forEach(function (item, index) {
+				item.index = index;
+			});
+
+			return 0;
+		}
+
+		// insert(section, index) {
+		//
+		// };
+
+		/**
+   * Remove a Section from the Spine
+   * @private
+   * @param  {Section} section
+   */
+
+	}, {
+		key: "remove",
+		value: function remove(section) {
+			var index = this.spineItems.indexOf(section);
+
+			if (index > -1) {
+				delete this.spineByHref[section.href];
+				delete this.spineById[section.idref];
+
+				return this.spineItems.splice(index, 1);
+			}
+		}
+
+		/**
+   * Loop over the Sections in the Spine
+   * @return {method} forEach
+   */
+
+	}, {
+		key: "each",
+		value: function each() {
+			return this.spineItems.forEach.apply(this.spineItems, arguments);
+		}
+	}, {
+		key: "first",
+		value: function first() {
+			var index = 0;
+
+			while (index < this.spineItems.length - 1) {
+				var next = this.get(index);
+				if (next && next.linear) {
+					return next;
+				}
+				index += 1;
+			}
+		}
+	}, {
+		key: "last",
+		value: function last() {
+			var index = this.spineItems.length - 1;
+
+			while (index > 0) {
+				var prev = this.get(index);
+				if (prev && prev.linear) {
+					return prev;
+				}
+				index -= 1;
+			}
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.each(function (section) {
+				return section.destroy();
+			});
+
+			this.spineItems = undefined;
+			this.spineByHref = undefined;
+			this.spineById = undefined;
+
+			this.hooks.serialize.clear();
+			this.hooks.content.clear();
+			this.hooks = undefined;
+
+			this.epubcfi = undefined;
+
+			this.loaded = false;
+
+			this.items = undefined;
+			this.manifest = undefined;
+			this.spineNodeIndex = undefined;
+			this.baseUrl = undefined;
+			this.length = undefined;
+		}
+	}]);
+
+	return Spine;
+}();
+
+exports.default = Spine;
+module.exports = exports["default"];
+
+/***/ }),
+/* 37 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _hook = __webpack_require__(8);
+
+var _hook2 = _interopRequireDefault(_hook);
+
+var _replacements = __webpack_require__(6);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Represents a Section of the Book
+ * In most books this is equivelent to a Chapter
+ * @param {object} item  The spine item representing the section
+ * @param {object} hooks hooks for serialize and content
+ */
+var Section = function () {
+	function Section(item, hooks) {
+		_classCallCheck(this, Section);
+
+		this.idref = item.idref;
+		this.linear = item.linear === "yes";
+		this.properties = item.properties;
+		this.index = item.index;
+		this.href = item.href;
+		this.url = item.url;
+		this.next = item.next;
+		this.prev = item.prev;
+
+		this.cfiBase = item.cfiBase;
+
+		if (hooks) {
+			this.hooks = hooks;
+		} else {
+			this.hooks = {};
+			this.hooks.serialize = new _hook2.default(this);
+			this.hooks.content = new _hook2.default(this);
+		}
+
+		this.document = undefined;
+		this.contents = undefined;
+		this.output = undefined;
+	}
+
+	/**
+  * Load the section from its url
+  * @param  {method} _request a request method to use for loading
+  * @return {document} a promise with the xml document
+  */
+
+
+	_createClass(Section, [{
+		key: "load",
+		value: function load(_request) {
+			var request = _request || this.request || __webpack_require__(9);
+			var loading = new _core.defer();
+			var loaded = loading.promise;
+
+			if (this.contents) {
+				loading.resolve(this.contents);
+			} else {
+				request(this.url).then(function (xml) {
+					// var directory = new Url(this.url).directory;
+
+					this.document = xml;
+					this.contents = xml.documentElement;
+
+					return this.hooks.content.trigger(this.document, this);
+				}.bind(this)).then(function () {
+					loading.resolve(this.contents);
+				}.bind(this)).catch(function (error) {
+					loading.reject(error);
+				});
+			}
+
+			return loaded;
+		}
+
+		/**
+   * Adds a base tag for resolving urls in the section
+   * @private
+   */
+
+	}, {
+		key: "base",
+		value: function base() {
+			return (0, _replacements.replaceBase)(this.document, this);
+		}
+
+		/**
+   * Render the contents of a section
+   * @param  {method} _request a request method to use for loading
+   * @return {string} output a serialized XML Document
+   */
+
+	}, {
+		key: "render",
+		value: function render(_request) {
+			var rendering = new _core.defer();
+			var rendered = rendering.promise;
+			this.output; // TODO: better way to return this from hooks?
+
+			this.load(_request).then(function (contents) {
+				var userAgent = typeof navigator !== 'undefined' && navigator.userAgent || '';
+				var isIE = userAgent.indexOf('Trident') >= 0;
+				var Serializer;
+				if (typeof XMLSerializer === "undefined" || isIE) {
+					Serializer = __webpack_require__(13).XMLSerializer;
+				} else {
+					Serializer = XMLSerializer;
+				}
+				var serializer = new Serializer();
+				this.output = serializer.serializeToString(contents);
+				return this.output;
+			}.bind(this)).then(function () {
+				return this.hooks.serialize.trigger(this.output, this);
+			}.bind(this)).then(function () {
+				rendering.resolve(this.output);
+			}.bind(this)).catch(function (error) {
+				rendering.reject(error);
+			});
+
+			return rendered;
+		}
+
+		/**
+   * Find a string in a section
+   * @param  {string} _query The query string to find
+   * @return {object[]} A list of matches, with form {cfi, excerpt}
+   */
+
+	}, {
+		key: "find",
+		value: function find(_query) {
+			var section = this;
+			var matches = [];
+			var query = _query.toLowerCase();
+			var find = function find(node) {
+				var text = node.textContent.toLowerCase();
+				var range = section.document.createRange();
+				var cfi;
+				var pos;
+				var last = -1;
+				var excerpt;
+				var limit = 150;
+
+				while (pos != -1) {
+					// Search for the query
+					pos = text.indexOf(query, last + 1);
+
+					if (pos != -1) {
+						// We found it! Generate a CFI
+						range = section.document.createRange();
+						range.setStart(node, pos);
+						range.setEnd(node, pos + query.length);
+
+						cfi = section.cfiFromRange(range);
+
+						// Generate the excerpt
+						if (node.textContent.length < limit) {
+							excerpt = node.textContent;
+						} else {
+							excerpt = node.textContent.substring(pos - limit / 2, pos + limit / 2);
+							excerpt = "..." + excerpt + "...";
+						}
+
+						// Add the CFI to the matches list
+						matches.push({
+							cfi: cfi,
+							excerpt: excerpt
+						});
+					}
+
+					last = pos;
+				}
+			};
+
+			(0, _core.sprint)(section.document, function (node) {
+				find(node);
+			});
+
+			return matches;
+		}
+	}, {
+		key: "reconcileLayoutSettings",
+
+
+		/**
+  * Reconciles the current chapters layout properies with
+  * the global layout properities.
+  * @param {object} global  The globa layout settings object, chapter properties string
+  * @return {object} layoutProperties Object with layout properties
+  */
+		value: function reconcileLayoutSettings(global) {
+			//-- Get the global defaults
+			var settings = {
+				layout: global.layout,
+				spread: global.spread,
+				orientation: global.orientation
+			};
+
+			//-- Get the chapter's display type
+			this.properties.forEach(function (prop) {
+				var rendition = prop.replace("rendition:", "");
+				var split = rendition.indexOf("-");
+				var property, value;
+
+				if (split != -1) {
+					property = rendition.slice(0, split);
+					value = rendition.slice(split + 1);
+
+					settings[property] = value;
+				}
+			});
+			return settings;
+		}
+
+		/**
+   * Get a CFI from a Range in the Section
+   * @param  {range} _range
+   * @return {string} cfi an EpubCFI string
+   */
+
+	}, {
+		key: "cfiFromRange",
+		value: function cfiFromRange(_range) {
+			return new _epubcfi2.default(_range, this.cfiBase).toString();
+		}
+
+		/**
+   * Get a CFI from an Element in the Section
+   * @param  {element} el
+   * @return {string} cfi an EpubCFI string
+   */
+
+	}, {
+		key: "cfiFromElement",
+		value: function cfiFromElement(el) {
+			return new _epubcfi2.default(el, this.cfiBase).toString();
+		}
+
+		/**
+   * Unload the section document
+   */
+
+	}, {
+		key: "unload",
+		value: function unload() {
+			this.document = undefined;
+			this.contents = undefined;
+			this.output = undefined;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.unload();
+			this.hooks.serialize.clear();
+			this.hooks.content.clear();
+
+			this.hooks = undefined;
+			this.idref = undefined;
+			this.linear = undefined;
+			this.properties = undefined;
+			this.index = undefined;
+			this.href = undefined;
+			this.url = undefined;
+			this.next = undefined;
+			this.prev = undefined;
+
+			this.cfiBase = undefined;
+		}
+	}]);
+
+	return Section;
+}();
+
+exports.default = Section;
+module.exports = exports["default"];
+
+/***/ }),
+/* 38 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+var _queue = __webpack_require__(10);
+
+var _queue2 = _interopRequireDefault(_queue);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Find Locations for a Book
+ * @param {Spine} spine
+ * @param {request} request
+ */
+var Locations = function () {
+	function Locations(spine, request, pause) {
+		_classCallCheck(this, Locations);
+
+		this.spine = spine;
+		this.request = request;
+		this.pause = pause || 100;
+
+		this.q = new _queue2.default(this);
+		this.epubcfi = new _epubcfi2.default();
+
+		this._locations = [];
+		this.total = 0;
+
+		this.break = 150;
+
+		this._current = 0;
+
+		this.currentLocation = '';
+		this._currentCfi = '';
+		this.processingTimeout = undefined;
+	}
+
+	/**
+  * Load all of sections in the book to generate locations
+  * @param  {int} chars how many chars to split on
+  * @return {object} locations
+  */
+
+
+	_createClass(Locations, [{
+		key: "generate",
+		value: function generate(chars) {
+
+			if (chars) {
+				this.break = chars;
+			}
+
+			this.q.pause();
+
+			this.spine.each(function (section) {
+				if (section.linear) {
+					this.q.enqueue(this.process.bind(this), section);
+				}
+			}.bind(this));
+
+			return this.q.run().then(function () {
+				this.total = this._locations.length - 1;
+
+				if (this._currentCfi) {
+					this.currentLocation = this._currentCfi;
+				}
+
+				return this._locations;
+				// console.log(this.percentage(this.book.rendition.location.start), this.percentage(this.book.rendition.location.end));
+			}.bind(this));
+		}
+	}, {
+		key: "createRange",
+		value: function createRange() {
+			return {
+				startContainer: undefined,
+				startOffset: undefined,
+				endContainer: undefined,
+				endOffset: undefined
+			};
+		}
+	}, {
+		key: "process",
+		value: function process(section) {
+
+			return section.load(this.request).then(function (contents) {
+				var completed = new _core.defer();
+				var locations = this.parse(contents, section.cfiBase);
+				this._locations = this._locations.concat(locations);
+
+				section.unload();
+
+				this.processingTimeout = setTimeout(function () {
+					return completed.resolve(locations);
+				}, this.pause);
+				return completed.promise;
+			}.bind(this));
+		}
+	}, {
+		key: "parse",
+		value: function parse(contents, cfiBase, chars) {
+			var locations = [];
+			var range;
+			var doc = contents.ownerDocument;
+			var body = (0, _core.qs)(doc, "body");
+			var counter = 0;
+			var prev;
+			var _break = chars || this.break;
+			var parser = function parser(node) {
+				var len = node.length;
+				var dist;
+				var pos = 0;
+
+				if (node.textContent.trim().length === 0) {
+					return false; // continue
+				}
+
+				// Start range
+				if (counter == 0) {
+					range = this.createRange();
+					range.startContainer = node;
+					range.startOffset = 0;
+				}
+
+				dist = _break - counter;
+
+				// Node is smaller than a break,
+				// skip over it
+				if (dist > len) {
+					counter += len;
+					pos = len;
+				}
+
+				while (pos < len) {
+					dist = _break - counter;
+
+					if (counter === 0) {
+						// Start new range
+						pos += 1;
+						range = this.createRange();
+						range.startContainer = node;
+						range.startOffset = pos;
+					}
+
+					// pos += dist;
+
+					// Gone over
+					if (pos + dist >= len) {
+						// Continue counter for next node
+						counter += len - pos;
+						// break
+						pos = len;
+						// At End
+					} else {
+						// Advance pos
+						pos += dist;
+
+						// End the previous range
+						range.endContainer = node;
+						range.endOffset = pos;
+						// cfi = section.cfiFromRange(range);
+						var cfi = new _epubcfi2.default(range, cfiBase).toString();
+						locations.push(cfi);
+						counter = 0;
+					}
+				}
+				prev = node;
+			};
+
+			(0, _core.sprint)(body, parser.bind(this));
+
+			// Close remaining
+			if (range && range.startContainer && prev) {
+				range.endContainer = prev;
+				range.endOffset = prev.length;
+				var cfi = new _epubcfi2.default(range, cfiBase).toString();
+				locations.push(cfi);
+				counter = 0;
+			}
+
+			return locations;
+		}
+	}, {
+		key: "locationFromCfi",
+		value: function locationFromCfi(cfi) {
+			var loc = void 0;
+			if (_epubcfi2.default.prototype.isCfiString(cfi)) {
+				cfi = new _epubcfi2.default(cfi);
+			}
+			// Check if the location has not been set yet
+			if (this._locations.length === 0) {
+				return -1;
+			}
+
+			loc = (0, _core.locationOf)(cfi, this._locations, this.epubcfi.compare);
+
+			if (loc > this.total) {
+				return this.total;
+			}
+
+			return loc;
+		}
+	}, {
+		key: "percentageFromCfi",
+		value: function percentageFromCfi(cfi) {
+			if (this._locations.length === 0) {
+				return null;
+			}
+			// Find closest cfi
+			var loc = this.locationFromCfi(cfi);
+			// Get percentage in total
+			return this.percentageFromLocation(loc);
+		}
+	}, {
+		key: "percentageFromLocation",
+		value: function percentageFromLocation(loc) {
+			if (!loc || !this.total) {
+				return 0;
+			}
+
+			return loc / this.total;
+		}
+	}, {
+		key: "cfiFromLocation",
+		value: function cfiFromLocation(loc) {
+			var cfi = -1;
+			// check that pg is an int
+			if (typeof loc != "number") {
+				loc = parseInt(loc);
+			}
+
+			if (loc >= 0 && loc < this._locations.length) {
+				cfi = this._locations[loc];
+			}
+
+			return cfi;
+		}
+	}, {
+		key: "cfiFromPercentage",
+		value: function cfiFromPercentage(percentage) {
+			var loc = void 0;
+			if (percentage > 1) {
+				console.warn("Normalize cfiFromPercentage value to between 0 - 1");
+			}
+
+			// Make sure 1 goes to very end
+			if (percentage >= 1) {
+				var cfi = new _epubcfi2.default(this._locations[this.total]);
+				cfi.collapse();
+				return cfi.toString();
+			}
+
+			loc = Math.ceil(this.total * percentage);
+			return this.cfiFromLocation(loc);
+		}
+	}, {
+		key: "load",
+		value: function load(locations) {
+			if (typeof locations === "string") {
+				this._locations = JSON.parse(locations);
+			} else {
+				this._locations = locations;
+			}
+			this.total = this._locations.length - 1;
+			return this._locations;
+		}
+	}, {
+		key: "save",
+		value: function save(json) {
+			return JSON.stringify(this._locations);
+		}
+	}, {
+		key: "getCurrent",
+		value: function getCurrent(json) {
+			return this._current;
+		}
+	}, {
+		key: "setCurrent",
+		value: function setCurrent(curr) {
+			var loc;
+
+			if (typeof curr == "string") {
+				this._currentCfi = curr;
+			} else if (typeof curr == "number") {
+				this._current = curr;
+			} else {
+				return;
+			}
+
+			if (this._locations.length === 0) {
+				return;
+			}
+
+			if (typeof curr == "string") {
+				loc = this.locationFromCfi(curr);
+				this._current = loc;
+			} else {
+				loc = curr;
+			}
+
+			this.emit("changed", {
+				percentage: this.percentageFromLocation(loc)
+			});
+		}
+	}, {
+		key: "length",
+		value: function length() {
+			return this._locations.length;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.spine = undefined;
+			this.request = undefined;
+			this.pause = undefined;
+
+			this.q.stop();
+			this.q = undefined;
+			this.epubcfi = undefined;
+
+			this._locations = undefined;
+			this.total = undefined;
+
+			this.break = undefined;
+			this._current = undefined;
+
+			this.currentLocation = undefined;
+			this._currentCfi = undefined;
+			clearTimeout(this.processingTimeout);
+		}
+	}, {
+		key: "currentLocation",
+		get: function get() {
+			return this._current;
+		},
+		set: function set(curr) {
+			this.setCurrent(curr);
+		}
+	}]);
+
+	return Locations;
+}();
+
+(0, _eventEmitter2.default)(Locations.prototype);
+
+exports.default = Locations;
+module.exports = exports["default"];
+
+/***/ }),
+/* 39 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _pathWebpack = __webpack_require__(5);
+
+var _pathWebpack2 = _interopRequireDefault(_pathWebpack);
+
+var _core = __webpack_require__(0);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Handles Parsing and Accessing an Epub Container
+ * @class
+ * @param {[document]} containerDocument xml document
+ */
+var Container = function () {
+	function Container(containerDocument) {
+		_classCallCheck(this, Container);
+
+		this.packagePath = '';
+		this.directory = '';
+		this.encoding = '';
+
+		if (containerDocument) {
+			this.parse(containerDocument);
+		}
+	}
+
+	/**
+  * Parse the Container XML
+  * @param  {document} containerDocument
+  */
+
+
+	_createClass(Container, [{
+		key: "parse",
+		value: function parse(containerDocument) {
+			//-- <rootfile full-path="OPS/package.opf" media-type="application/oebps-package+xml"/>
+			var rootfile;
+
+			if (!containerDocument) {
+				throw new Error("Container File Not Found");
+			}
+
+			rootfile = (0, _core.qs)(containerDocument, "rootfile");
+
+			if (!rootfile) {
+				throw new Error("No RootFile Found");
+			}
+
+			this.packagePath = rootfile.getAttribute("full-path");
+			this.directory = _pathWebpack2.default.dirname(this.packagePath);
+			this.encoding = containerDocument.xmlEncoding;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.packagePath = undefined;
+			this.directory = undefined;
+			this.encoding = undefined;
+		}
+	}]);
+
+	return Container;
+}();
+
+exports.default = Container;
+module.exports = exports["default"];
+
+/***/ }),
+/* 40 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Open Packaging Format Parser
+ * @class
+ * @param {document} packageDocument OPF XML
+ */
+var Packaging = function () {
+	function Packaging(packageDocument) {
+		_classCallCheck(this, Packaging);
+
+		this.manifest = {};
+		this.navPath = '';
+		this.ncxPath = '';
+		this.coverPath = '';
+		this.spineNodeIndex = 0;
+		this.spine = [];
+		this.metadata = {};
+
+		if (packageDocument) {
+			this.parse(packageDocument);
+		}
+	}
+
+	/**
+  * Parse OPF XML
+  * @param  {document} packageDocument OPF XML
+  * @return {object} parsed package parts
+  */
+
+
+	_createClass(Packaging, [{
+		key: 'parse',
+		value: function parse(packageDocument) {
+			var metadataNode, manifestNode, spineNode;
+
+			if (!packageDocument) {
+				throw new Error("Package File Not Found");
+			}
+
+			metadataNode = (0, _core.qs)(packageDocument, "metadata");
+			if (!metadataNode) {
+				throw new Error("No Metadata Found");
+			}
+
+			manifestNode = (0, _core.qs)(packageDocument, "manifest");
+			if (!manifestNode) {
+				throw new Error("No Manifest Found");
+			}
+
+			spineNode = (0, _core.qs)(packageDocument, "spine");
+			if (!spineNode) {
+				throw new Error("No Spine Found");
+			}
+
+			this.manifest = this.parseManifest(manifestNode);
+			this.navPath = this.findNavPath(manifestNode);
+			this.ncxPath = this.findNcxPath(manifestNode, spineNode);
+			this.coverPath = this.findCoverPath(packageDocument);
+
+			this.spineNodeIndex = (0, _core.indexOfElementNode)(spineNode);
+
+			this.spine = this.parseSpine(spineNode, this.manifest);
+
+			this.metadata = this.parseMetadata(metadataNode);
+
+			this.metadata.direction = spineNode.getAttribute("page-progression-direction");
+
+			return {
+				"metadata": this.metadata,
+				"spine": this.spine,
+				"manifest": this.manifest,
+				"navPath": this.navPath,
+				"ncxPath": this.ncxPath,
+				"coverPath": this.coverPath,
+				"spineNodeIndex": this.spineNodeIndex
+			};
+		}
+
+		/**
+   * Parse Metadata
+   * @private
+   * @param  {document} xml
+   * @return {object} metadata
+   */
+
+	}, {
+		key: 'parseMetadata',
+		value: function parseMetadata(xml) {
+			var metadata = {};
+
+			metadata.title = this.getElementText(xml, "title");
+			metadata.creator = this.getElementText(xml, "creator");
+			metadata.description = this.getElementText(xml, "description");
+
+			metadata.pubdate = this.getElementText(xml, "date");
+
+			metadata.publisher = this.getElementText(xml, "publisher");
+
+			metadata.identifier = this.getElementText(xml, "identifier");
+			metadata.language = this.getElementText(xml, "language");
+			metadata.rights = this.getElementText(xml, "rights");
+
+			metadata.modified_date = this.getPropertyText(xml, "dcterms:modified");
+
+			metadata.layout = this.getPropertyText(xml, "rendition:layout");
+			metadata.orientation = this.getPropertyText(xml, "rendition:orientation");
+			metadata.flow = this.getPropertyText(xml, "rendition:flow");
+			metadata.viewport = this.getPropertyText(xml, "rendition:viewport");
+			// metadata.page_prog_dir = packageXml.querySelector("spine").getAttribute("page-progression-direction");
+
+			return metadata;
+		}
+
+		/**
+   * Parse Manifest
+   * @private
+   * @param  {document} manifestXml
+   * @return {object} manifest
+   */
+
+	}, {
+		key: 'parseManifest',
+		value: function parseManifest(manifestXml) {
+			var manifest = {};
+
+			//-- Turn items into an array
+			// var selected = manifestXml.querySelectorAll("item");
+			var selected = (0, _core.qsa)(manifestXml, "item");
+			var items = Array.prototype.slice.call(selected);
+
+			//-- Create an object with the id as key
+			items.forEach(function (item) {
+				var id = item.getAttribute("id"),
+				    href = item.getAttribute("href") || "",
+				    type = item.getAttribute("media-type") || "",
+				    properties = item.getAttribute("properties") || "";
+
+				manifest[id] = {
+					"href": href,
+					// "url" : href,
+					"type": type,
+					"properties": properties.length ? properties.split(" ") : []
+				};
+			});
+
+			return manifest;
+		}
+
+		/**
+   * Parse Spine
+   * @param  {document} spineXml
+   * @param  {Packaging.manifest} manifest
+   * @return {object} spine
+   */
+
+	}, {
+		key: 'parseSpine',
+		value: function parseSpine(spineXml, manifest) {
+			var spine = [];
+
+			var selected = spineXml.getElementsByTagName("itemref");
+			var items = Array.prototype.slice.call(selected);
+
+			// var epubcfi = new EpubCFI();
+
+			//-- Add to array to mantain ordering and cross reference with manifest
+			items.forEach(function (item, index) {
+				var idref = item.getAttribute("idref");
+				// var cfiBase = epubcfi.generateChapterComponent(spineNodeIndex, index, Id);
+				var props = item.getAttribute("properties") || "";
+				var propArray = props.length ? props.split(" ") : [];
+				// var manifestProps = manifest[Id].properties;
+				// var manifestPropArray = manifestProps.length ? manifestProps.split(" ") : [];
+
+				var itemref = {
+					"idref": idref,
+					"linear": item.getAttribute("linear") || "yes",
+					"properties": propArray,
+					// "href" : manifest[Id].href,
+					// "url" :  manifest[Id].url,
+					"index": index
+					// "cfiBase" : cfiBase
+				};
+				spine.push(itemref);
+			});
+
+			return spine;
+		}
+
+		/**
+   * Find TOC NAV
+   * @private
+   */
+
+	}, {
+		key: 'findNavPath',
+		value: function findNavPath(manifestNode) {
+			// Find item with property "nav"
+			// Should catch nav irregardless of order
+			// var node = manifestNode.querySelector("item[properties$='nav'], item[properties^='nav '], item[properties*=' nav ']");
+			var node = (0, _core.qsp)(manifestNode, "item", { "properties": "nav" });
+			return node ? node.getAttribute("href") : false;
+		}
+
+		/**
+   * Find TOC NCX
+   * media-type="application/x-dtbncx+xml" href="toc.ncx"
+   * @private
+   */
+
+	}, {
+		key: 'findNcxPath',
+		value: function findNcxPath(manifestNode, spineNode) {
+			// var node = manifestNode.querySelector("item[media-type='application/x-dtbncx+xml']");
+			var node = (0, _core.qsp)(manifestNode, "item", { "media-type": "application/x-dtbncx+xml" });
+			var tocId;
+
+			// If we can't find the toc by media-type then try to look for id of the item in the spine attributes as
+			// according to http://www.idpf.org/epub/20/spec/OPF_2.0.1_draft.htm#Section2.4.1.2,
+			// "The item that describes the NCX must be referenced by the spine toc attribute."
+			if (!node) {
+				tocId = spineNode.getAttribute("toc");
+				if (tocId) {
+					// node = manifestNode.querySelector("item[id='" + tocId + "']");
+					node = manifestNode.getElementById(tocId);
+				}
+			}
+
+			return node ? node.getAttribute("href") : false;
+		}
+
+		/**
+   * Find the Cover Path
+   * <item properties="cover-image" id="ci" href="cover.svg" media-type="image/svg+xml" />
+   * Fallback for Epub 2.0
+   * @param  {document} packageXml
+   * @return {string} href
+   */
+
+	}, {
+		key: 'findCoverPath',
+		value: function findCoverPath(packageXml) {
+			var pkg = (0, _core.qs)(packageXml, "package");
+			var epubVersion = pkg.getAttribute("version");
+
+			if (epubVersion === "2.0") {
+				var metaCover = (0, _core.qsp)(packageXml, "meta", { "name": "cover" });
+				if (metaCover) {
+					var coverId = metaCover.getAttribute("content");
+					// var cover = packageXml.querySelector("item[id='" + coverId + "']");
+					var cover = packageXml.getElementById(coverId);
+					return cover ? cover.getAttribute("href") : "";
+				} else {
+					return false;
+				}
+			} else {
+				// var node = packageXml.querySelector("item[properties='cover-image']");
+				var node = (0, _core.qsp)(packageXml, "item", { "properties": "cover-image" });
+				return node ? node.getAttribute("href") : "";
+			}
+		}
+
+		/**
+   * Get text of a namespaced element
+   * @private
+   * @param  {document} xml
+   * @param  {string} tag
+   * @return {string} text
+   */
+
+	}, {
+		key: 'getElementText',
+		value: function getElementText(xml, tag) {
+			var found = xml.getElementsByTagNameNS("http://purl.org/dc/elements/1.1/", tag);
+			var el;
+
+			if (!found || found.length === 0) return "";
+
+			el = found[0];
+
+			if (el.childNodes.length) {
+				return el.childNodes[0].nodeValue;
+			}
+
+			return "";
+		}
+
+		/**
+   * Get text by property
+   * @private
+   * @param  {document} xml
+   * @param  {string} property
+   * @return {string} text
+   */
+
+	}, {
+		key: 'getPropertyText',
+		value: function getPropertyText(xml, property) {
+			var el = (0, _core.qsp)(xml, "meta", { "property": property });
+
+			if (el && el.childNodes.length) {
+				return el.childNodes[0].nodeValue;
+			}
+
+			return "";
+		}
+
+		/**
+   * Load JSON Manifest
+   * @param  {document} packageDocument OPF XML
+   * @return {object} parsed package parts
+   */
+
+	}, {
+		key: 'load',
+		value: function load(json) {
+			var _this = this;
+
+			this.metadata = json.metadata;
+
+			this.spine = json.spine.map(function (item, index) {
+				item.index = index;
+				return item;
+			});
+
+			json.resources.forEach(function (item, index) {
+				_this.manifest[index] = item;
+
+				if (item.rel && item.rel[0] === "cover") {
+					_this.coverPath = item.href;
+				}
+			});
+
+			this.spineNodeIndex = 0;
+
+			this.toc = json.toc.map(function (item, index) {
+				item.label = item.title;
+				return item;
+			});
+
+			return {
+				"metadata": this.metadata,
+				"spine": this.spine,
+				"manifest": this.manifest,
+				"navPath": this.navPath,
+				"ncxPath": this.ncxPath,
+				"coverPath": this.coverPath,
+				"spineNodeIndex": this.spineNodeIndex,
+				"toc": this.toc
+			};
+		}
+	}, {
+		key: 'destroy',
+		value: function destroy() {
+			this.manifest = undefined;
+			this.navPath = undefined;
+			this.ncxPath = undefined;
+			this.coverPath = undefined;
+			this.spineNodeIndex = undefined;
+			this.spine = undefined;
+			this.metadata = undefined;
+		}
+	}]);
+
+	return Packaging;
+}();
+
+exports.default = Packaging;
+module.exports = exports['default'];
+
+/***/ }),
+/* 41 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Navigation Parser
+ * @param {document} xml navigation html / xhtml / ncx
+ */
+var Navigation = function () {
+	function Navigation(xml) {
+		_classCallCheck(this, Navigation);
+
+		this.toc = [];
+		this.tocByHref = {};
+		this.tocById = {};
+
+		if (xml) {
+			this.parse(xml);
+		}
+	}
+
+	/**
+  * Parse out the navigation items
+  * @param {document} xml navigation html / xhtml / ncx
+  */
+
+
+	_createClass(Navigation, [{
+		key: "parse",
+		value: function parse(xml) {
+			var isXml = xml.nodeType;
+			var html = void 0;
+			var ncx = void 0;
+
+			if (isXml) {
+				html = (0, _core.qs)(xml, "html");
+				ncx = (0, _core.qs)(xml, "ncx");
+			}
+
+			if (!isXml) {
+				this.toc = this.load(xml);
+			} else if (html) {
+				this.toc = this.parseNav(xml);
+			} else if (ncx) {
+				this.toc = this.parseNcx(xml);
+			}
+
+			this.unpack(this.toc);
+		}
+
+		/**
+   * Unpack navigation items
+   * @private
+   * @param  {array} toc
+   */
+
+	}, {
+		key: "unpack",
+		value: function unpack(toc) {
+			var item;
+
+			for (var i = 0; i < toc.length; i++) {
+				item = toc[i];
+				this.tocByHref[item.href] = i;
+				this.tocById[item.id] = i;
+			}
+		}
+
+		/**
+   * Get an item from the navigation
+   * @param  {string} target
+   * @return {object} navItems
+   */
+
+	}, {
+		key: "get",
+		value: function get(target) {
+			var index;
+
+			if (!target) {
+				return this.toc;
+			}
+
+			if (target.indexOf("#") === 0) {
+				index = this.tocById[target.substring(1)];
+			} else if (target in this.tocByHref) {
+				index = this.tocByHref[target];
+			}
+
+			return this.toc[index];
+		}
+	}, {
+		key: "createTocItem",
+		value: function createTocItem(linkElement, id) {
+			var _this = this;
+
+			var list = [],
+			    tocLinkElms = linkElement.childNodes,
+			    tocLinkArray = Array.prototype.slice.call(tocLinkElms);
+
+			var index = id ? id : 0;
+			tocLinkArray.forEach(function (linkElm) {
+				if (linkElm.nodeName.toLowerCase() === 'li') {
+					var tocLink = (0, _core.qs)(linkElm, 'a'),
+					    tocLinkData = {
+						id: -1,
+						href: tocLink.getAttribute('href'),
+						label: tocLink.textContent,
+						parent: null
+					},
+					    subItemElm = (0, _core.qs)(linkElm, 'ol');
+					index++;
+					tocLinkData.id = index;
+					if (id) {
+						tocLinkData.parent = id;
+					}
+					list.push(tocLinkData);
+					if (subItemElm) {
+						var subitems = _this.createTocItem(subItemElm, index);
+						if (subitems && subitems.length > 0) {
+							index = index + subitems.length;
+							list = list.concat(subitems);
+						}
+					}
+				}
+			});
+			return list;
+		}
+
+		/**
+   * Parse from a Epub > 3.0 Nav
+   * @private
+   * @param  {document} navHtml
+   * @return {array} navigation list
+   */
+
+	}, {
+		key: "parseNav",
+		value: function parseNav(navHtml) {
+			var navElement = (0, _core.querySelectorByType)(navHtml, "nav", "toc");
+			var tocItems = (0, _core.qs)(navElement, "ol");
+			return this.createTocItem(tocItems);
+		}
+
+		/**
+   * Create a navItem
+   * @private
+   * @param  {element} item
+   * @return {object} navItem
+   */
+
+	}, {
+		key: "navItem",
+		value: function navItem(item) {
+			var id = item.getAttribute("id") || false,
+			    content = (0, _core.qs)(item, "a"),
+			    src = content.getAttribute("href") || "",
+			    text = content.textContent || "",
+			    subitems = [],
+			    parentNode = item.parentNode,
+			    parent;
+
+			if (parentNode && parentNode.nodeName === "navPoint") {
+				parent = parentNode.getAttribute("id");
+			}
+
+			return {
+				"id": id,
+				"href": src,
+				"label": text,
+				"subitems": subitems,
+				"parent": parent
+			};
+		}
+
+		/**
+   * Parse from a Epub > 3.0 NC
+   * @private
+   * @param  {document} navHtml
+   * @return {array} navigation list
+   */
+
+	}, {
+		key: "parseNcx",
+		value: function parseNcx(tocXml) {
+			var navPoints = (0, _core.qsa)(tocXml, "navPoint");
+			var length = navPoints.length;
+			var i;
+			var toc = {};
+			var list = [];
+			var item, parent;
+
+			if (!navPoints || length === 0) return list;
+
+			for (i = 0; i < length; ++i) {
+				item = this.ncxItem(navPoints[i]);
+				toc[item.id] = item;
+				if (!item.parent) {
+					list.push(item);
+				} else {
+					parent = toc[item.parent];
+					parent.subitems.push(item);
+				}
+			}
+
+			return list;
+		}
+
+		/**
+   * Create a ncxItem
+   * @private
+   * @param  {element} item
+   * @return {object} ncxItem
+   */
+
+	}, {
+		key: "ncxItem",
+		value: function ncxItem(item) {
+			var id = item.getAttribute("id") || false,
+			    content = (0, _core.qs)(item, "content"),
+			    src = content.getAttribute("src"),
+			    navLabel = (0, _core.qs)(item, "navLabel"),
+			    text = navLabel.textContent ? navLabel.textContent : "",
+			    subitems = [],
+			    parentNode = item.parentNode,
+			    parent;
+
+			if (parentNode && parentNode.nodeName === "navPoint") {
+				parent = parentNode.getAttribute("id");
+			}
+
+			return {
+				"id": id,
+				"href": src,
+				"label": text,
+				"subitems": subitems,
+				"parent": parent
+			};
+		}
+
+		/**
+   * Load Spine Items
+   * @param  {object} json the items to be loaded
+   */
+
+	}, {
+		key: "load",
+		value: function load(json) {
+			var _this2 = this;
+
+			return json.map(function (item) {
+				item.label = item.title;
+				if (item.children) {
+					item.subitems = _this2.load(item.children);
+				}
+				return item;
+			});
+		}
+
+		/**
+   * forEach pass through
+   * @param  {Function} fn function to run on each item
+   * @return {method} forEach loop
+   */
+
+	}, {
+		key: "forEach",
+		value: function forEach(fn) {
+			return this.toc.forEach(fn);
+		}
+	}]);
+
+	return Navigation;
+}();
+
+exports.default = Navigation;
+module.exports = exports["default"];
+
+/***/ }),
+/* 42 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _replacements = __webpack_require__(6);
+
+var _core = __webpack_require__(0);
+
+var _url = __webpack_require__(4);
+
+var _url2 = _interopRequireDefault(_url);
+
+var _mime = __webpack_require__(14);
+
+var _mime2 = _interopRequireDefault(_mime);
+
+var _path = __webpack_require__(3);
+
+var _path2 = _interopRequireDefault(_path);
+
+var _pathWebpack = __webpack_require__(5);
+
+var _pathWebpack2 = _interopRequireDefault(_pathWebpack);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Handle Package Resources
+ * @class
+ * @param {Manifest} manifest
+ * @param {[object]} options
+ * @param {[string="base64"]} options.replacements
+ * @param {[Archive]} options.archive
+ * @param {[method]} options.resolver
+ */
+var Resources = function () {
+	function Resources(manifest, options) {
+		_classCallCheck(this, Resources);
+
+		this.settings = {
+			replacements: options && options.replacements || "base64",
+			archive: options && options.archive,
+			resolver: options && options.resolver,
+			request: options && options.request
+		};
+		this.manifest = manifest;
+		this.resources = Object.keys(manifest).map(function (key) {
+			return manifest[key];
+		});
+
+		this.replacementUrls = [];
+
+		this.html = [];
+		this.assets = [];
+		this.css = [];
+
+		this.urls = [];
+		this.cssUrls = [];
+
+		this.split();
+		this.splitUrls();
+	}
+
+	/**
+  * Split resources by type
+  * @private
+  */
+
+
+	_createClass(Resources, [{
+		key: "split",
+		value: function split() {
+
+			// HTML
+			this.html = this.resources.filter(function (item) {
+				if (item.type === "application/xhtml+xml" || item.type === "text/html") {
+					return true;
+				}
+			});
+
+			// Exclude HTML
+			this.assets = this.resources.filter(function (item) {
+				if (item.type !== "application/xhtml+xml" && item.type !== "text/html") {
+					return true;
+				}
+			});
+
+			// Only CSS
+			this.css = this.resources.filter(function (item) {
+				if (item.type === "text/css") {
+					return true;
+				}
+			});
+		}
+
+		/**
+   * Convert split resources into Urls
+   * @private
+   */
+
+	}, {
+		key: "splitUrls",
+		value: function splitUrls() {
+
+			// All Assets Urls
+			this.urls = this.assets.map(function (item) {
+				return item.href;
+			}.bind(this));
+
+			// Css Urls
+			this.cssUrls = this.css.map(function (item) {
+				return item.href;
+			});
+		}
+	}, {
+		key: "createUrl",
+		value: function createUrl(url) {
+			var parsedUrl = new _url2.default(url);
+			var mimeType = _mime2.default.lookup(parsedUrl.filename);
+
+			if (this.settings.archive) {
+				return this.settings.archive.createUrl(url, { "base64": this.settings.replacements === "base64" });
+			} else {
+				if (this.settings.replacements === "base64") {
+					return this.settings.request(url, 'blob').then(function (blob) {
+						return (0, _core.blob2base64)(blob);
+					}).then(function (blob) {
+						return (0, _core.createBase64Url)(blob, mimeType);
+					});
+				} else {
+					return this.settings.request(url, 'blob').then(function (blob) {
+						return (0, _core.createBlobUrl)(blob, mimeType);
+					});
+				}
+			}
+		}
+
+		/**
+   * Create blob urls for all the assets
+   * @return {Promise}         returns replacement urls
+   */
+
+	}, {
+		key: "replacements",
+		value: function replacements() {
+			var _this = this;
+
+			if (this.settings.replacements === "none") {
+				return new Promise(function (resolve) {
+					resolve(this.urls);
+				}.bind(this));
+			}
+
+			var replacements = this.urls.map(function (url) {
+				var absolute = _this.settings.resolver(url);
+
+				return _this.createUrl(absolute).catch(function (err) {
+					console.error(err);
+					return null;
+				});
+			});
+
+			return Promise.all(replacements).then(function (replacementUrls) {
+				_this.replacementUrls = replacementUrls.filter(function (url) {
+					return typeof url === "string";
+				});
+				return replacementUrls;
+			});
+		}
+
+		/**
+   * Replace URLs in CSS resources
+   * @private
+   * @param  {[Archive]} archive
+   * @param  {[method]} resolver
+   * @return {Promise}
+   */
+
+	}, {
+		key: "replaceCss",
+		value: function replaceCss(archive, resolver) {
+			var replaced = [];
+			archive = archive || this.settings.archive;
+			resolver = resolver || this.settings.resolver;
+			this.cssUrls.forEach(function (href) {
+				var replacement = this.createCssFile(href, archive, resolver).then(function (replacementUrl) {
+					// switch the url in the replacementUrls
+					var indexInUrls = this.urls.indexOf(href);
+					if (indexInUrls > -1) {
+						this.replacementUrls[indexInUrls] = replacementUrl;
+					}
+				}.bind(this));
+
+				replaced.push(replacement);
+			}.bind(this));
+			return Promise.all(replaced);
+		}
+
+		/**
+   * Create a new CSS file with the replaced URLs
+   * @private
+   * @param  {string} href the original css file
+   * @return {Promise}  returns a BlobUrl to the new CSS file or a data url
+   */
+
+	}, {
+		key: "createCssFile",
+		value: function createCssFile(href) {
+			var _this2 = this;
+
+			var newUrl;
+
+			if (_pathWebpack2.default.isAbsolute(href)) {
+				return new Promise(function (resolve) {
+					resolve();
+				});
+			}
+
+			var absolute = this.settings.resolver(href);
+
+			// Get the text of the css file from the archive
+			var textResponse;
+
+			if (this.settings.archive) {
+				textResponse = this.settings.archive.getText(absolute);
+			} else {
+				textResponse = this.settings.request(absolute, "text");
+			}
+
+			// Get asset links relative to css file
+			var relUrls = this.urls.map(function (assetHref) {
+				var resolved = _this2.settings.resolver(assetHref);
+				var relative = new _path2.default(absolute).relative(resolved);
+
+				return relative;
+			});
+
+			if (!textResponse) {
+				// file not found, don't replace
+				return new Promise(function (resolve) {
+					resolve();
+				});
+			}
+
+			return textResponse.then(function (text) {
+				// Replacements in the css text
+				text = (0, _replacements.substitute)(text, relUrls, _this2.replacementUrls);
+
+				// Get the new url
+				if (_this2.settings.replacements === "base64") {
+					newUrl = (0, _core.createBase64Url)(text, "text/css");
+				} else {
+					newUrl = (0, _core.createBlobUrl)(text, "text/css");
+				}
+
+				return newUrl;
+			}, function (err) {
+				// handle response errors
+				return new Promise(function (resolve) {
+					resolve();
+				});
+			});
+		}
+
+		/**
+   * Resolve all resources URLs relative to an absolute URL
+   * @param  {string} absolute to be resolved to
+   * @param  {[resolver]} resolver
+   * @return {string[]} array with relative Urls
+   */
+
+	}, {
+		key: "relativeTo",
+		value: function relativeTo(absolute, resolver) {
+			resolver = resolver || this.settings.resolver;
+
+			// Get Urls relative to current sections
+			return this.urls.map(function (href) {
+				var resolved = resolver(href);
+				var relative = new _path2.default(absolute).relative(resolved);
+				return relative;
+			}.bind(this));
+		}
+
+		/**
+   * Get a URL for a resource
+   * @param  {string} path
+   * @return {string} url
+   */
+
+	}, {
+		key: "get",
+		value: function get(path) {
+			var indexInUrls = this.urls.indexOf(path);
+			if (indexInUrls === -1) {
+				return;
+			}
+			if (this.replacementUrls.length) {
+				return new Promise(function (resolve, reject) {
+					resolve(this.replacementUrls[indexInUrls]);
+				}.bind(this));
+			} else {
+				return this.createUrl(path);
+			}
+		}
+
+		/**
+   * Substitute urls in content, with replacements,
+   * relative to a url if provided
+   * @param  {string} content
+   * @param  {[string]} url   url to resolve to
+   * @return {string}         content with urls substituted
+   */
+
+	}, {
+		key: "substitute",
+		value: function substitute(content, url) {
+			var relUrls;
+			if (url) {
+				relUrls = this.relativeTo(url);
+			} else {
+				relUrls = this.urls;
+			}
+			return (0, _replacements.substitute)(content, relUrls, this.replacementUrls);
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.settings = undefined;
+			this.manifest = undefined;
+			this.resources = undefined;
+			this.replacementUrls = undefined;
+			this.html = undefined;
+			this.assets = undefined;
+			this.css = undefined;
+
+			this.urls = undefined;
+			this.cssUrls = undefined;
+		}
+	}]);
+
+	return Resources;
+}();
+
+exports.default = Resources;
+module.exports = exports["default"];
+
+/***/ }),
+/* 43 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _core = __webpack_require__(0);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Page List Parser
+ * @param {[document]} xml
+ */
+var PageList = function () {
+	function PageList(xml) {
+		_classCallCheck(this, PageList);
+
+		this.pages = [];
+		this.locations = [];
+		this.epubcfi = new _epubcfi2.default();
+
+		this.firstPage = 0;
+		this.lastPage = 0;
+		this.totalPages = 0;
+
+		this.toc = undefined;
+		this.ncx = undefined;
+
+		this.lastPage;
+		if (xml) {
+			this.pageList = this.parse(xml);
+		}
+
+		if (this.pageList && this.pageList.length) {
+			this.process(this.pageList);
+		}
+	}
+
+	/**
+  * Parse PageList Xml
+  * @param  {document} xml
+  */
+
+
+	_createClass(PageList, [{
+		key: "parse",
+		value: function parse(xml) {
+			var html = (0, _core.qs)(xml, "html");
+			var ncx = (0, _core.qs)(xml, "ncx");
+
+			if (html) {
+				this.toc = this.parseNav(xml);
+			} else if (ncx) {
+				// Not supported
+				// this.toc = this.parseNcx(xml);
+				return;
+			}
+		}
+
+		/**
+   * Parse a Nav PageList
+   * @private
+   * @param  {document} navHtml
+   * @return {PageList.item[]} list
+   */
+
+	}, {
+		key: "parseNav",
+		value: function parseNav(navHtml) {
+			var navElement = (0, _core.querySelectorByType)(navHtml, "nav", "page-list");
+			var navItems = navElement ? (0, _core.qsa)(navElement, "li") : [];
+			var length = navItems.length;
+			var i;
+			var list = [];
+			var item;
+
+			if (!navItems || length === 0) return list;
+
+			for (i = 0; i < length; ++i) {
+				item = this.item(navItems[i]);
+				list.push(item);
+			}
+
+			return list;
+		}
+
+		/**
+   * Page List Item
+   * @private
+   * @param  {object} item
+   * @return {object} pageListItem
+   */
+
+	}, {
+		key: "item",
+		value: function item(_item) {
+			var content = (0, _core.qs)(_item, "a"),
+			    href = content.getAttribute("href") || "",
+			    text = content.textContent || "",
+			    page = parseInt(text),
+			    isCfi = href.indexOf("epubcfi"),
+			    split,
+			    packageUrl,
+			    cfi;
+
+			if (isCfi != -1) {
+				split = href.split("#");
+				packageUrl = split[0];
+				cfi = split.length > 1 ? split[1] : false;
+				return {
+					"cfi": cfi,
+					"href": href,
+					"packageUrl": packageUrl,
+					"page": page
+				};
+			} else {
+				return {
+					"href": href,
+					"page": page
+				};
+			}
+		}
+
+		/**
+   * Process pageList items
+   * @private
+   * @param  {array} pageList
+   */
+
+	}, {
+		key: "process",
+		value: function process(pageList) {
+			pageList.forEach(function (item) {
+				this.pages.push(item.page);
+				if (item.cfi) {
+					this.locations.push(item.cfi);
+				}
+			}, this);
+			this.firstPage = parseInt(this.pages[0]);
+			this.lastPage = parseInt(this.pages[this.pages.length - 1]);
+			this.totalPages = this.lastPage - this.firstPage;
+		}
+
+		/**
+   * Replace HREFs with CFI
+   * TODO: implement getting CFI from Href
+   */
+
+	}, {
+		key: "addCFIs",
+		value: function addCFIs() {
+			this.pageList.forEach(function (pg) {
+				if (!pg.cfi) {
+					// epubcfi.generateCfiFromHref(pg.href, book).then(function(cfi){
+					// 	pg.cfi = cfi;
+					// 	pg.packageUrl = book.settings.packageUrl;
+					// });
+				}
+			});
+		}
+
+		/*
+  EPUBJS.generateCfiFromHref(href, book) {
+    var uri = EPUBJS.core.uri(href);
+    var path = uri.path;
+    var fragment = uri.fragment;
+    var spinePos = book.spineIndexByURL[path];
+    var loaded;
+    var deferred = new RSVP.defer();
+    var epubcfi = new EPUBJS.EpubCFI();
+    var spineItem;
+  	  if(typeof spinePos !== "undefined"){
+      spineItem = book.spine[spinePos];
+      loaded = book.loadXml(spineItem.url);
+      loaded.then(function(doc){
+        var element = doc.getElementById(fragment);
+        var cfi;
+        cfi = epubcfi.generateCfiFromElement(element, spineItem.cfiBase);
+        deferred.resolve(cfi);
+      });
+    }
+  	  return deferred.promise;
+  }
+  */
+
+		/**
+   * Get a PageList result from a EpubCFI
+   * @param  {string} cfi EpubCFI String
+   * @return {string} page
+   */
+
+	}, {
+		key: "pageFromCfi",
+		value: function pageFromCfi(cfi) {
+			var pg = -1;
+
+			// Check if the pageList has not been set yet
+			if (this.locations.length === 0) {
+				return -1;
+			}
+
+			// TODO: check if CFI is valid?
+
+			// check if the cfi is in the location list
+			// var index = this.locations.indexOf(cfi);
+			var index = (0, _core.indexOfSorted)(cfi, this.locations, this.epubcfi.compare);
+			if (index != -1) {
+				pg = this.pages[index];
+			} else {
+				// Otherwise add it to the list of locations
+				// Insert it in the correct position in the locations page
+				//index = EPUBJS.core.insert(cfi, this.locations, this.epubcfi.compare);
+				index = (0, _core.locationOf)(cfi, this.locations, this.epubcfi.compare);
+				// Get the page at the location just before the new one, or return the first
+				pg = index - 1 >= 0 ? this.pages[index - 1] : this.pages[0];
+				if (pg !== undefined) {
+					// Add the new page in so that the locations and page array match up
+					//this.pages.splice(index, 0, pg);
+				} else {
+					pg = -1;
+				}
+			}
+			return pg;
+		}
+
+		/**
+   * Get an EpubCFI from a Page List Item
+   * @param  {string} pg
+   * @return {string} cfi
+   */
+
+	}, {
+		key: "cfiFromPage",
+		value: function cfiFromPage(pg) {
+			var cfi = -1;
+			// check that pg is an int
+			if (typeof pg != "number") {
+				pg = parseInt(pg);
+			}
+
+			// check if the cfi is in the page list
+			// Pages could be unsorted.
+			var index = this.pages.indexOf(pg);
+			if (index != -1) {
+				cfi = this.locations[index];
+			}
+			// TODO: handle pages not in the list
+			return cfi;
+		}
+
+		/**
+   * Get a Page from Book percentage
+   * @param  {number} percent
+   * @return {string} page
+   */
+
+	}, {
+		key: "pageFromPercentage",
+		value: function pageFromPercentage(percent) {
+			var pg = Math.round(this.totalPages * percent);
+			return pg;
+		}
+
+		/**
+   * Returns a value between 0 - 1 corresponding to the location of a page
+   * @param  {int} pg the page
+   * @return {number} percentage
+   */
+
+	}, {
+		key: "percentageFromPage",
+		value: function percentageFromPage(pg) {
+			var percentage = (pg - this.firstPage) / this.totalPages;
+			return Math.round(percentage * 1000) / 1000;
+		}
+
+		/**
+   * Returns a value between 0 - 1 corresponding to the location of a cfi
+   * @param  {string} cfi EpubCFI String
+   * @return {number} percentage
+   */
+
+	}, {
+		key: "percentageFromCfi",
+		value: function percentageFromCfi(cfi) {
+			var pg = this.pageFromCfi(cfi);
+			var percentage = this.percentageFromPage(pg);
+			return percentage;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.pages = undefined;
+			this.locations = undefined;
+			this.epubcfi = undefined;
+
+			this.pageList = undefined;
+
+			this.toc = undefined;
+			this.ncx = undefined;
+		}
+	}]);
+
+	return PageList;
+}();
+
+exports.default = PageList;
+module.exports = exports["default"];
+
+/***/ }),
+/* 44 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Figures out the CSS to apply for a layout
+ * @class
+ * @param {object} settings
+ * @param {[string=reflowable]} settings.layout
+ * @param {[string]} settings.spread
+ * @param {[int=800]} settings.minSpreadWidth
+ * @param {[boolean=false]} settings.evenSpreads
+ */
+var Layout = function () {
+	function Layout(settings) {
+		_classCallCheck(this, Layout);
+
+		this.settings = settings;
+		this.name = settings.layout || "reflowable";
+		this._spread = settings.spread === "none" ? false : true;
+		this._minSpreadWidth = settings.minSpreadWidth || 800;
+		this._evenSpreads = settings.evenSpreads || false;
+
+		if (settings.flow === "scrolled" || settings.flow === "scrolled-continuous" || settings.flow === "scrolled-doc") {
+			this._flow = "scrolled";
+		} else {
+			this._flow = "paginated";
+		}
+
+		this.width = 0;
+		this.height = 0;
+		this.spreadWidth = 0;
+		this.delta = 0;
+
+		this.columnWidth = 0;
+		this.gap = 0;
+		this.divisor = 1;
+
+		this.props = {
+			name: this.name,
+			spread: this._spread,
+			flow: this._flow,
+			width: 0,
+			height: 0,
+			spreadWidth: 0,
+			delta: 0,
+			columnWidth: 0,
+			gap: 0,
+			divisor: 1
+		};
+	}
+
+	/**
+  * Switch the flow between paginated and scrolled
+  * @param  {string} flow paginated | scrolled
+  */
+
+
+	_createClass(Layout, [{
+		key: "flow",
+		value: function flow(_flow) {
+			if (typeof _flow != "undefined") {
+				if (_flow === "scrolled" || _flow === "scrolled-continuous" || _flow === "scrolled-doc") {
+					this._flow = "scrolled";
+				} else {
+					this._flow = "paginated";
+				}
+				this.props.flow = this._flow;
+			}
+			return this._flow;
+		}
+
+		/**
+   * Switch between using spreads or not, and set the
+   * width at which they switch to single.
+   * @param  {string} spread true | false
+   * @param  {boolean} min integer in pixels
+   */
+
+	}, {
+		key: "spread",
+		value: function spread(_spread, min) {
+
+			if (_spread) {
+				this._spread = _spread === "none" ? false : true;
+				this.props.spread = this._spread;
+			}
+
+			if (min >= 0) {
+				this._minSpreadWidth = min;
+			}
+
+			return this._spread;
+		}
+
+		/**
+   * Calculate the dimensions of the pagination
+   * @param  {number} _width  [description]
+   * @param  {number} _height [description]
+   * @param  {number} _gap    [description]
+   */
+
+	}, {
+		key: "calculate",
+		value: function calculate(_width, _height, _gap) {
+
+			var divisor = 1;
+			var gap = _gap || 0;
+
+			//-- Check the width and create even width columns
+			// var fullWidth = Math.floor(_width);
+			var width = _width;
+
+			var section = Math.floor(width / 12);
+
+			var colWidth;
+			var spreadWidth;
+			var pageWidth;
+			var delta;
+
+			if (this._spread && width >= this._minSpreadWidth) {
+				divisor = 2;
+			} else {
+				divisor = 1;
+			}
+
+			if (this.name === "reflowable" && this._flow === "paginated" && !(_gap >= 0)) {
+				gap = section % 2 === 0 ? section : section - 1;
+			}
+
+			if (this.name === "pre-paginated") {
+				gap = 0;
+			}
+
+			//-- Double Page
+			if (divisor > 1) {
+				// width = width - gap;
+				// colWidth = (width - gap) / divisor;
+				// gap = gap / divisor;
+				colWidth = width / divisor - gap;
+				pageWidth = colWidth + gap;
+			} else {
+				colWidth = width;
+				pageWidth = width;
+			}
+
+			if (this.name === "pre-paginated" && divisor > 1) {
+				width = colWidth;
+			}
+
+			spreadWidth = colWidth * divisor + gap;
+
+			delta = width;
+
+			this.width = width;
+			this.height = _height;
+			this.spreadWidth = spreadWidth;
+			this.pageWidth = pageWidth;
+			this.delta = delta;
+
+			this.columnWidth = colWidth;
+			this.gap = gap;
+			this.divisor = divisor;
+
+			this.props.width = width;
+			this.props.height = _height;
+			this.props.spreadWidth = spreadWidth;
+			this.props.pageWidth = pageWidth;
+			this.props.delta = delta;
+
+			this.props.columnWidth = colWidth;
+			this.props.gap = gap;
+			this.props.divisor = divisor;
+		}
+
+		/**
+   * Apply Css to a Document
+   * @param  {Contents} contents
+   * @return {[Promise]}
+   */
+
+	}, {
+		key: "format",
+		value: function format(contents) {
+			var formating;
+
+			if (this.name === "pre-paginated") {
+				formating = contents.fit(this.columnWidth, this.height);
+			} else if (this._flow === "paginated") {
+				formating = contents.columns(this.width, this.height, this.columnWidth, this.gap);
+			} else {
+				// scrolled
+				formating = contents.size(this.width, null);
+			}
+
+			return formating; // might be a promise in some View Managers
+		}
+
+		/**
+   * Count number of pages
+   * @param  {number} totalWidth
+   * @return {number} spreads
+   * @return {number} pages
+   */
+
+	}, {
+		key: "count",
+		value: function count(totalLength, pageLength) {
+			// var totalWidth = contents.scrollWidth();
+			var spreads = void 0,
+			    pages = void 0;
+
+			if (this.name === "pre-paginated") {
+				spreads = 1;
+				pages = 1;
+			} else if (this._flow === "paginated") {
+				pageLength = pageLength || this.delta;
+				spreads = Math.ceil(totalLength / pageLength);
+				pages = spreads * this.divisor;
+			} else {
+				// scrolled
+				pageLength = pageLength || this.height;
+				spreads = Math.ceil(totalLength / pageLength);
+				pages = spreads;
+			}
+
+			return {
+				spreads: spreads,
+				pages: pages
+			};
+		}
+	}]);
+
+	return Layout;
+}();
+
+exports.default = Layout;
+module.exports = exports["default"];
+
+/***/ }),
+/* 45 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _url = __webpack_require__(4);
+
+var _url2 = _interopRequireDefault(_url);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Themes = function () {
+	function Themes(rendition) {
+		_classCallCheck(this, Themes);
+
+		this.rendition = rendition;
+		this._themes = {
+			"default": {
+				"rules": {},
+				"url": "",
+				"serialized": ""
+			}
+		};
+		this._overrides = {};
+		this._current = "default";
+		this._injected = [];
+		this.rendition.hooks.content.register(this.inject.bind(this));
+		this.rendition.hooks.content.register(this.overrides.bind(this));
+	}
+
+	_createClass(Themes, [{
+		key: "register",
+		value: function register() {
+			if (arguments.length === 0) {
+				return;
+			}
+			if (arguments.length === 1 && _typeof(arguments[0]) === "object") {
+				return this.registerThemes(arguments[0]);
+			}
+			if (arguments.length === 1 && typeof arguments[0] === "string") {
+				return this.default(arguments[0]);
+			}
+			if (arguments.length === 2 && typeof arguments[1] === "string") {
+				return this.registerUrl(arguments[0], arguments[1]);
+			}
+			if (arguments.length === 2 && _typeof(arguments[1]) === "object") {
+				return this.registerRules(arguments[0], arguments[1]);
+			}
+		}
+	}, {
+		key: "default",
+		value: function _default(theme) {
+			if (!theme) {
+				return;
+			}
+			if (typeof theme === "string") {
+				return this.registerUrl("default", theme);
+			}
+			if ((typeof theme === "undefined" ? "undefined" : _typeof(theme)) === "object") {
+				return this.registerRules("default", theme);
+			}
+		}
+	}, {
+		key: "registerThemes",
+		value: function registerThemes(themes) {
+			for (var theme in themes) {
+				if (themes.hasOwnProperty(theme)) {
+					if (typeof themes[theme] === "string") {
+						this.registerUrl(theme, themes[theme]);
+					} else {
+						this.registerRules(theme, themes[theme]);
+					}
+				}
+			}
+		}
+	}, {
+		key: "registerUrl",
+		value: function registerUrl(name, input) {
+			var url = new _url2.default(input);
+			this._themes[name] = { "url": url.toString() };
+			if (this._injected[name]) {
+				this.update(name);
+			}
+		}
+	}, {
+		key: "registerRules",
+		value: function registerRules(name, rules) {
+			this._themes[name] = { "rules": rules };
+			// TODO: serialize css rules
+			if (this._injected[name]) {
+				this.update(name);
+			}
+		}
+	}, {
+		key: "select",
+		value: function select(name) {
+			var prev = this._current;
+			var contents;
+
+			this._current = name;
+			this.update(name);
+
+			contents = this.rendition.getContents();
+			contents.forEach(function (content) {
+				content.removeClass(prev);
+				content.addClass(name);
+			});
+		}
+	}, {
+		key: "update",
+		value: function update(name) {
+			var _this = this;
+
+			var contents = this.rendition.getContents();
+			contents.forEach(function (content) {
+				_this.add(name, content);
+			});
+		}
+	}, {
+		key: "inject",
+		value: function inject(contents) {
+			var links = [];
+			var themes = this._themes;
+			var theme;
+
+			for (var name in themes) {
+				if (themes.hasOwnProperty(name) && (name === this._current || name === "default")) {
+					theme = themes[name];
+					if (theme.rules && Object.keys(theme.rules).length > 0 || theme.url && links.indexOf(theme.url) === -1) {
+						this.add(name, contents);
+					}
+					this._injected.push(name);
+				}
+			}
+
+			if (this._current != "default") {
+				contents.addClass(this._current);
+			}
+		}
+	}, {
+		key: "add",
+		value: function add(name, contents) {
+			var theme = this._themes[name];
+
+			if (!theme || !contents) {
+				return;
+			}
+
+			if (theme.url) {
+				contents.addStylesheet(theme.url);
+			} else if (theme.serialized) {
+				// TODO: handle serialized
+			} else if (theme.rules) {
+				contents.addStylesheetRules(theme.rules);
+				theme.injected = true;
+			}
+		}
+	}, {
+		key: "override",
+		value: function override(name, value) {
+			var _this2 = this;
+
+			var contents = this.rendition.getContents();
+
+			this._overrides[name] = value;
+
+			contents.forEach(function (content) {
+				content.css(name, _this2._overrides[name]);
+			});
+		}
+	}, {
+		key: "overrides",
+		value: function overrides(contents) {
+			var overrides = this._overrides;
+
+			for (var rule in overrides) {
+				if (overrides.hasOwnProperty(rule)) {
+					contents.css(rule, overrides[rule]);
+				}
+			}
+		}
+	}, {
+		key: "fontSize",
+		value: function fontSize(size) {
+			this.override("font-size", size);
+		}
+	}, {
+		key: "font",
+		value: function font(f) {
+			this.override("font-family", f);
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			this.rendition = undefined;
+			this._themes = undefined;
+			this._overrides = undefined;
+			this._current = undefined;
+			this._injected = undefined;
+		}
+	}]);
+
+	return Themes;
+}();
+
+exports.default = Themes;
+module.exports = exports["default"];
+
+/***/ }),
+/* 46 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.Underline = exports.Highlight = exports.Mark = exports.Pane = undefined;
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _svg = __webpack_require__(47);
+
+var _svg2 = _interopRequireDefault(_svg);
+
+var _events = __webpack_require__(48);
+
+var _events2 = _interopRequireDefault(_events);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Pane = exports.Pane = function () {
+    function Pane(target) {
+        var container = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : document.body;
+
+        _classCallCheck(this, Pane);
+
+        this.target = target;
+        this.element = _svg2.default.createElement('svg');
+        this.marks = [];
+
+        // Match the coordinates of the target element
+        this.element.style.position = 'absolute';
+        // Disable pointer events
+        this.element.setAttribute('pointer-events', 'none');
+
+        // Set up mouse event proxying between the target element and the marks
+        _events2.default.proxyMouse(this.target, this.marks);
+
+        container.appendChild(this.element);
+
+        this.render();
+    }
+
+    _createClass(Pane, [{
+        key: 'addMark',
+        value: function addMark(mark) {
+            var g = _svg2.default.createElement('g');
+            this.element.appendChild(g);
+            mark.bind(g);
+
+            this.marks.push(mark);
+
+            mark.render();
+            return mark;
+        }
+    }, {
+        key: 'removeMark',
+        value: function removeMark(mark) {
+            var idx = this.marks.indexOf(mark);
+            if (idx === -1) {
+                return;
+            }
+            var el = mark.unbind();
+            this.element.removeChild(el);
+            this.marks.splice(idx, 1);
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            setCoords(this.element, coords(this.target));
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = this.marks[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var m = _step.value;
+
+                    m.render();
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+        }
+    }]);
+
+    return Pane;
+}();
+
+var Mark = exports.Mark = function () {
+    function Mark() {
+        _classCallCheck(this, Mark);
+
+        this.element = null;
+    }
+
+    _createClass(Mark, [{
+        key: 'bind',
+        value: function bind(element) {
+            this.element = element;
+        }
+    }, {
+        key: 'unbind',
+        value: function unbind() {
+            var el = this.element;
+            this.element = null;
+            return el;
+        }
+    }, {
+        key: 'render',
+        value: function render() {}
+    }, {
+        key: 'dispatchEvent',
+        value: function dispatchEvent(e) {
+            if (!this.element) return;
+            this.element.dispatchEvent(e);
+        }
+    }, {
+        key: 'getBoundingClientRect',
+        value: function getBoundingClientRect() {
+            return this.element.getBoundingClientRect();
+        }
+    }, {
+        key: 'getClientRects',
+        value: function getClientRects() {
+            var rects = [];
+            var el = this.element.firstChild;
+            while (el) {
+                rects.push(el.getBoundingClientRect());
+                el = el.nextSibling;
+            }
+            return rects;
+        }
+    }, {
+        key: 'filteredRanges',
+        value: function filteredRanges() {
+            var rects = Array.from(this.range.getClientRects());
+
+            // De-duplicate the boxes
+            return rects.filter(function (box) {
+                for (var i = 0; i < rects.length; i++) {
+                    if (rects[i] === box) {
+                        return true;
+                    }
+                    var contained = contains(rects[i], box);
+                    if (contained) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+    }]);
+
+    return Mark;
+}();
+
+var Highlight = exports.Highlight = function (_Mark) {
+    _inherits(Highlight, _Mark);
+
+    function Highlight(range, className, data, attributes) {
+        _classCallCheck(this, Highlight);
+
+        var _this = _possibleConstructorReturn(this, (Highlight.__proto__ || Object.getPrototypeOf(Highlight)).call(this));
+
+        _this.range = range;
+        _this.className = className;
+        _this.data = data || {};
+        _this.attributes = attributes || {};
+        return _this;
+    }
+
+    _createClass(Highlight, [{
+        key: 'bind',
+        value: function bind(element) {
+            _get(Highlight.prototype.__proto__ || Object.getPrototypeOf(Highlight.prototype), 'bind', this).call(this, element);
+
+            for (var attr in this.data) {
+                if (this.data.hasOwnProperty(attr)) {
+                    this.element.dataset[attr] = this.data[attr];
+                }
+            }
+
+            for (var attr in this.attributes) {
+                if (this.attributes.hasOwnProperty(attr)) {
+                    this.element.setAttribute(attr, this.attributes[attr]);
+                }
+            }
+
+            if (this.className) {
+                this.element.classList.add(this.className);
+            }
+        }
+    }, {
+        key: 'render',
+        value: function render() {
+            // Empty element
+            while (this.element.firstChild) {
+                this.element.removeChild(this.element.firstChild);
+            }
+
+            var docFrag = this.element.ownerDocument.createDocumentFragment();
+            var filtered = this.filteredRanges();
+            var offset = this.element.getBoundingClientRect();
+
+            for (var i = 0, len = filtered.length; i < len; i++) {
+                var r = filtered[i];
+                var el = _svg2.default.createElement('rect');
+                el.setAttribute('x', r.left - offset.left);
+                el.setAttribute('y', r.top - offset.top);
+                el.setAttribute('height', r.height);
+                el.setAttribute('width', r.width);
+                docFrag.appendChild(el);
+            }
+
+            this.element.appendChild(docFrag);
+        }
+    }]);
+
+    return Highlight;
+}(Mark);
+
+var Underline = exports.Underline = function (_Highlight) {
+    _inherits(Underline, _Highlight);
+
+    function Underline(range, className, data, attributes) {
+        _classCallCheck(this, Underline);
+
+        return _possibleConstructorReturn(this, (Underline.__proto__ || Object.getPrototypeOf(Underline)).call(this, range, className, data, attributes));
+    }
+
+    _createClass(Underline, [{
+        key: 'render',
+        value: function render() {
+            // Empty element
+            while (this.element.firstChild) {
+                this.element.removeChild(this.element.firstChild);
+            }
+
+            var docFrag = this.element.ownerDocument.createDocumentFragment();
+            var filtered = this.filteredRanges();
+            var offset = this.element.getBoundingClientRect();
+
+            for (var i = 0, len = filtered.length; i < len; i++) {
+                var r = filtered[i];
+
+                var rect = _svg2.default.createElement('rect');
+                rect.setAttribute('x', r.left - offset.left);
+                rect.setAttribute('y', r.top - offset.top);
+                rect.setAttribute('height', r.height);
+                rect.setAttribute('width', r.width);
+                rect.setAttribute('fill', 'none');
+
+                var line = _svg2.default.createElement('line');
+                line.setAttribute('x1', r.left - offset.left);
+                line.setAttribute('x2', r.left - offset.left + r.width);
+                line.setAttribute('y1', r.top - offset.top + r.height - 1);
+                line.setAttribute('y2', r.top - offset.top + r.height - 1);
+
+                line.setAttribute('stroke-width', 1);
+                line.setAttribute('stroke', 'black'); //TODO: match text color?
+                line.setAttribute('stroke-linecap', 'square');
+
+                docFrag.appendChild(rect);
+
+                docFrag.appendChild(line);
+            }
+
+            this.element.appendChild(docFrag);
+        }
+    }]);
+
+    return Underline;
+}(Highlight);
+
+function coords(el) {
+    var rect = el.getBoundingClientRect();
+
+    return {
+        top: rect.top + el.ownerDocument.body.scrollTop,
+        left: rect.left + el.ownerDocument.body.scrollLeft,
+        height: rect.height + el.scrollHeight,
+        width: rect.width + el.scrollWidth
+    };
+}
+
+function setCoords(el, coords) {
+    el.style.top = coords.top + 'px';
+    el.style.left = coords.left + 'px';
+    el.style.height = '100%';
+    el.style.width = '100%';
+}
+
+function contains(rect1, rect2) {
+    return rect2.right <= rect1.right && rect2.left >= rect1.left && rect2.top >= rect1.top && rect2.bottom <= rect1.bottom;
+}
+
+/***/ }),
+/* 47 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.createElement = createElement;
+function createElement(name) {
+    return document.createElementNS('http://www.w3.org/2000/svg', name);
+}
+
+exports.default = {
+    createElement: createElement
+};
+
+/***/ }),
+/* 48 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+exports.proxyMouse = proxyMouse;
+exports.clone = clone;
+// import 'babelify/polyfill'; // needed for Object.assign
+
+exports.default = {
+    proxyMouse: proxyMouse
+};
+
+/**
+ * Start proxying all mouse events that occur on the target node to each node in
+ * a set of tracked nodes.
+ *
+ * The items in tracked do not strictly have to be DOM Nodes, but they do have
+ * to have dispatchEvent, getBoundingClientRect, and getClientRects methods.
+ *
+ * @param target {Node} The node on which to listen for mouse events.
+ * @param tracked {Node[]} A (possibly mutable) array of nodes to which to proxy
+ *                         events.
+ */
+
+function proxyMouse(target, tracked) {
+    function dispatch(e) {
+        // We walk through the set of tracked elements in reverse order so that
+        // events are sent to those most recently added first.
+        //
+        // This is the least surprising behaviour as it simulates the way the
+        // browser would work if items added later were drawn "on top of"
+        // earlier ones.
+        for (var i = tracked.length - 1; i >= 0; i--) {
+            var t = tracked[i];
+
+            if (!contains(t, e.clientX, e.clientY)) {
+                continue;
+            }
+
+            // The event targets this mark, so dispatch a cloned event:
+            t.dispatchEvent(clone(e));
+            // We only dispatch the cloned event to the first matching mark.
+            break;
+        }
+    }
+
+    var _arr = ['mouseup', 'mousedown', 'click'];
+    for (var _i = 0; _i < _arr.length; _i++) {
+        var ev = _arr[_i];
+        target.addEventListener(ev, function (e) {
+            return dispatch(e);
+        }, false);
+    }
+}
+
+/**
+ * Clone a mouse event object.
+ *
+ * @param e {MouseEvent} A mouse event object to clone.
+ * @returns {MouseEvent}
+ */
+function clone(e) {
+    var opts = Object.assign({}, e, { bubbles: false });
+    try {
+        return new MouseEvent(e.type, opts);
+    } catch (err) {
+        // compat: webkit
+        var copy = document.createEvent('MouseEvents');
+        copy.initMouseEvent(e.type, false, opts.cancelable, opts.view, opts.detail, opts.screenX, opts.screenY, opts.clientX, opts.clientY, opts.ctrlKey, opts.altKey, opts.shiftKey, opts.metaKey, opts.button, opts.relatedTarget);
+        return copy;
+    }
+}
+
+/**
+ * Check if the item contains the point denoted by the passed coordinates
+ * @param item {Object} An object with getBoundingClientRect and getClientRects
+ *                      methods.
+ * @param x {Number}
+ * @param y {Number}
+ * @returns {Boolean}
+ */
+function contains(item, x, y) {
+    function rectContains(r, x, y) {
+        var bottom = r.top + r.height;
+        var right = r.left + r.width;
+        return r.top <= y && r.left <= x && bottom > y && right > x;
+    }
+
+    // Check overall bounding box first
+    var rect = item.getBoundingClientRect();
+    if (!rectContains(rect, x, y)) {
+        return false;
+    }
+
+    // Then continue to check each child rect
+    var rects = item.getClientRects();
+    for (var i = 0, len = rects.length; i < len; i++) {
+        if (rectContains(rects[i], x, y)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/***/ }),
+/* 49 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); // Manage annotations for a book?
+
+/*
+let a = rendition.annotations.highlight(cfiRange, data)
+
+a.on("added", () => console.log("added"))
+a.on("removed", () => console.log("removed"))
+a.on("clicked", () => console.log("clicked"))
+
+a.update(data)
+a.remove();
+a.text();
+
+rendition.annotations.show()
+rendition.annotations.hide()
+
+rendition.annotations.highlights.show()
+rendition.annotations.highlights.hide()
+*/
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+	* Handles managing adding & removing Annotations
+	* @class
+	*/
+var Annotations = function () {
+	function Annotations(rendition) {
+		_classCallCheck(this, Annotations);
+
+		this.rendition = rendition;
+		this.highlights = [];
+		this.underlines = [];
+		this.marks = [];
+		this._annotations = {};
+		this._annotationsBySectionIndex = {};
+
+		this.rendition.hooks.content.register(this.inject.bind(this));
+		this.rendition.hooks.unloaded.register(this.clear.bind(this));
+	}
+
+	_createClass(Annotations, [{
+		key: "add",
+		value: function add(type, cfiRange, data, cb) {
+			var hash = encodeURI(cfiRange);
+			var cfi = new _epubcfi2.default(cfiRange);
+			var sectionIndex = cfi.spinePos;
+			var annotation = new Annotation({
+				type: type,
+				cfiRange: cfiRange,
+				data: data,
+				sectionIndex: sectionIndex,
+				cb: cb
+			});
+
+			this._annotations[hash] = annotation;
+
+			if (sectionIndex in this._annotationsBySectionIndex) {
+				this._annotationsBySectionIndex[sectionIndex].push(hash);
+			} else {
+				this._annotationsBySectionIndex[sectionIndex] = [hash];
+			}
+
+			var contents = this.rendition.getContents();
+			contents.forEach(function (content) {
+				if (annotation.sectionIndex === content.sectionIndex) {
+					annotation.attach(content);
+				}
+			});
+
+			return annotation;
+		}
+	}, {
+		key: "remove",
+		value: function remove(cfiRange, type) {
+			var hash = encodeURI(cfiRange);
+
+			if (hash in this._annotations) {
+				var annotation = this._annotations[hash];
+
+				var contents = this.rendition.getContents();
+				contents.forEach(function (content) {
+					if (annotation.sectionIndex === content.sectionIndex) {
+						annotation.detach(content);
+					}
+				});
+
+				delete this._annotations[hash];
+			}
+		}
+	}, {
+		key: "highlight",
+		value: function highlight(cfiRange, data, cb) {
+			this.add("highlight", cfiRange, data, cb);
+		}
+	}, {
+		key: "underline",
+		value: function underline(cfiRange, data, cb) {
+			this.add("underline", cfiRange, data, cb);
+		}
+	}, {
+		key: "mark",
+		value: function mark(cfiRange, data, cb) {
+			this.add("mark", cfiRange, data, cb);
+		}
+	}, {
+		key: "each",
+		value: function each() {
+			return this._annotations.forEach.apply(this._annotations, arguments);
+		}
+	}, {
+		key: "inject",
+		value: function inject(contents) {
+			var _this = this;
+
+			var sectionIndex = contents.index;
+			if (sectionIndex in this._annotationsBySectionIndex) {
+				var annotations = this._annotationsBySectionIndex[sectionIndex];
+				annotations.forEach(function (hash) {
+					var annotation = _this._annotations[hash];
+					annotation.attach(contents);
+				});
+			}
+		}
+	}, {
+		key: "clear",
+		value: function clear(contents) {
+			var _this2 = this;
+
+			var sectionIndex = contents.index;
+			if (sectionIndex in this._annotationsBySectionIndex) {
+				var annotations = this._annotationsBySectionIndex[sectionIndex];
+				annotations.forEach(function (hash) {
+					var annotation = _this2._annotations[hash];
+					annotation.detach(contents);
+				});
+			}
+		}
+	}, {
+		key: "show",
+		value: function show() {}
+	}, {
+		key: "hide",
+		value: function hide() {}
+	}]);
+
+	return Annotations;
+}();
+
+var Annotation = function () {
+	function Annotation(_ref) {
+		var type = _ref.type,
+		    cfiRange = _ref.cfiRange,
+		    data = _ref.data,
+		    sectionIndex = _ref.sectionIndex;
+
+		_classCallCheck(this, Annotation);
+
+		this.type = type;
+		this.cfiRange = cfiRange;
+		this.data = data;
+		this.sectionIndex = sectionIndex;
+		this.mark = undefined;
+	}
+
+	_createClass(Annotation, [{
+		key: "update",
+		value: function update(data) {
+			this.data = data;
+		}
+	}, {
+		key: "attach",
+		value: function attach(contents) {
+			var cfiRange = this.cfiRange,
+			    data = this.data,
+			    type = this.type,
+			    mark = this.mark,
+			    cb = this.cb;
+
+			var result = void 0;
+			/*
+   if (mark) {
+   	return; // already added
+   }
+   */
+			if (type === "highlight") {
+				result = contents.highlight(cfiRange, data, cb);
+			} else if (type === "underline") {
+				result = contents.underline(cfiRange, data, cb);
+			} else if (type === "mark") {
+				result = contents.mark(cfiRange, data, cb);
+			}
+
+			this.mark = result;
+
+			return result;
+		}
+	}, {
+		key: "detach",
+		value: function detach(contents) {
+			var cfiRange = this.cfiRange,
+			    type = this.type;
+
+			var result = void 0;
+
+			if (contents) {
+				if (type === "highlight") {
+					result = contents.unhighlight(cfiRange);
+				} else if (type === "underline") {
+					result = contents.ununderline(cfiRange);
+				} else if (type === "mark") {
+					result = contents.unmark(cfiRange);
+				}
+			}
+
+			this.mark = undefined;
+
+			return result;
+		}
+	}, {
+		key: "text",
+		value: function text() {
+			// TODO: needs implementation in contents
+		}
+	}]);
+
+	return Annotation;
+}();
+
+(0, _eventEmitter2.default)(Annotation.prototype);
+
+exports.default = Annotations;
+module.exports = exports["default"];
+
+/***/ }),
+/* 50 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+var _request = __webpack_require__(9);
+
+var _request2 = _interopRequireDefault(_request);
+
+var _mime = __webpack_require__(14);
+
+var _mime2 = _interopRequireDefault(_mime);
+
+var _path = __webpack_require__(3);
+
+var _path2 = _interopRequireDefault(_path);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+/**
+ * Handles Unzipping a requesting files from an Epub Archive
+ * @class
+ */
+var Archive = function () {
+	function Archive() {
+		_classCallCheck(this, Archive);
+
+		this.zip = undefined;
+		this.urlCache = {};
+
+		this.checkRequirements();
+	}
+
+	/**
+  * Checks to see if JSZip exists in global namspace,
+  * Requires JSZip if it isn't there
+  * @private
+  */
+
+
+	_createClass(Archive, [{
+		key: "checkRequirements",
+		value: function checkRequirements() {
+			try {
+				if (typeof JSZip === "undefined") {
+					var _JSZip = __webpack_require__(51);
+					this.zip = new _JSZip();
+				} else {
+					this.zip = new JSZip();
+				}
+			} catch (e) {
+				throw new Error("JSZip lib not loaded");
+			}
+		}
+
+		/**
+   * Open an archive
+   * @param  {binary} input
+   * @param  {boolean} isBase64 tells JSZip if the input data is base64 encoded
+   * @return {Promise} zipfile
+   */
+
+	}, {
+		key: "open",
+		value: function open(input, isBase64) {
+			return this.zip.loadAsync(input, { "base64": isBase64 });
+		}
+
+		/**
+   * Load and Open an archive
+   * @param  {string} zipUrl
+   * @param  {boolean} isBase64 tells JSZip if the input data is base64 encoded
+   * @return {Promise} zipfile
+   */
+
+	}, {
+		key: "openUrl",
+		value: function openUrl(zipUrl, isBase64) {
+			return (0, _request2.default)(zipUrl, "binary").then(function (data) {
+				return this.zip.loadAsync(data, { "base64": isBase64 });
+			}.bind(this));
+		}
+
+		/**
+   * Request
+   * @param  {string} url  a url to request from the archive
+   * @param  {[string]} type specify the type of the returned result
+   * @return {Promise}
+   */
+
+	}, {
+		key: "request",
+		value: function request(url, type) {
+			var deferred = new _core.defer();
+			var response;
+			var path = new _path2.default(url);
+
+			// If type isn't set, determine it from the file extension
+			if (!type) {
+				type = path.extension;
+			}
+
+			if (type == "blob") {
+				response = this.getBlob(url);
+			} else {
+				response = this.getText(url);
+			}
+
+			if (response) {
+				response.then(function (r) {
+					var result = this.handleResponse(r, type);
+					deferred.resolve(result);
+				}.bind(this));
+			} else {
+				deferred.reject({
+					message: "File not found in the epub: " + url,
+					stack: new Error().stack
+				});
+			}
+			return deferred.promise;
+		}
+
+		/**
+   * Handle the response from request
+   * @private
+   * @param  {any} response
+   * @param  {[string]} type
+   * @return {any} the parsed result
+   */
+
+	}, {
+		key: "handleResponse",
+		value: function handleResponse(response, type) {
+			var r;
+
+			if (type == "json") {
+				r = JSON.parse(response);
+			} else if ((0, _core.isXml)(type)) {
+				r = (0, _core.parse)(response, "text/xml");
+			} else if (type == "xhtml") {
+				r = (0, _core.parse)(response, "application/xhtml+xml");
+			} else if (type == "html" || type == "htm") {
+				r = (0, _core.parse)(response, "text/html");
+			} else {
+				r = response;
+			}
+
+			return r;
+		}
+
+		/**
+   * Get a Blob from Archive by Url
+   * @param  {string} url
+   * @param  {[string]} mimeType
+   * @return {Blob}
+   */
+
+	}, {
+		key: "getBlob",
+		value: function getBlob(url, mimeType) {
+			var decodededUrl = window.decodeURIComponent(url.substr(1)); // Remove first slash
+			var entry = this.zip.file(decodededUrl);
+
+			if (entry) {
+				mimeType = mimeType || _mime2.default.lookup(entry.name);
+				return entry.async("uint8array").then(function (uint8array) {
+					return new Blob([uint8array], { type: mimeType });
+				});
+			}
+		}
+
+		/**
+   * Get Text from Archive by Url
+   * @param  {string} url
+   * @param  {[string]} encoding
+   * @return {string}
+   */
+
+	}, {
+		key: "getText",
+		value: function getText(url, encoding) {
+			var decodededUrl = window.decodeURIComponent(url.substr(1)); // Remove first slash
+			var entry = this.zip.file(decodededUrl);
+
+			if (entry) {
+				return entry.async("string").then(function (text) {
+					return text;
+				});
+			}
+		}
+
+		/**
+   * Get a base64 encoded result from Archive by Url
+   * @param  {string} url
+   * @param  {[string]} mimeType
+   * @return {string} base64 encoded
+   */
+
+	}, {
+		key: "getBase64",
+		value: function getBase64(url, mimeType) {
+			var decodededUrl = window.decodeURIComponent(url.substr(1)); // Remove first slash
+			var entry = this.zip.file(decodededUrl);
+
+			if (entry) {
+				mimeType = mimeType || _mime2.default.lookup(entry.name);
+				return entry.async("base64").then(function (data) {
+					return "data:" + mimeType + ";base64," + data;
+				});
+			}
+		}
+
+		/**
+   * Create a Url from an unarchived item
+   * @param  {string} url
+   * @param  {[object]} options.base64 use base64 encoding or blob url
+   * @return {Promise} url promise with Url string
+   */
+
+	}, {
+		key: "createUrl",
+		value: function createUrl(url, options) {
+			var deferred = new _core.defer();
+			var _URL = window.URL || window.webkitURL || window.mozURL;
+			var tempUrl;
+			var response;
+			var useBase64 = options && options.base64;
+
+			if (url in this.urlCache) {
+				deferred.resolve(this.urlCache[url]);
+				return deferred.promise;
+			}
+
+			if (useBase64) {
+				response = this.getBase64(url);
+
+				if (response) {
+					response.then(function (tempUrl) {
+
+						this.urlCache[url] = tempUrl;
+						deferred.resolve(tempUrl);
+					}.bind(this));
+				}
+			} else {
+
+				response = this.getBlob(url);
+
+				if (response) {
+					response.then(function (blob) {
+
+						tempUrl = _URL.createObjectURL(blob);
+						this.urlCache[url] = tempUrl;
+						deferred.resolve(tempUrl);
+					}.bind(this));
+				}
+			}
+
+			if (!response) {
+				deferred.reject({
+					message: "File not found in the epub: " + url,
+					stack: new Error().stack
+				});
+			}
+
+			return deferred.promise;
+		}
+
+		/**
+   * Revoke Temp Url for a achive item
+   * @param  {string} url url of the item in the archive
+   */
+
+	}, {
+		key: "revokeUrl",
+		value: function revokeUrl(url) {
+			var _URL = window.URL || window.webkitURL || window.mozURL;
+			var fromCache = this.urlCache[url];
+			if (fromCache) _URL.revokeObjectURL(fromCache);
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			var _URL = window.URL || window.webkitURL || window.mozURL;
+			for (var fromCache in this.urlCache) {
+				_URL.revokeObjectURL(fromCache);
+			}
+			this.zip = undefined;
+			this.urlCache = {};
+		}
+	}]);
+
+	return Archive;
+}();
+
+exports.default = Archive;
+module.exports = exports["default"];
+
+/***/ }),
+/* 51 */
+/***/ (function(module, exports) {
+
+if(typeof __WEBPACK_EXTERNAL_MODULE_51__ === 'undefined') {var e = new Error("Cannot find module \"JSZip\""); e.code = 'MODULE_NOT_FOUND'; throw e;}
+module.exports = __WEBPACK_EXTERNAL_MODULE_51__;
+
+/***/ }),
+/* 52 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global, module) {var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;/* From https://github.com/webcomponents/URL/blob/master/url.js
+ * Added UMD, file link handling */
+
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
+
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+(function (root, factory) {
+  // Fix for this being undefined in modules
+  if (!root) {
+    root = window || global;
+  }
+  if (( false ? 'undefined' : _typeof(module)) === 'object' && module.exports) {
+    // Node
+    module.exports = factory(root);
+  } else if (true) {
+    // AMD. Register as an anonymous module.
+    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+				(__WEBPACK_AMD_DEFINE_FACTORY__.apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__)) : __WEBPACK_AMD_DEFINE_FACTORY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  } else {
+    // Browser globals (root is window)
+    root.URL = factory(root);
+  }
+})(undefined, function (scope) {
+  // feature detect for URL constructor
+  var hasWorkingUrl = false;
+  if (!scope.forceJURL) {
+    try {
+      var u = new URL('b', 'http://a');
+      u.pathname = 'c%20d';
+      hasWorkingUrl = u.href === 'http://a/c%20d';
+    } catch (e) {}
+  }
+
+  if (hasWorkingUrl) return scope.URL;
+
+  var relative = Object.create(null);
+  relative['ftp'] = 21;
+  relative['file'] = 0;
+  relative['gopher'] = 70;
+  relative['http'] = 80;
+  relative['https'] = 443;
+  relative['ws'] = 80;
+  relative['wss'] = 443;
+
+  var relativePathDotMapping = Object.create(null);
+  relativePathDotMapping['%2e'] = '.';
+  relativePathDotMapping['.%2e'] = '..';
+  relativePathDotMapping['%2e.'] = '..';
+  relativePathDotMapping['%2e%2e'] = '..';
+
+  function isRelativeScheme(scheme) {
+    return relative[scheme] !== undefined;
+  }
+
+  function invalid() {
+    clear.call(this);
+    this._isInvalid = true;
+  }
+
+  function IDNAToASCII(h) {
+    if ('' == h) {
+      invalid.call(this);
+    }
+    // XXX
+    return h.toLowerCase();
+  }
+
+  function percentEscape(c) {
+    var unicode = c.charCodeAt(0);
+    if (unicode > 0x20 && unicode < 0x7F &&
+    // " # < > ? `
+    [0x22, 0x23, 0x3C, 0x3E, 0x3F, 0x60].indexOf(unicode) == -1) {
+      return c;
+    }
+    return encodeURIComponent(c);
+  }
+
+  function percentEscapeQuery(c) {
+    // XXX This actually needs to encode c using encoding and then
+    // convert the bytes one-by-one.
+
+    var unicode = c.charCodeAt(0);
+    if (unicode > 0x20 && unicode < 0x7F &&
+    // " # < > ` (do not escape '?')
+    [0x22, 0x23, 0x3C, 0x3E, 0x60].indexOf(unicode) == -1) {
+      return c;
+    }
+    return encodeURIComponent(c);
+  }
+
+  var EOF = undefined,
+      ALPHA = /[a-zA-Z]/,
+      ALPHANUMERIC = /[a-zA-Z0-9\+\-\.]/;
+
+  function parse(input, stateOverride, base) {
+    function err(message) {
+      errors.push(message);
+    }
+
+    var state = stateOverride || 'scheme start',
+        cursor = 0,
+        buffer = '',
+        seenAt = false,
+        seenBracket = false,
+        errors = [];
+
+    loop: while ((input[cursor - 1] != EOF || cursor == 0) && !this._isInvalid) {
+      var c = input[cursor];
+      switch (state) {
+        case 'scheme start':
+          if (c && ALPHA.test(c)) {
+            buffer += c.toLowerCase(); // ASCII-safe
+            state = 'scheme';
+          } else if (!stateOverride) {
+            buffer = '';
+            state = 'no scheme';
+            continue;
+          } else {
+            err('Invalid scheme.');
+            break loop;
+          }
+          break;
+
+        case 'scheme':
+          if (c && ALPHANUMERIC.test(c)) {
+            buffer += c.toLowerCase(); // ASCII-safe
+          } else if (':' == c) {
+            this._scheme = buffer;
+            buffer = '';
+            if (stateOverride) {
+              break loop;
+            }
+            if (isRelativeScheme(this._scheme)) {
+              this._isRelative = true;
+            }
+            if ('file' == this._scheme) {
+              state = 'relative';
+            } else if (this._isRelative && base && base._scheme == this._scheme) {
+              state = 'relative or authority';
+            } else if (this._isRelative) {
+              state = 'authority first slash';
+            } else {
+              state = 'scheme data';
+            }
+          } else if (!stateOverride) {
+            buffer = '';
+            cursor = 0;
+            state = 'no scheme';
+            continue;
+          } else if (EOF == c) {
+            break loop;
+          } else {
+            err('Code point not allowed in scheme: ' + c);
+            break loop;
+          }
+          break;
+
+        case 'scheme data':
+          if ('?' == c) {
+            this._query = '?';
+            state = 'query';
+          } else if ('#' == c) {
+            this._fragment = '#';
+            state = 'fragment';
+          } else {
+            // XXX error handling
+            if (EOF != c && '\t' != c && '\n' != c && '\r' != c) {
+              this._schemeData += percentEscape(c);
+            }
+          }
+          break;
+
+        case 'no scheme':
+          if (!base || !isRelativeScheme(base._scheme)) {
+            err('Missing scheme.');
+            invalid.call(this);
+          } else {
+            state = 'relative';
+            continue;
+          }
+          break;
+
+        case 'relative or authority':
+          if ('/' == c && '/' == input[cursor + 1]) {
+            state = 'authority ignore slashes';
+          } else {
+            err('Expected /, got: ' + c);
+            state = 'relative';
+            continue;
+          }
+          break;
+
+        case 'relative':
+          this._isRelative = true;
+          if ('file' != this._scheme) this._scheme = base._scheme;
+          if (EOF == c) {
+            this._host = base._host;
+            this._port = base._port;
+            this._path = base._path.slice();
+            this._query = base._query;
+            this._username = base._username;
+            this._password = base._password;
+            break loop;
+          } else if ('/' == c || '\\' == c) {
+            if ('\\' == c) err('\\ is an invalid code point.');
+            state = 'relative slash';
+          } else if ('?' == c) {
+            this._host = base._host;
+            this._port = base._port;
+            this._path = base._path.slice();
+            this._query = '?';
+            this._username = base._username;
+            this._password = base._password;
+            state = 'query';
+          } else if ('#' == c) {
+            this._host = base._host;
+            this._port = base._port;
+            this._path = base._path.slice();
+            this._query = base._query;
+            this._fragment = '#';
+            this._username = base._username;
+            this._password = base._password;
+            state = 'fragment';
+          } else {
+            var nextC = input[cursor + 1];
+            var nextNextC = input[cursor + 2];
+            if ('file' != this._scheme || !ALPHA.test(c) || nextC != ':' && nextC != '|' || EOF != nextNextC && '/' != nextNextC && '\\' != nextNextC && '?' != nextNextC && '#' != nextNextC) {
+              this._host = base._host;
+              this._port = base._port;
+              this._username = base._username;
+              this._password = base._password;
+              this._path = base._path.slice();
+              this._path.pop();
+            }
+            state = 'relative path';
+            continue;
+          }
+          break;
+
+        case 'relative slash':
+          if ('/' == c || '\\' == c) {
+            if ('\\' == c) {
+              err('\\ is an invalid code point.');
+            }
+            if ('file' == this._scheme) {
+              state = 'file host';
+            } else {
+              state = 'authority ignore slashes';
+            }
+          } else {
+            if ('file' != this._scheme) {
+              this._host = base._host;
+              this._port = base._port;
+              this._username = base._username;
+              this._password = base._password;
+            }
+            state = 'relative path';
+            continue;
+          }
+          break;
+
+        case 'authority first slash':
+          if ('/' == c) {
+            state = 'authority second slash';
+          } else {
+            err("Expected '/', got: " + c);
+            state = 'authority ignore slashes';
+            continue;
+          }
+          break;
+
+        case 'authority second slash':
+          state = 'authority ignore slashes';
+          if ('/' != c) {
+            err("Expected '/', got: " + c);
+            continue;
+          }
+          break;
+
+        case 'authority ignore slashes':
+          if ('/' != c && '\\' != c) {
+            state = 'authority';
+            continue;
+          } else {
+            err('Expected authority, got: ' + c);
+          }
+          break;
+
+        case 'authority':
+          if ('@' == c) {
+            if (seenAt) {
+              err('@ already seen.');
+              buffer += '%40';
+            }
+            seenAt = true;
+            for (var i = 0; i < buffer.length; i++) {
+              var cp = buffer[i];
+              if ('\t' == cp || '\n' == cp || '\r' == cp) {
+                err('Invalid whitespace in authority.');
+                continue;
+              }
+              // XXX check URL code points
+              if (':' == cp && null === this._password) {
+                this._password = '';
+                continue;
+              }
+              var tempC = percentEscape(cp);
+              null !== this._password ? this._password += tempC : this._username += tempC;
+            }
+            buffer = '';
+          } else if (EOF == c || '/' == c || '\\' == c || '?' == c || '#' == c) {
+            cursor -= buffer.length;
+            buffer = '';
+            state = 'host';
+            continue;
+          } else {
+            buffer += c;
+          }
+          break;
+
+        case 'file host':
+          if (EOF == c || '/' == c || '\\' == c || '?' == c || '#' == c) {
+            if (buffer.length == 2 && ALPHA.test(buffer[0]) && (buffer[1] == ':' || buffer[1] == '|')) {
+              state = 'relative path';
+            } else if (buffer.length == 0) {
+              state = 'relative path start';
+            } else {
+              this._host = IDNAToASCII.call(this, buffer);
+              buffer = '';
+              state = 'relative path start';
+            }
+            continue;
+          } else if ('\t' == c || '\n' == c || '\r' == c) {
+            err('Invalid whitespace in file host.');
+          } else {
+            buffer += c;
+          }
+          break;
+
+        case 'host':
+        case 'hostname':
+          if (':' == c && !seenBracket) {
+            // XXX host parsing
+            this._host = IDNAToASCII.call(this, buffer);
+            buffer = '';
+            state = 'port';
+            if ('hostname' == stateOverride) {
+              break loop;
+            }
+          } else if (EOF == c || '/' == c || '\\' == c || '?' == c || '#' == c) {
+            this._host = IDNAToASCII.call(this, buffer);
+            buffer = '';
+            state = 'relative path start';
+            if (stateOverride) {
+              break loop;
+            }
+            continue;
+          } else if ('\t' != c && '\n' != c && '\r' != c) {
+            if ('[' == c) {
+              seenBracket = true;
+            } else if (']' == c) {
+              seenBracket = false;
+            }
+            buffer += c;
+          } else {
+            err('Invalid code point in host/hostname: ' + c);
+          }
+          break;
+
+        case 'port':
+          if (/[0-9]/.test(c)) {
+            buffer += c;
+          } else if (EOF == c || '/' == c || '\\' == c || '?' == c || '#' == c || stateOverride) {
+            if ('' != buffer) {
+              var temp = parseInt(buffer, 10);
+              if (temp != relative[this._scheme]) {
+                this._port = temp + '';
+              }
+              buffer = '';
+            }
+            if (stateOverride) {
+              break loop;
+            }
+            state = 'relative path start';
+            continue;
+          } else if ('\t' == c || '\n' == c || '\r' == c) {
+            err('Invalid code point in port: ' + c);
+          } else {
+            invalid.call(this);
+          }
+          break;
+
+        case 'relative path start':
+          if ('\\' == c) err("'\\' not allowed in path.");
+          state = 'relative path';
+          if ('/' != c && '\\' != c) {
+            continue;
+          }
+          break;
+
+        case 'relative path':
+          if (EOF == c || '/' == c || '\\' == c || !stateOverride && ('?' == c || '#' == c)) {
+            if ('\\' == c) {
+              err('\\ not allowed in relative path.');
+            }
+            var tmp;
+            if (tmp = relativePathDotMapping[buffer.toLowerCase()]) {
+              buffer = tmp;
+            }
+            if ('..' == buffer) {
+              this._path.pop();
+              if ('/' != c && '\\' != c) {
+                this._path.push('');
+              }
+            } else if ('.' == buffer && '/' != c && '\\' != c) {
+              this._path.push('');
+            } else if ('.' != buffer) {
+              if ('file' == this._scheme && this._path.length == 0 && buffer.length == 2 && ALPHA.test(buffer[0]) && buffer[1] == '|') {
+                buffer = buffer[0] + ':';
+              }
+              this._path.push(buffer);
+            }
+            buffer = '';
+            if ('?' == c) {
+              this._query = '?';
+              state = 'query';
+            } else if ('#' == c) {
+              this._fragment = '#';
+              state = 'fragment';
+            }
+          } else if ('\t' != c && '\n' != c && '\r' != c) {
+            buffer += percentEscape(c);
+          }
+          break;
+
+        case 'query':
+          if (!stateOverride && '#' == c) {
+            this._fragment = '#';
+            state = 'fragment';
+          } else if (EOF != c && '\t' != c && '\n' != c && '\r' != c) {
+            this._query += percentEscapeQuery(c);
+          }
+          break;
+
+        case 'fragment':
+          if (EOF != c && '\t' != c && '\n' != c && '\r' != c) {
+            this._fragment += c;
+          }
+          break;
+      }
+
+      cursor++;
+    }
+  }
+
+  function clear() {
+    this._scheme = '';
+    this._schemeData = '';
+    this._username = '';
+    this._password = null;
+    this._host = '';
+    this._port = '';
+    this._path = [];
+    this._query = '';
+    this._fragment = '';
+    this._isInvalid = false;
+    this._isRelative = false;
+  }
+
+  // Does not process domain names or IP addresses.
+  // Does not handle encoding for the query parameter.
+  function jURL(url, base /* , encoding */) {
+    if (base !== undefined && !(base instanceof jURL)) base = new jURL(String(base));
+
+    this._url = url;
+    clear.call(this);
+
+    var input = url.replace(/^[ \t\r\n\f]+|[ \t\r\n\f]+$/g, '');
+    // encoding = encoding || 'utf-8'
+
+    parse.call(this, input, null, base);
+  }
+
+  jURL.prototype = {
+    toString: function toString() {
+      return this.href;
+    },
+    get href() {
+      if (this._isInvalid) return this._url;
+
+      var authority = '';
+      if ('' != this._username || null != this._password) {
+        authority = this._username + (null != this._password ? ':' + this._password : '') + '@';
+      }
+
+      return this.protocol + (this._isRelative ? '//' + authority + this.host : '') + this.pathname + this._query + this._fragment;
+    },
+    set href(href) {
+      clear.call(this);
+      parse.call(this, href);
+    },
+
+    get protocol() {
+      return this._scheme + ':';
+    },
+    set protocol(protocol) {
+      if (this._isInvalid) return;
+      parse.call(this, protocol + ':', 'scheme start');
+    },
+
+    get host() {
+      return this._isInvalid ? '' : this._port ? this._host + ':' + this._port : this._host;
+    },
+    set host(host) {
+      if (this._isInvalid || !this._isRelative) return;
+      parse.call(this, host, 'host');
+    },
+
+    get hostname() {
+      return this._host;
+    },
+    set hostname(hostname) {
+      if (this._isInvalid || !this._isRelative) return;
+      parse.call(this, hostname, 'hostname');
+    },
+
+    get port() {
+      return this._port;
+    },
+    set port(port) {
+      if (this._isInvalid || !this._isRelative) return;
+      parse.call(this, port, 'port');
+    },
+
+    get pathname() {
+      return this._isInvalid ? '' : this._isRelative ? '/' + this._path.join('/') : this._schemeData;
+    },
+    set pathname(pathname) {
+      if (this._isInvalid || !this._isRelative) return;
+      this._path = [];
+      parse.call(this, pathname, 'relative path start');
+    },
+
+    get search() {
+      return this._isInvalid || !this._query || '?' == this._query ? '' : this._query;
+    },
+    set search(search) {
+      if (this._isInvalid || !this._isRelative) return;
+      this._query = '?';
+      if ('?' == search[0]) search = search.slice(1);
+      parse.call(this, search, 'query');
+    },
+
+    get hash() {
+      return this._isInvalid || !this._fragment || '#' == this._fragment ? '' : this._fragment;
+    },
+    set hash(hash) {
+      if (this._isInvalid) return;
+      this._fragment = '#';
+      if ('#' == hash[0]) hash = hash.slice(1);
+      parse.call(this, hash, 'fragment');
+    },
+
+    get origin() {
+      var host;
+      if (this._isInvalid || !this._scheme) {
+        return '';
+      }
+      // javascript: Gecko returns String(""), WebKit/Blink String("null")
+      // Gecko throws error for "data://"
+      // data: Gecko returns "", Blink returns "data://", WebKit returns "null"
+      // Gecko returns String("") for file: mailto:
+      // WebKit/Blink returns String("SCHEME://") for file: mailto:
+      switch (this._scheme) {
+        case 'file':
+          return 'file://'; // EPUBJS Added
+        case 'data':
+        case 'javascript':
+        case 'mailto':
+          return 'null';
+      }
+      host = this.host;
+      if (!host) {
+        return '';
+      }
+      return this._scheme + '://' + host;
+    }
+  };
+
+  // Copy over the static methods
+  var OriginalURL = scope.URL;
+  if (OriginalURL) {
+    jURL.createObjectURL = function (blob) {
+      // IE extension allows a second optional options argument.
+      // http://msdn.microsoft.com/en-us/library/ie/hh772302(v=vs.85).aspx
+      return OriginalURL.createObjectURL.apply(OriginalURL, arguments);
+    };
+    jURL.revokeObjectURL = function (url) {
+      OriginalURL.revokeObjectURL(url);
+    };
+  }
+
+  return jURL;
+});
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(53)(module)))
+
+/***/ }),
+/* 53 */
+/***/ (function(module, exports) {
+
+module.exports = function(module) {
+	if(!module.webpackPolyfill) {
+		module.deprecate = function() {};
+		module.paths = [];
+		// module.parent = undefined by default
+		if(!module.children) module.children = [];
+		Object.defineProperty(module, "loaded", {
+			enumerable: true,
+			get: function() {
+				return module.l;
+			}
+		});
+		Object.defineProperty(module, "id", {
+			enumerable: true,
+			get: function() {
+				return module.i;
+			}
+		});
+		module.webpackPolyfill = 1;
+	}
+	return module;
+};
+
+
+/***/ }),
+/* 54 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _eventEmitter = __webpack_require__(2);
+
+var _eventEmitter2 = _interopRequireDefault(_eventEmitter);
+
+var _core = __webpack_require__(0);
+
+var _epubcfi = __webpack_require__(1);
+
+var _epubcfi2 = _interopRequireDefault(_epubcfi);
+
+var _contents = __webpack_require__(12);
+
+var _contents2 = _interopRequireDefault(_contents);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var IframeView = function () {
+	function IframeView(section, options) {
+		_classCallCheck(this, IframeView);
+
+		this.settings = (0, _core.extend)({
+			ignoreClass: "",
+			axis: "vertical",
+			width: 0,
+			height: 0,
+			layout: undefined,
+			globalLayoutProperties: {}
+		}, options || {});
+
+		this.id = "epubjs-view-" + (0, _core.uuid)();
+		this.section = section;
+		this.index = section.index;
+
+		this.element = this.container(this.settings.axis);
+
+		this.added = false;
+		this.displayed = false;
+		this.rendered = false;
+
+		// this.width  = this.settings.width;
+		// this.height = this.settings.height;
+
+		this.fixedWidth = 0;
+		this.fixedHeight = 0;
+
+		// Blank Cfi for Parsing
+		this.epubcfi = new _epubcfi2.default();
+
+		this.layout = this.settings.layout;
+		// Dom events to listen for
+		// this.listenedEvents = ["keydown", "keyup", "keypressed", "mouseup", "mousedown", "click", "touchend", "touchstart"];
+	}
+
+	_createClass(IframeView, [{
+		key: "container",
+		value: function container(axis) {
+			var element = document.createElement("div");
+
+			element.classList.add("epub-view");
+
+			// this.element.style.minHeight = "100px";
+			element.style.height = "0px";
+			element.style.width = "0px";
+			element.style.overflow = "hidden";
+
+			if (axis && axis == "horizontal") {
+				element.style.display = "block";
+				element.style.flex = "none";
+			} else {
+				element.style.display = "block";
+			}
+
+			return element;
+		}
+	}, {
+		key: "create",
+		value: function create() {
+
+			if (this.iframe) {
+				return this.iframe;
+			}
+
+			if (!this.element) {
+				this.element = this.createContainer();
+			}
+
+			this.iframe = document.createElement("iframe");
+			this.iframe.id = this.id;
+			this.iframe.scrolling = "no"; // Might need to be removed: breaks ios width calculations
+			this.iframe.style.overflow = "hidden";
+			this.iframe.seamless = "seamless";
+			// Back up if seamless isn't supported
+			this.iframe.style.border = "none";
+
+			this.iframe.setAttribute("enable-annotation", "true");
+
+			this.resizing = true;
+
+			// this.iframe.style.display = "none";
+			this.element.style.visibility = "hidden";
+			this.iframe.style.visibility = "hidden";
+
+			this.iframe.style.width = "0";
+			this.iframe.style.height = "0";
+			this._width = 0;
+			this._height = 0;
+
+			this.element.setAttribute("ref", this.index);
+
+			this.element.appendChild(this.iframe);
+			this.added = true;
+
+			this.elementBounds = (0, _core.bounds)(this.element);
+
+			// if(width || height){
+			//   this.resize(width, height);
+			// } else if(this.width && this.height){
+			//   this.resize(this.width, this.height);
+			// } else {
+			//   this.iframeBounds = bounds(this.iframe);
+			// }
+
+			// Firefox has trouble with baseURI and srcdoc
+			// TODO: Disable for now in firefox
+
+
+			if ("srcdoc" in this.iframe) {
+				this.supportsSrcdoc = true;
+			} else {
+				this.supportsSrcdoc = false;
+			}
+
+			return this.iframe;
+		}
+	}, {
+		key: "render",
+		value: function render(request, show) {
+
+			// view.onLayout = this.layout.format.bind(this.layout);
+			this.create();
+
+			// Fit to size of the container, apply padding
+			this.size();
+
+			if (!this.sectionRender) {
+				this.sectionRender = this.section.render(request);
+			}
+
+			// Render Chain
+			return this.sectionRender.then(function (contents) {
+				return this.load(contents);
+			}.bind(this)).then(function () {
+				var _this = this;
+
+				// apply the layout function to the contents
+				this.settings.layout.format(this.contents);
+
+				// Listen for events that require an expansion of the iframe
+				this.addListeners();
+
+				return new Promise(function (resolve, reject) {
+					// Expand the iframe to the full size of the content
+					_this.expand();
+					resolve();
+				});
+			}.bind(this)).then(function () {
+				this.emit("rendered", this.section);
+			}.bind(this)).catch(function (e) {
+				this.emit("loaderror", e);
+			}.bind(this));
+		}
+	}, {
+		key: "reset",
+		value: function reset() {
+			if (this.iframe) {
+				this.iframe.style.width = "0";
+				this.iframe.style.height = "0";
+				this._width = 0;
+				this._height = 0;
+				this._textWidth = undefined;
+				this._contentWidth = undefined;
+				this._textHeight = undefined;
+				this._contentHeight = undefined;
+			}
+			this._needsReframe = true;
+		}
+
+		// Determine locks base on settings
+
+	}, {
+		key: "size",
+		value: function size(_width, _height) {
+			var width = _width || this.settings.width;
+			var height = _height || this.settings.height;
+
+			if (this.layout.name === "pre-paginated") {
+				this.lock("both", width, height);
+			} else if (this.settings.axis === "horizontal") {
+				this.lock("height", width, height);
+			} else {
+				this.lock("width", width, height);
+			}
+		}
+
+		// Lock an axis to element dimensions, taking borders into account
+
+	}, {
+		key: "lock",
+		value: function lock(what, width, height) {
+			var elBorders = (0, _core.borders)(this.element);
+			var iframeBorders;
+
+			if (this.iframe) {
+				iframeBorders = (0, _core.borders)(this.iframe);
+			} else {
+				iframeBorders = { width: 0, height: 0 };
+			}
+
+			if (what == "width" && (0, _core.isNumber)(width)) {
+				this.lockedWidth = width - elBorders.width - iframeBorders.width;
+				// this.resize(this.lockedWidth, width); //  width keeps ratio correct
+			}
+
+			if (what == "height" && (0, _core.isNumber)(height)) {
+				this.lockedHeight = height - elBorders.height - iframeBorders.height;
+				// this.resize(width, this.lockedHeight);
+			}
+
+			if (what === "both" && (0, _core.isNumber)(width) && (0, _core.isNumber)(height)) {
+
+				this.lockedWidth = width - elBorders.width - iframeBorders.width;
+				this.lockedHeight = height - elBorders.height - iframeBorders.height;
+				// this.resize(this.lockedWidth, this.lockedHeight);
+			}
+
+			if (this.displayed && this.iframe) {
+
+				// this.contents.layout();
+				this.expand();
+			}
+		}
+
+		// Resize a single axis based on content dimensions
+
+	}, {
+		key: "expand",
+		value: function expand(force) {
+			var width = this.lockedWidth;
+			var height = this.lockedHeight;
+			var columns;
+
+			var textWidth, textHeight;
+
+			if (!this.iframe || this._expanding) return;
+
+			if (this.layout.name === "pre-paginated") return;
+
+			this._expanding = true;
+
+			// Expand Horizontally
+			if (this.settings.axis === "horizontal") {
+				// Get the width of the text
+				width = this.contents.textWidth();
+
+				if (width % this.layout.pageWidth > 0) {
+					width = Math.ceil(width / this.layout.pageWidth) * this.layout.pageWidth;
+				}
+
+				/*
+    columns = Math.ceil(width / this.settings.layout.delta);
+    if ( this.settings.layout.divisor > 1 &&
+    		 this.settings.layout.name === "reflowable" &&
+    		(columns % 2 > 0)) {
+    	// add a blank page
+    	width += this.settings.layout.gap + this.settings.layout.columnWidth;
+    }
+    */
+			} // Expand Vertically
+			else if (this.settings.axis === "vertical") {
+					height = this.contents.textHeight();
+				}
+
+			// Only Resize if dimensions have changed or
+			// if Frame is still hidden, so needs reframing
+			if (this._needsReframe || width != this._width || height != this._height) {
+				this.reframe(width, height);
+			}
+
+			this._expanding = false;
+		}
+	}, {
+		key: "reframe",
+		value: function reframe(width, height) {
+			var size;
+
+			if ((0, _core.isNumber)(width)) {
+				this.element.style.width = width + "px";
+				this.iframe.style.width = width + "px";
+				this._width = width;
+			}
+
+			if ((0, _core.isNumber)(height)) {
+				this.element.style.height = height + "px";
+				this.iframe.style.height = height + "px";
+				this._height = height;
+			}
+
+			var widthDelta = this.prevBounds ? width - this.prevBounds.width : width;
+			var heightDelta = this.prevBounds ? height - this.prevBounds.height : height;
+
+			size = {
+				width: width,
+				height: height,
+				widthDelta: widthDelta,
+				heightDelta: heightDelta
+			};
+
+			this.onResize(this, size);
+
+			this.emit("resized", size);
+
+			this.prevBounds = size;
+		}
+	}, {
+		key: "load",
+		value: function load(contents) {
+			var loading = new _core.defer();
+			var loaded = loading.promise;
+
+			if (!this.iframe) {
+				loading.reject(new Error("No Iframe Available"));
+				return loaded;
+			}
+
+			this.iframe.onload = function (event) {
+
+				this.onLoad(event, loading);
+			}.bind(this);
+
+			if (this.supportsSrcdoc) {
+				this.iframe.srcdoc = contents;
+			} else {
+
+				this.document = this.iframe.contentDocument;
+
+				if (!this.document) {
+					loading.reject(new Error("No Document Available"));
+					return loaded;
+				}
+
+				this.iframe.contentDocument.open();
+				this.iframe.contentDocument.write(contents);
+				this.iframe.contentDocument.close();
+			}
+
+			return loaded;
+		}
+	}, {
+		key: "onLoad",
+		value: function onLoad(event, promise) {
+			var _this2 = this;
+
+			this.window = this.iframe.contentWindow;
+			this.document = this.iframe.contentDocument;
+
+			this.contents = new _contents2.default(this.document, this.document.body, this.section.cfiBase, this.section.index);
+
+			this.rendering = false;
+
+			var link = this.document.querySelector("link[rel='canonical']");
+			if (link) {
+				link.setAttribute("href", this.section.url);
+			} else {
+				link = this.document.createElement("link");
+				link.setAttribute("rel", "canonical");
+				link.setAttribute("href", this.section.url);
+				this.document.querySelector("head").appendChild(link);
+			}
+
+			this.contents.on("expand", function () {
+				if (_this2.displayed && _this2.iframe) {
+					_this2.expand();
+					if (_this2.contents) {
+						_this2.settings.layout.format(_this2.contents);
+					}
+				}
+			});
+
+			this.contents.on("resize", function (e) {
+				if (_this2.displayed && _this2.iframe) {
+					_this2.expand();
+					if (_this2.contents) {
+						_this2.settings.layout.format(_this2.contents);
+					}
+				}
+			});
+
+			promise.resolve(this.contents);
+		}
+	}, {
+		key: "setLayout",
+		value: function setLayout(layout) {
+			this.layout = layout;
+		}
+	}, {
+		key: "setAxis",
+		value: function setAxis(axis) {
+			this.settings.axis = axis;
+		}
+	}, {
+		key: "addListeners",
+		value: function addListeners() {
+			//TODO: Add content listeners for expanding
+		}
+	}, {
+		key: "removeListeners",
+		value: function removeListeners(layoutFunc) {
+			//TODO: remove content listeners for expanding
+		}
+	}, {
+		key: "display",
+		value: function display(request) {
+			var displayed = new _core.defer();
+
+			if (!this.displayed) {
+
+				this.render(request).then(function () {
+
+					this.emit("displayed", this);
+					this.onDisplayed(this);
+
+					this.displayed = true;
+					displayed.resolve(this);
+				}.bind(this));
+			} else {
+				displayed.resolve(this);
+			}
+
+			return displayed.promise;
+		}
+	}, {
+		key: "show",
+		value: function show() {
+
+			this.element.style.visibility = "visible";
+
+			if (this.iframe) {
+				this.iframe.style.visibility = "visible";
+			}
+
+			this.emit("shown", this);
+		}
+	}, {
+		key: "hide",
+		value: function hide() {
+			// this.iframe.style.display = "none";
+			this.element.style.visibility = "hidden";
+			this.iframe.style.visibility = "hidden";
+
+			this.stopExpanding = true;
+			this.emit("hidden", this);
+		}
+	}, {
+		key: "offset",
+		value: function offset() {
+			return {
+				top: this.element.offsetTop,
+				left: this.element.offsetLeft
+			};
+		}
+	}, {
+		key: "width",
+		value: function width() {
+			return this._width;
+		}
+	}, {
+		key: "height",
+		value: function height() {
+			return this._height;
+		}
+	}, {
+		key: "position",
+		value: function position() {
+			return this.element.getBoundingClientRect();
+		}
+	}, {
+		key: "locationOf",
+		value: function locationOf(target) {
+			var parentPos = this.iframe.getBoundingClientRect();
+			var targetPos = this.contents.locationOf(target, this.settings.ignoreClass);
+
+			return {
+				"left": targetPos.left,
+				"top": targetPos.top
+			};
+		}
+	}, {
+		key: "onDisplayed",
+		value: function onDisplayed(view) {
+			// Stub, override with a custom functions
+		}
+	}, {
+		key: "onResize",
+		value: function onResize(view, e) {
+			// Stub, override with a custom functions
+		}
+	}, {
+		key: "bounds",
+		value: function bounds() {
+			if (!this.elementBounds) {
+				this.elementBounds = (0, _core.bounds)(this.element);
+			}
+			return this.elementBounds;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy() {
+
+			if (this.displayed) {
+				this.displayed = false;
+
+				this.removeListeners();
+
+				this.stopExpanding = true;
+				this.element.removeChild(this.iframe);
+				this.displayed = false;
+				this.iframe = null;
+
+				this._textWidth = null;
+				this._textHeight = null;
+				this._width = null;
+				this._height = null;
+			}
+			// this.element.style.height = "0px";
+			// this.element.style.width = "0px";
+		}
+	}]);
+
+	return IframeView;
+}();
+
+(0, _eventEmitter2.default)(IframeView.prototype);
+
+exports.default = IframeView;
+module.exports = exports["default"];
+
+/***/ }),
+/* 55 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Stage = function () {
+	function Stage(_options) {
+		_classCallCheck(this, Stage);
+
+		this.settings = _options || {};
+		this.id = "epubjs-container-" + (0, _core.uuid)();
+
+		this.container = this.create(this.settings);
+
+		if (this.settings.hidden) {
+			this.wrapper = this.wrap(this.container);
+		}
+	}
+
+	/*
+ * Creates an element to render to.
+ * Resizes to passed width and height or to the elements size
+ */
+
+
+	_createClass(Stage, [{
+		key: "create",
+		value: function create(options) {
+			var height = options.height; // !== false ? options.height : "100%";
+			var width = options.width; // !== false ? options.width : "100%";
+			var overflow = options.overflow || false;
+			var axis = options.axis || "vertical";
+
+			if (options.height && (0, _core.isNumber)(options.height)) {
+				height = options.height + "px";
+			}
+
+			if (options.width && (0, _core.isNumber)(options.width)) {
+				width = options.width + "px";
+			}
+
+			// Create new container element
+			var container = document.createElement("div");
+
+			container.id = this.id;
+			container.classList.add("epub-container");
+
+			// Style Element
+			// container.style.fontSize = "0";
+			container.style.wordSpacing = "0";
+			container.style.lineHeight = "0";
+			container.style.verticalAlign = "top";
+			container.style.position = "relative";
+
+			if (axis === "horizontal") {
+				// container.style.whiteSpace = "nowrap";
+				container.style.display = "flex";
+				container.style.flexDirection = "row";
+				container.style.flexWrap = "nowrap";
+			}
+
+			if (width) {
+				container.style.width = width;
+			}
+
+			if (height) {
+				container.style.height = height;
+			}
+
+			if (overflow) {
+				container.style.overflow = overflow;
+			}
+
+			return container;
+		}
+	}, {
+		key: "wrap",
+		value: function wrap(container) {
+			var wrapper = document.createElement("div");
+
+			wrapper.style.visibility = "hidden";
+			wrapper.style.overflow = "hidden";
+			wrapper.style.width = "0";
+			wrapper.style.height = "0";
+
+			wrapper.appendChild(container);
+			return wrapper;
+		}
+	}, {
+		key: "getElement",
+		value: function getElement(_element) {
+			var element;
+
+			if ((0, _core.isElement)(_element)) {
+				element = _element;
+			} else if (typeof _element === "string") {
+				element = document.getElementById(_element);
+			}
+
+			if (!element) {
+				throw new Error("Not an Element");
+			}
+
+			return element;
+		}
+	}, {
+		key: "attachTo",
+		value: function attachTo(what) {
+
+			var element = this.getElement(what);
+			var base;
+
+			if (!element) {
+				return;
+			}
+
+			if (this.settings.hidden) {
+				base = this.wrapper;
+			} else {
+				base = this.container;
+			}
+
+			element.appendChild(base);
+
+			this.element = element;
+
+			return element;
+		}
+	}, {
+		key: "getContainer",
+		value: function getContainer() {
+			return this.container;
+		}
+	}, {
+		key: "onResize",
+		value: function onResize(func) {
+			// Only listen to window for resize event if width and height are not fixed.
+			// This applies if it is set to a percent or auto.
+			if (!(0, _core.isNumber)(this.settings.width) || !(0, _core.isNumber)(this.settings.height)) {
+				this.resizeFunc = func;
+				window.addEventListener("resize", this.resizeFunc, false);
+			}
+		}
+	}, {
+		key: "onOrientationChange",
+		value: function onOrientationChange(func) {
+			this.orientationChangeFunc = func;
+			window.addEventListener("orientationChange", this.orientationChangeFunc, false);
+		}
+	}, {
+		key: "size",
+		value: function size(width, height) {
+			var bounds;
+			// var width = _width || this.settings.width;
+			// var height = _height || this.settings.height;
+
+			// If width or height are set to false, inherit them from containing element
+			if (width === null) {
+				bounds = this.element.getBoundingClientRect();
+
+				if (bounds.width) {
+					width = bounds.width;
+					this.container.style.width = bounds.width + "px";
+				}
+			}
+
+			if (height === null) {
+				bounds = bounds || this.element.getBoundingClientRect();
+
+				if (bounds.height) {
+					height = bounds.height;
+					this.container.style.height = bounds.height + "px";
+				}
+			}
+
+			if (!(0, _core.isNumber)(width)) {
+				bounds = this.container.getBoundingClientRect();
+				width = bounds.width;
+				//height = bounds.height;
+			}
+
+			if (!(0, _core.isNumber)(height)) {
+				bounds = bounds || this.container.getBoundingClientRect();
+				//width = bounds.width;
+				height = bounds.height;
+			}
+
+			this.containerStyles = window.getComputedStyle(this.container);
+
+			this.containerPadding = {
+				left: parseFloat(this.containerStyles["padding-left"]) || 0,
+				right: parseFloat(this.containerStyles["padding-right"]) || 0,
+				top: parseFloat(this.containerStyles["padding-top"]) || 0,
+				bottom: parseFloat(this.containerStyles["padding-bottom"]) || 0
+			};
+
+			// Bounds not set, get them from window
+			var _windowBounds = (0, _core.windowBounds)();
+			if (!width) {
+				width = _windowBounds.width;
+			}
+			if (this.settings.fullsize || !height) {
+				height = _windowBounds.height;
+			}
+
+			return {
+				width: width - this.containerPadding.left - this.containerPadding.right,
+				height: height - this.containerPadding.top - this.containerPadding.bottom
+			};
+		}
+	}, {
+		key: "bounds",
+		value: function bounds() {
+			var box = void 0;
+			if (this.container.style.overflow !== "visible") {
+				box = this.container && this.container.getBoundingClientRect();
+			}
+
+			if (!box || !box.width || !box.height) {
+				return (0, _core.windowBounds)();
+			} else {
+				return box;
+			}
+		}
+	}, {
+		key: "getSheet",
+		value: function getSheet() {
+			var style = document.createElement("style");
+
+			// WebKit hack --> https://davidwalsh.name/add-rules-stylesheets
+			style.appendChild(document.createTextNode(""));
+
+			document.head.appendChild(style);
+
+			return style.sheet;
+		}
+	}, {
+		key: "addStyleRules",
+		value: function addStyleRules(selector, rulesArray) {
+			var scope = "#" + this.id + " ";
+			var rules = "";
+
+			if (!this.sheet) {
+				this.sheet = this.getSheet();
+			}
+
+			rulesArray.forEach(function (set) {
+				for (var prop in set) {
+					if (set.hasOwnProperty(prop)) {
+						rules += prop + ":" + set[prop] + ";";
+					}
+				}
+			});
+
+			this.sheet.insertRule(scope + selector + " {" + rules + "}", 0);
+		}
+	}, {
+		key: "axis",
+		value: function axis(_axis) {
+			if (_axis === "horizontal") {
+				this.container.style.display = "flex";
+				this.container.style.flexDirection = "row";
+				this.container.style.flexWrap = "nowrap";
+			} else {
+				this.container.style.display = "block";
+			}
+		}
+
+		// orientation(orientation) {
+		// 	if (orientation === "landscape") {
+		//
+		// 	} else {
+		//
+		// 	}
+		//
+		// 	this.orientation = orientation;
+		// }
+
+	}, {
+		key: "destroy",
+		value: function destroy() {
+			var base;
+
+			if (this.element) {
+
+				if (this.settings.hidden) {
+					base = this.wrapper;
+				} else {
+					base = this.container;
+				}
+
+				if (this.element.contains(this.container)) {
+					this.element.removeChild(this.container);
+				}
+
+				window.removeEventListener("resize", this.resizeFunc);
+				window.removeEventListener("orientationChange", this.orientationChangeFunc);
+			}
+		}
+	}]);
+
+	return Stage;
+}();
+
+exports.default = Stage;
+module.exports = exports["default"];
+
+/***/ }),
+/* 56 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var Views = function () {
+	function Views(container) {
+		_classCallCheck(this, Views);
+
+		this.container = container;
+		this._views = [];
+		this.length = 0;
+		this.hidden = false;
+	}
+
+	_createClass(Views, [{
+		key: "all",
+		value: function all() {
+			return this._views;
+		}
+	}, {
+		key: "first",
+		value: function first() {
+			return this._views[0];
+		}
+	}, {
+		key: "last",
+		value: function last() {
+			return this._views[this._views.length - 1];
+		}
+	}, {
+		key: "indexOf",
+		value: function indexOf(view) {
+			return this._views.indexOf(view);
+		}
+	}, {
+		key: "slice",
+		value: function slice() {
+			return this._views.slice.apply(this._views, arguments);
+		}
+	}, {
+		key: "get",
+		value: function get(i) {
+			return this._views[i];
+		}
+	}, {
+		key: "append",
+		value: function append(view) {
+			this._views.push(view);
+			if (this.container) {
+				this.container.appendChild(view.element);
+			}
+			this.length++;
+			return view;
+		}
+	}, {
+		key: "prepend",
+		value: function prepend(view) {
+			this._views.unshift(view);
+			if (this.container) {
+				this.container.insertBefore(view.element, this.container.firstChild);
+			}
+			this.length++;
+			return view;
+		}
+	}, {
+		key: "insert",
+		value: function insert(view, index) {
+			this._views.splice(index, 0, view);
+
+			if (this.container) {
+				if (index < this.container.children.length) {
+					this.container.insertBefore(view.element, this.container.children[index]);
+				} else {
+					this.container.appendChild(view.element);
+				}
+			}
+
+			this.length++;
+			return view;
+		}
+	}, {
+		key: "remove",
+		value: function remove(view) {
+			var index = this._views.indexOf(view);
+
+			if (index > -1) {
+				this._views.splice(index, 1);
+			}
+
+			this.destroy(view);
+
+			this.length--;
+		}
+	}, {
+		key: "destroy",
+		value: function destroy(view) {
+			if (view.displayed) {
+				view.destroy();
+			}
+
+			if (this.container) {
+				this.container.removeChild(view.element);
+			}
+			view = null;
+		}
+
+		// Iterators
+
+	}, {
+		key: "each",
+		value: function each() {
+			return this._views.forEach.apply(this._views, arguments);
+		}
+	}, {
+		key: "clear",
+		value: function clear() {
+			// Remove all views
+			var view;
+			var len = this.length;
+
+			if (!this.length) return;
+
+			for (var i = 0; i < len; i++) {
+				view = this._views[i];
+				this.destroy(view);
+			}
+
+			this._views = [];
+			this.length = 0;
+		}
+	}, {
+		key: "find",
+		value: function find(section) {
+
+			var view;
+			var len = this.length;
+
+			for (var i = 0; i < len; i++) {
+				view = this._views[i];
+				if (view.displayed && view.section.index == section.index) {
+					return view;
+				}
+			}
+		}
+	}, {
+		key: "displayed",
+		value: function displayed() {
+			var displayed = [];
+			var view;
+			var len = this.length;
+
+			for (var i = 0; i < len; i++) {
+				view = this._views[i];
+				if (view.displayed) {
+					displayed.push(view);
+				}
+			}
+			return displayed;
+		}
+	}, {
+		key: "show",
+		value: function show() {
+			var view;
+			var len = this.length;
+
+			for (var i = 0; i < len; i++) {
+				view = this._views[i];
+				if (view.displayed) {
+					view.show();
+				}
+			}
+			this.hidden = false;
+		}
+	}, {
+		key: "hide",
+		value: function hide() {
+			var view;
+			var len = this.length;
+
+			for (var i = 0; i < len; i++) {
+				view = this._views[i];
+				if (view.displayed) {
+					view.hide();
+				}
+			}
+			this.hidden = true;
+		}
+	}]);
+
+	return Views;
+}();
+
+exports.default = Views;
+module.exports = exports["default"];
+
+/***/ }),
+/* 57 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _core = __webpack_require__(0);
+
+var _default = __webpack_require__(16);
+
+var _default2 = _interopRequireDefault(_default);
+
+var _debounce = __webpack_require__(58);
+
+var _debounce2 = _interopRequireDefault(_debounce);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var ContinuousViewManager = function (_DefaultViewManager) {
+	_inherits(ContinuousViewManager, _DefaultViewManager);
+
+	function ContinuousViewManager(options) {
+		_classCallCheck(this, ContinuousViewManager);
+
+		var _this = _possibleConstructorReturn(this, (ContinuousViewManager.__proto__ || Object.getPrototypeOf(ContinuousViewManager)).call(this, options));
+
+		_this.name = "continuous";
+
+		_this.settings = (0, _core.extend)(_this.settings || {}, {
+			infinite: true,
+			overflow: undefined,
+			axis: "vertical",
+			offset: 500,
+			offsetDelta: 250,
+			width: undefined,
+			height: undefined
+		});
+
+		(0, _core.extend)(_this.settings, options.settings || {});
+
+		// Gap can be 0, but defaults doesn't handle that
+		if (options.settings.gap != "undefined" && options.settings.gap === 0) {
+			_this.settings.gap = options.settings.gap;
+		}
+
+		_this.viewSettings = {
+			ignoreClass: _this.settings.ignoreClass,
+			axis: _this.settings.axis,
+			layout: _this.layout,
+			width: 0,
+			height: 0
+		};
+
+		_this.scrollTop = 0;
+		_this.scrollLeft = 0;
+		return _this;
+	}
+
+	_createClass(ContinuousViewManager, [{
+		key: "display",
+		value: function display(section, target) {
+			return _default2.default.prototype.display.call(this, section, target).then(function () {
+				return this.fill();
+			}.bind(this));
+		}
+	}, {
+		key: "fill",
+		value: function fill(_full) {
+			var _this2 = this;
+
+			var full = _full || new _core.defer();
+
+			this.q.enqueue(function () {
+				return _this2.check();
+			}).then(function (result) {
+				if (result) {
+					_this2.fill(full);
+				} else {
+					full.resolve();
+				}
+			});
+
+			return full.promise;
+		}
+	}, {
+		key: "moveTo",
+		value: function moveTo(offset) {
+			// var bounds = this.stage.bounds();
+			// var dist = Math.floor(offset.top / bounds.height) * bounds.height;
+			var distX = 0,
+			    distY = 0;
+
+			var offsetX = 0,
+			    offsetY = 0;
+
+			if (this.settings.axis === "vertical") {
+				distY = offset.top;
+				offsetY = offset.top + this.settings.offset;
+			} else {
+				distX = Math.floor(offset.left / this.layout.delta) * this.layout.delta;
+				offsetX = distX + this.settings.offset;
+			}
+
+			this.check(offsetX, offsetY);
+			this.scrollBy(distX, distY, true);
+
+			// return this.check(offsetX, offsetY)
+			// 	.then(function(){
+			// 		this.scrollBy(distX, distY, true);
+			// 	}.bind(this));
+		}
+
+		/*
+  afterDisplayed(currView){
+  	var next = currView.section.next();
+  	var prev = currView.section.prev();
+  	var index = this.views.indexOf(currView);
+  	var prevView, nextView;
+  		if(index + 1 === this.views.length && next) {
+  		nextView = this.createView(next);
+  		this.q.enqueue(this.append.bind(this), nextView);
+  	}
+  		if(index === 0 && prev) {
+  		prevView = this.createView(prev, this.viewSettings);
+  		this.q.enqueue(this.prepend.bind(this), prevView);
+  	}
+  		// this.removeShownListeners(currView);
+  	// currView.onShown = this.afterDisplayed.bind(this);
+  	this.emit("added", currView.section);
+  	}
+  */
+
+	}, {
+		key: "onResized",
+		value: function onResized(e) {
+
+			// this.views.clear();
+
+			clearTimeout(this.resizeTimeout);
+			this.resizeTimeout = setTimeout(function () {
+				this.resize();
+			}.bind(this), 150);
+		}
+	}, {
+		key: "afterResized",
+		value: function afterResized(view) {
+			this.emit("resize", view.section);
+		}
+
+		// Remove Previous Listeners if present
+
+	}, {
+		key: "removeShownListeners",
+		value: function removeShownListeners(view) {
+
+			// view.off("shown", this.afterDisplayed);
+			// view.off("shown", this.afterDisplayedAbove);
+			view.onDisplayed = function () {};
+		}
+
+		// append(section){
+		// 	return this.q.enqueue(function() {
+		//
+		// 		this._append(section);
+		//
+		//
+		// 	}.bind(this));
+		// };
+		//
+		// prepend(section){
+		// 	return this.q.enqueue(function() {
+		//
+		// 		this._prepend(section);
+		//
+		// 	}.bind(this));
+		//
+		// };
+
+	}, {
+		key: "add",
+		value: function add(section) {
+			var view = this.createView(section);
+
+			this.views.append(view);
+
+			view.on("resized", function (bounds) {
+				view.expanded = true;
+			});
+
+			// view.on("shown", this.afterDisplayed.bind(this));
+			view.onDisplayed = this.afterDisplayed.bind(this);
+			view.onResize = this.afterResized.bind(this);
+
+			return view.display(this.request);
+		}
+	}, {
+		key: "append",
+		value: function append(section) {
+			var view = this.createView(section);
+
+			view.on("resized", function (bounds) {
+				view.expanded = true;
+			});
+
+			this.views.append(view);
+
+			view.onDisplayed = this.afterDisplayed.bind(this);
+
+			return view;
+		}
+	}, {
+		key: "prepend",
+		value: function prepend(section) {
+			var _this3 = this;
+
+			var view = this.createView(section);
+
+			view.on("resized", function (bounds) {
+				_this3.counter(bounds);
+				view.expanded = true;
+			});
+
+			this.views.prepend(view);
+
+			view.onDisplayed = this.afterDisplayed.bind(this);
+
+			return view;
+		}
+	}, {
+		key: "counter",
+		value: function counter(bounds) {
+			if (this.settings.axis === "vertical") {
+				this.scrollBy(0, bounds.heightDelta, true);
+			} else {
+				this.scrollBy(bounds.widthDelta, 0, true);
+			}
+		}
+	}, {
+		key: "update",
+		value: function update(_offset) {
+			var container = this.bounds();
+			var views = this.views.all();
+			var viewsLength = views.length;
+			var visible = [];
+			var offset = typeof _offset != "undefined" ? _offset : this.settings.offset || 0;
+			var isVisible;
+			var view;
+
+			var updating = new _core.defer();
+			var promises = [];
+			for (var i = 0; i < viewsLength; i++) {
+				view = views[i];
+
+				isVisible = this.isVisible(view, offset, offset, container);
+
+				if (isVisible === true) {
+					// console.log("visible " + view.index);
+
+					if (!view.displayed) {
+						promises.push(view.display(this.request).then(function (view) {
+							view.show();
+						}));
+					} else {
+						view.show();
+					}
+					visible.push(view);
+				} else {
+					// this.q.enqueue(view.destroy.bind(view));
+					// console.log("hidden " + view.index);
+
+					clearTimeout(this.trimTimeout);
+					this.trimTimeout = setTimeout(function () {
+						this.q.enqueue(this.trim.bind(this));
+					}.bind(this), 250);
+				}
+			}
+
+			if (promises.length) {
+				return Promise.all(promises);
+			} else {
+				updating.resolve();
+				return updating.promise;
+			}
+		}
+	}, {
+		key: "check",
+		value: function check(_offsetLeft, _offsetTop) {
+			var _this4 = this;
+
+			var last, first, next, prev;
+
+			var checking = new _core.defer();
+			var newViews = [];
+
+			var horizontal = this.settings.axis === "horizontal";
+			var delta = this.settings.offset || 0;
+
+			if (_offsetLeft && horizontal) {
+				delta = _offsetLeft;
+			}
+
+			if (_offsetTop && !horizontal) {
+				delta = _offsetTop;
+			}
+
+			var bounds = this._bounds; // bounds saved this until resize
+
+			var offset = horizontal ? this.scrollLeft : this.scrollTop;
+			var visibleLength = horizontal ? bounds.width : bounds.height;
+			var contentLength = horizontal ? this.container.scrollWidth : this.container.scrollHeight;
+
+			if (offset + visibleLength + delta >= contentLength) {
+				last = this.views.last();
+				next = last && last.section.next();
+
+				if (next) {
+					newViews.push(this.append(next));
+				}
+			}
+
+			if (offset - delta < 0) {
+				first = this.views.first();
+
+				prev = first && first.section.prev();
+				if (prev) {
+					newViews.push(this.prepend(prev));
+				}
+			}
+
+			var promises = newViews.map(function (view) {
+				return view.displayed;
+			});
+
+			if (newViews.length) {
+				return Promise.all(promises).then(function () {
+					// Check to see if anything new is on screen after rendering
+					return _this4.update(delta);
+				});
+			} else {
+				this.q.enqueue(function () {
+					this.update();
+				}.bind(this));
+				checking.resolve(false);
+				return checking.promise;
+			}
+		}
+	}, {
+		key: "trim",
+		value: function trim() {
+			var task = new _core.defer();
+			var displayed = this.views.displayed();
+			var first = displayed[0];
+			var last = displayed[displayed.length - 1];
+			var firstIndex = this.views.indexOf(first);
+			var lastIndex = this.views.indexOf(last);
+			var above = this.views.slice(0, firstIndex);
+			var below = this.views.slice(lastIndex + 1);
+
+			// Erase all but last above
+			for (var i = 0; i < above.length - 1; i++) {
+				this.erase(above[i], above);
+			}
+
+			// Erase all except first below
+			for (var j = 1; j < below.length; j++) {
+				this.erase(below[j]);
+			}
+
+			task.resolve();
+			return task.promise;
+		}
+	}, {
+		key: "erase",
+		value: function erase(view, above) {
+			//Trim
+
+			var prevTop;
+			var prevLeft;
+
+			if (this.settings.height) {
+				prevTop = this.container.scrollTop;
+				prevLeft = this.container.scrollLeft;
+			} else {
+				prevTop = window.scrollY;
+				prevLeft = window.scrollX;
+			}
+
+			var bounds = view.bounds();
+
+			view.destroy.bind(view);
+			this.views.remove(view);
+
+			if (above) {
+
+				if (this.settings.axis === "vertical") {
+					this.scrollTo(0, prevTop - bounds.height, true);
+				} else {
+					this.scrollTo(prevLeft - bounds.width, 0, true);
+				}
+			}
+		}
+	}, {
+		key: "addEventListeners",
+		value: function addEventListeners(stage) {
+
+			window.addEventListener("unload", function (e) {
+				this.ignore = true;
+				// this.scrollTo(0,0);
+				this.destroy();
+			}.bind(this));
+
+			this.addScrollListeners();
+		}
+	}, {
+		key: "addScrollListeners",
+		value: function addScrollListeners() {
+			var scroller;
+
+			this.tick = _core.requestAnimationFrame;
+
+			if (this.settings.height) {
+				this.prevScrollTop = this.container.scrollTop;
+				this.prevScrollLeft = this.container.scrollLeft;
+			} else {
+				this.prevScrollTop = window.scrollY;
+				this.prevScrollLeft = window.scrollX;
+			}
+
+			this.scrollDeltaVert = 0;
+			this.scrollDeltaHorz = 0;
+
+			if (this.settings.height) {
+				scroller = this.container;
+				this.scrollTop = this.container.scrollTop;
+				this.scrollLeft = this.container.scrollLeft;
+			} else {
+				scroller = window;
+				this.scrollTop = window.scrollY;
+				this.scrollLeft = window.scrollX;
+			}
+
+			scroller.addEventListener("scroll", this.onScroll.bind(this));
+			this._scrolled = (0, _debounce2.default)(this.scrolled.bind(this), 300);
+			// this.tick.call(window, this.onScroll.bind(this));
+
+			this.scrolled = false;
+		}
+	}, {
+		key: "removeEventListeners",
+		value: function removeEventListeners() {
+			var scroller;
+
+			if (this.settings.height) {
+				scroller = this.container;
+			} else {
+				scroller = window;
+			}
+
+			scroller.removeEventListener("scroll", this.onScroll.bind(this));
+		}
+	}, {
+		key: "onScroll",
+		value: function onScroll() {
+			var scrollTop = void 0;
+			var scrollLeft = void 0;
+
+			if (this.settings.height) {
+				scrollTop = this.container.scrollTop;
+				scrollLeft = this.container.scrollLeft;
+			} else {
+				scrollTop = window.scrollY;
+				scrollLeft = window.scrollX;
+			}
+
+			this.scrollTop = scrollTop;
+			this.scrollLeft = scrollLeft;
+
+			if (!this.ignore) {
+
+				this._scrolled();
+			} else {
+				this.ignore = false;
+			}
+
+			this.scrollDeltaVert += Math.abs(scrollTop - this.prevScrollTop);
+			this.scrollDeltaHorz += Math.abs(scrollLeft - this.prevScrollLeft);
+
+			this.prevScrollTop = scrollTop;
+			this.prevScrollLeft = scrollLeft;
+
+			clearTimeout(this.scrollTimeout);
+			this.scrollTimeout = setTimeout(function () {
+				this.scrollDeltaVert = 0;
+				this.scrollDeltaHorz = 0;
+			}.bind(this), 150);
+
+			this.scrolled = false;
+		}
+	}, {
+		key: "scrolled",
+		value: function scrolled() {
+			this.q.enqueue(function () {
+				this.check();
+			}.bind(this));
+
+			this.emit("scroll", {
+				top: this.scrollTop,
+				left: this.scrollLeft
+			});
+
+			clearTimeout(this.afterScrolled);
+			this.afterScrolled = setTimeout(function () {
+				this.emit("scrolled", {
+					top: this.scrollTop,
+					left: this.scrollLeft
+				});
+			}.bind(this));
+		}
+	}, {
+		key: "next",
+		value: function next() {
+
+			if (this.settings.axis === "horizontal") {
+
+				this.scrollLeft = this.container.scrollLeft;
+
+				if (this.container.scrollLeft + this.container.offsetWidth + this.layout.delta < this.container.scrollWidth) {
+					this.scrollBy(this.layout.delta, 0, true);
+				} else {
+					this.scrollTo(this.container.scrollWidth - this.layout.delta, 0, true);
+				}
+			} else {
+				this.scrollBy(0, this.layout.height, true);
+			}
+
+			this.q.enqueue(function () {
+				this.check();
+			}.bind(this));
+		}
+	}, {
+		key: "prev",
+		value: function prev() {
+			if (this.settings.axis === "horizontal") {
+				this.scrollBy(-this.layout.delta, 0, true);
+			} else {
+				this.scrollBy(0, -this.layout.height, true);
+			}
+
+			this.q.enqueue(function () {
+				this.check();
+			}.bind(this));
+		}
+	}, {
+		key: "updateFlow",
+		value: function updateFlow(flow) {
+			var axis = flow === "paginated" ? "horizontal" : "vertical";
+
+			this.settings.axis = axis;
+
+			this.stage && this.stage.axis(axis);
+
+			this.viewSettings.axis = axis;
+
+			if (!this.settings.overflow) {
+				this.overflow = flow === "paginated" ? "hidden" : "auto";
+			} else {
+				this.overflow = this.settings.overflow;
+			}
+
+			// this.views.each(function(view){
+			// 	view.setAxis(axis);
+			// });
+
+			if (this.settings.axis === "vertical") {
+				this.settings.infinite = true;
+			} else {
+				this.settings.infinite = false;
+			}
+
+			this.updateLayout();
+		}
+	}]);
+
+	return ContinuousViewManager;
+}(_default2.default);
+
+exports.default = ContinuousViewManager;
+module.exports = exports["default"];
+
+/***/ }),
+/* 58 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var isObject = __webpack_require__(17),
+    now = __webpack_require__(59),
+    toNumber = __webpack_require__(61);
+
+/** Error message constants. */
+var FUNC_ERROR_TEXT = 'Expected a function';
+
+/* Built-in method references for those with the same name as other `lodash` methods. */
+var nativeMax = Math.max,
+    nativeMin = Math.min;
+
+/**
+ * Creates a debounced function that delays invoking `func` until after `wait`
+ * milliseconds have elapsed since the last time the debounced function was
+ * invoked. The debounced function comes with a `cancel` method to cancel
+ * delayed `func` invocations and a `flush` method to immediately invoke them.
+ * Provide `options` to indicate whether `func` should be invoked on the
+ * leading and/or trailing edge of the `wait` timeout. The `func` is invoked
+ * with the last arguments provided to the debounced function. Subsequent
+ * calls to the debounced function return the result of the last `func`
+ * invocation.
+ *
+ * **Note:** If `leading` and `trailing` options are `true`, `func` is
+ * invoked on the trailing edge of the timeout only if the debounced function
+ * is invoked more than once during the `wait` timeout.
+ *
+ * If `wait` is `0` and `leading` is `false`, `func` invocation is deferred
+ * until to the next tick, similar to `setTimeout` with a timeout of `0`.
+ *
+ * See [David Corbacho's article](https://css-tricks.com/debouncing-throttling-explained-examples/)
+ * for details over the differences between `_.debounce` and `_.throttle`.
+ *
+ * @static
+ * @memberOf _
+ * @since 0.1.0
+ * @category Function
+ * @param {Function} func The function to debounce.
+ * @param {number} [wait=0] The number of milliseconds to delay.
+ * @param {Object} [options={}] The options object.
+ * @param {boolean} [options.leading=false]
+ *  Specify invoking on the leading edge of the timeout.
+ * @param {number} [options.maxWait]
+ *  The maximum time `func` is allowed to be delayed before it's invoked.
+ * @param {boolean} [options.trailing=true]
+ *  Specify invoking on the trailing edge of the timeout.
+ * @returns {Function} Returns the new debounced function.
+ * @example
+ *
+ * // Avoid costly calculations while the window size is in flux.
+ * jQuery(window).on('resize', _.debounce(calculateLayout, 150));
+ *
+ * // Invoke `sendMail` when clicked, debouncing subsequent calls.
+ * jQuery(element).on('click', _.debounce(sendMail, 300, {
+ *   'leading': true,
+ *   'trailing': false
+ * }));
+ *
+ * // Ensure `batchLog` is invoked once after 1 second of debounced calls.
+ * var debounced = _.debounce(batchLog, 250, { 'maxWait': 1000 });
+ * var source = new EventSource('/stream');
+ * jQuery(source).on('message', debounced);
+ *
+ * // Cancel the trailing debounced invocation.
+ * jQuery(window).on('popstate', debounced.cancel);
+ */
+function debounce(func, wait, options) {
+  var lastArgs,
+      lastThis,
+      maxWait,
+      result,
+      timerId,
+      lastCallTime,
+      lastInvokeTime = 0,
+      leading = false,
+      maxing = false,
+      trailing = true;
+
+  if (typeof func != 'function') {
+    throw new TypeError(FUNC_ERROR_TEXT);
+  }
+  wait = toNumber(wait) || 0;
+  if (isObject(options)) {
+    leading = !!options.leading;
+    maxing = 'maxWait' in options;
+    maxWait = maxing ? nativeMax(toNumber(options.maxWait) || 0, wait) : maxWait;
+    trailing = 'trailing' in options ? !!options.trailing : trailing;
+  }
+
+  function invokeFunc(time) {
+    var args = lastArgs,
+        thisArg = lastThis;
+
+    lastArgs = lastThis = undefined;
+    lastInvokeTime = time;
+    result = func.apply(thisArg, args);
+    return result;
+  }
+
+  function leadingEdge(time) {
+    // Reset any `maxWait` timer.
+    lastInvokeTime = time;
+    // Start the timer for the trailing edge.
+    timerId = setTimeout(timerExpired, wait);
+    // Invoke the leading edge.
+    return leading ? invokeFunc(time) : result;
+  }
+
+  function remainingWait(time) {
+    var timeSinceLastCall = time - lastCallTime,
+        timeSinceLastInvoke = time - lastInvokeTime,
+        result = wait - timeSinceLastCall;
+
+    return maxing ? nativeMin(result, maxWait - timeSinceLastInvoke) : result;
+  }
+
+  function shouldInvoke(time) {
+    var timeSinceLastCall = time - lastCallTime,
+        timeSinceLastInvoke = time - lastInvokeTime;
+
+    // Either this is the first call, activity has stopped and we're at the
+    // trailing edge, the system time has gone backwards and we're treating
+    // it as the trailing edge, or we've hit the `maxWait` limit.
+    return (lastCallTime === undefined || (timeSinceLastCall >= wait) ||
+      (timeSinceLastCall < 0) || (maxing && timeSinceLastInvoke >= maxWait));
+  }
+
+  function timerExpired() {
+    var time = now();
+    if (shouldInvoke(time)) {
+      return trailingEdge(time);
+    }
+    // Restart the timer.
+    timerId = setTimeout(timerExpired, remainingWait(time));
+  }
+
+  function trailingEdge(time) {
+    timerId = undefined;
+
+    // Only invoke if we have `lastArgs` which means `func` has been
+    // debounced at least once.
+    if (trailing && lastArgs) {
+      return invokeFunc(time);
+    }
+    lastArgs = lastThis = undefined;
+    return result;
+  }
+
+  function cancel() {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+    lastInvokeTime = 0;
+    lastArgs = lastCallTime = lastThis = timerId = undefined;
+  }
+
+  function flush() {
+    return timerId === undefined ? result : trailingEdge(now());
+  }
+
+  function debounced() {
+    var time = now(),
+        isInvoking = shouldInvoke(time);
+
+    lastArgs = arguments;
+    lastThis = this;
+    lastCallTime = time;
+
+    if (isInvoking) {
+      if (timerId === undefined) {
+        return leadingEdge(lastCallTime);
+      }
+      if (maxing) {
+        // Handle invocations in a tight loop.
+        timerId = setTimeout(timerExpired, wait);
+        return invokeFunc(lastCallTime);
+      }
+    }
+    if (timerId === undefined) {
+      timerId = setTimeout(timerExpired, wait);
+    }
+    return result;
+  }
+  debounced.cancel = cancel;
+  debounced.flush = flush;
+  return debounced;
+}
+
+module.exports = debounce;
+
+
+/***/ }),
+/* 59 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var root = __webpack_require__(18);
+
+/**
+ * Gets the timestamp of the number of milliseconds that have elapsed since
+ * the Unix epoch (1 January 1970 00:00:00 UTC).
+ *
+ * @static
+ * @memberOf _
+ * @since 2.4.0
+ * @category Date
+ * @returns {number} Returns the timestamp.
+ * @example
+ *
+ * _.defer(function(stamp) {
+ *   console.log(_.now() - stamp);
+ * }, _.now());
+ * // => Logs the number of milliseconds it took for the deferred invocation.
+ */
+var now = function() {
+  return root.Date.now();
+};
+
+module.exports = now;
+
+
+/***/ }),
+/* 60 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(global) {/** Detect free variable `global` from Node.js. */
+var freeGlobal = typeof global == 'object' && global && global.Object === Object && global;
+
+module.exports = freeGlobal;
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
+
+/***/ }),
+/* 61 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var isObject = __webpack_require__(17),
+    isSymbol = __webpack_require__(62);
+
+/** Used as references for various `Number` constants. */
+var NAN = 0 / 0;
+
+/** Used to match leading and trailing whitespace. */
+var reTrim = /^\s+|\s+$/g;
+
+/** Used to detect bad signed hexadecimal string values. */
+var reIsBadHex = /^[-+]0x[0-9a-f]+$/i;
+
+/** Used to detect binary string values. */
+var reIsBinary = /^0b[01]+$/i;
+
+/** Used to detect octal string values. */
+var reIsOctal = /^0o[0-7]+$/i;
+
+/** Built-in method references without a dependency on `root`. */
+var freeParseInt = parseInt;
+
+/**
+ * Converts `value` to a number.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to process.
+ * @returns {number} Returns the number.
+ * @example
+ *
+ * _.toNumber(3.2);
+ * // => 3.2
+ *
+ * _.toNumber(Number.MIN_VALUE);
+ * // => 5e-324
+ *
+ * _.toNumber(Infinity);
+ * // => Infinity
+ *
+ * _.toNumber('3.2');
+ * // => 3.2
+ */
+function toNumber(value) {
+  if (typeof value == 'number') {
+    return value;
+  }
+  if (isSymbol(value)) {
+    return NAN;
+  }
+  if (isObject(value)) {
+    var other = typeof value.valueOf == 'function' ? value.valueOf() : value;
+    value = isObject(other) ? (other + '') : other;
+  }
+  if (typeof value != 'string') {
+    return value === 0 ? value : +value;
+  }
+  value = value.replace(reTrim, '');
+  var isBinary = reIsBinary.test(value);
+  return (isBinary || reIsOctal.test(value))
+    ? freeParseInt(value.slice(2), isBinary ? 2 : 8)
+    : (reIsBadHex.test(value) ? NAN : +value);
+}
+
+module.exports = toNumber;
+
+
+/***/ }),
+/* 62 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var baseGetTag = __webpack_require__(63),
+    isObjectLike = __webpack_require__(66);
+
+/** `Object#toString` result references. */
+var symbolTag = '[object Symbol]';
+
+/**
+ * Checks if `value` is classified as a `Symbol` primitive or object.
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a symbol, else `false`.
+ * @example
+ *
+ * _.isSymbol(Symbol.iterator);
+ * // => true
+ *
+ * _.isSymbol('abc');
+ * // => false
+ */
+function isSymbol(value) {
+  return typeof value == 'symbol' ||
+    (isObjectLike(value) && baseGetTag(value) == symbolTag);
+}
+
+module.exports = isSymbol;
+
+
+/***/ }),
+/* 63 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var Symbol = __webpack_require__(19),
+    getRawTag = __webpack_require__(64),
+    objectToString = __webpack_require__(65);
+
+/** `Object#toString` result references. */
+var nullTag = '[object Null]',
+    undefinedTag = '[object Undefined]';
+
+/** Built-in value references. */
+var symToStringTag = Symbol ? Symbol.toStringTag : undefined;
+
+/**
+ * The base implementation of `getTag` without fallbacks for buggy environments.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the `toStringTag`.
+ */
+function baseGetTag(value) {
+  if (value == null) {
+    return value === undefined ? undefinedTag : nullTag;
+  }
+  return (symToStringTag && symToStringTag in Object(value))
+    ? getRawTag(value)
+    : objectToString(value);
+}
+
+module.exports = baseGetTag;
+
+
+/***/ }),
+/* 64 */
+/***/ (function(module, exports, __webpack_require__) {
+
+var Symbol = __webpack_require__(19);
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var nativeObjectToString = objectProto.toString;
+
+/** Built-in value references. */
+var symToStringTag = Symbol ? Symbol.toStringTag : undefined;
+
+/**
+ * A specialized version of `baseGetTag` which ignores `Symbol.toStringTag` values.
+ *
+ * @private
+ * @param {*} value The value to query.
+ * @returns {string} Returns the raw `toStringTag`.
+ */
+function getRawTag(value) {
+  var isOwn = hasOwnProperty.call(value, symToStringTag),
+      tag = value[symToStringTag];
+
+  try {
+    value[symToStringTag] = undefined;
+    var unmasked = true;
+  } catch (e) {}
+
+  var result = nativeObjectToString.call(value);
+  if (unmasked) {
+    if (isOwn) {
+      value[symToStringTag] = tag;
+    } else {
+      delete value[symToStringTag];
+    }
+  }
+  return result;
+}
+
+module.exports = getRawTag;
+
+
+/***/ }),
+/* 65 */
+/***/ (function(module, exports) {
+
+/** Used for built-in method references. */
+var objectProto = Object.prototype;
+
+/**
+ * Used to resolve the
+ * [`toStringTag`](http://ecma-international.org/ecma-262/7.0/#sec-object.prototype.tostring)
+ * of values.
+ */
+var nativeObjectToString = objectProto.toString;
+
+/**
+ * Converts `value` to a string using `Object.prototype.toString`.
+ *
+ * @private
+ * @param {*} value The value to convert.
+ * @returns {string} Returns the converted string.
+ */
+function objectToString(value) {
+  return nativeObjectToString.call(value);
+}
+
+module.exports = objectToString;
+
+
+/***/ }),
+/* 66 */
+/***/ (function(module, exports) {
+
+/**
+ * Checks if `value` is object-like. A value is object-like if it's not `null`
+ * and has a `typeof` result of "object".
+ *
+ * @static
+ * @memberOf _
+ * @since 4.0.0
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is object-like, else `false`.
+ * @example
+ *
+ * _.isObjectLike({});
+ * // => true
+ *
+ * _.isObjectLike([1, 2, 3]);
+ * // => true
+ *
+ * _.isObjectLike(_.noop);
+ * // => false
+ *
+ * _.isObjectLike(null);
+ * // => false
+ */
+function isObjectLike(value) {
+  return value != null && typeof value == 'object';
+}
+
+module.exports = isObjectLike;
+
+
+/***/ })
+/******/ ]);
+});
 //# sourceMappingURL=epub.js.map

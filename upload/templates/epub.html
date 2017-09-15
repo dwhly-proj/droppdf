@@ -9,7 +9,7 @@
   <title>{{ filename }}</title>
 
   <script src="{% static 'epubjs/epub.min.js' %}"></script>
-  <script src="{% static 'epubjs/libs/zip.min.js' %}"></script>
+  <script src="{% static 'epubjs/jszip.min.js' %}"></script>
 
   <script type="text/javascript">
     window.hypothesisConfig = function () {
@@ -36,10 +36,6 @@
       font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       color: #333;
     }
-
-    <!--#viewer iframe {-->
-      <!--opacity: 0;-->
-    <!--}-->
 
     #navigation {
       width: 400px;
@@ -141,13 +137,15 @@
     }
 
     .arrow .material-icons {
-      font-size: 8vw;
+      font-size: 64px;
     }
 
     #prev {
+      float: left;
     }
 
     #next {
+      float: right;
     }
 
     #toc {
@@ -193,6 +191,8 @@
     #viewer.spreads {
       width: 84vw;
       height: 80vh;
+      box-shadow: 0 0 4px #ccc;
+      border-radius: 5px;
       padding: 0;
       position: relative;
       margin: 10vh auto;
@@ -204,28 +204,6 @@
       display: none;
     }
 
-    @media (max-width: 1000px) {
-      #prev {
-        left: 0px;
-      }
-      #next {
-        right: 0px;
-      }
-    }
-
-    @media (max-width: 400px) {
-      .arrow .material-icons {
-        font-size: 10vw;
-      }
-      #prev {
-        left: -7px;
-      }
-      #next {
-        right: -7px;
-      }
-    }
-
-
   </style>
 </head>
 <body>
@@ -234,11 +212,11 @@
       <i class="material-icons">menu</i>
     </a>
     <div id="viewer" class="spreads"></div>
-    <span id="hiddenTitle"></span>
-    <a id="prev" href="javascript:void(0)" class="arrow">
+    <span id="hiddenTitle"></span>g
+    <a id="prev" href="#prev" class="arrow">
       <i class="material-icons">chevron_left</i>
     </a>
-    <a id="next" href="javascript:void(0)" class="arrow">
+    <a id="next" href="#next" class="arrow">
       <i class="material-icons">chevron_right</i>
     </a>
   </div>
@@ -253,192 +231,36 @@
   </div>
 
   <script>
+    var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
+    var url = params && params.get("url") && decodeURIComponent(params.get("url"));
 
-    EPUBJS.Render.Iframe.prototype.addIframe = function(){
-      this.iframe = document.createElement('iframe');
-      this.iframe.id = "epubjs-iframe:" + this.id;
-      this.iframe.scrolling = this.scrolling || "no";
-      this.iframe.seamless = "seamless";
-      this.iframe.style.border = "none";
-
-      this.iframe.setAttribute('enable-annotation',"true");
-
-      this.iframe.addEventListener("load", this.loaded.bind(this), false);
-
-      if (this._width || this._height) {
-        this.iframe.height = this._height;
-        this.iframe.width = this._width;
-      }
-      return this.iframe;
-    };
-
-    EPUBJS.Renderer.prototype.nextPage = function() {
-
-      if (this.chapterPos >= this.displayedPages) {
-
-        //end of book
-        if (book.spinePos >= book.spine.length - 1) {
-          return;
-        }
-
-        console.log(book.spinePos);
-        console.log(book)
-        var next = +book.spinePos + 1;
-        console.log(next);
-        var href = book.spine[next].href;
-        //hard reload
-        var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(href) ;
-        window.location.href = newurl; 
-        return true; 
-      }
-      else {
-        return this.page(this.chapterPos + 1);
-      }
-    };
-
-
-    EPUBJS.Renderer.prototype.prevPage = function() {
-      if (this.chapterPos <= 1) {
-        //beginning of book
-        if (book.spinePos <= 0) {
-          return true
-        }
-        //back one chapter
-        
-        var prev = book.spinePos - 1;
-        var href = book.spine[prev].href;
-        var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(href) + '&page=' + prev;
-        window.location.href = newurl; 
-        return true; 
-        
-      }
-      return this.page(this.chapterPos - 1);
-    };
-
-
+    // Load the opf
     var book = ePub("/static/drop-pdf/{{ filename }}");
+    var rendition = book.renderTo("viewer", {
+      ignoreClass: "annotator-hl",
+      width: "100%",
+      height: "100%"
+    });
 
-    //console.log(book);
-    //var render = book.renderTo("viewer");
-
-    var spine_toc_map = (function() {
-      //map spine position to toc 
-      var out = {};
-      book.on('book:ready', function() {
-        book.toc.forEach(function(item, index) {
-          out[item.spinePos] = item;
-        });
-      });
-      return out;
-    }());
-
-    function get_current() {
-      var label;
-      var cur = book.spinePos;
-      if (cur in spine_toc_map) {
-        label = spine_toc_map[cur].label;
-      }
-      else {
-        label = book.metadata.bookTitle;
-      }
-      if (typeof label === undefined) {
-        label = 'Epub'; 
-      }
-      var spine = book.spine[cur];
-      var href = spine.href; 
-
-      return {
-        label: label,
-        href: href
-      }
-
-    };
-
-    function update_title() {
-      var current = get_current();
-      if (current) {
-        document.title = current.label;
-      }
-
-    };
-
-    function update_history() {
-      //add query string
-      var current = get_current();
-      var newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?loc=' + encodeURIComponent(current.href) ;
-      window.history.pushState({}, current.label, newurl);
-      update_title();
+    // var hash = window.location.hash.slice(2);
+    var loc = window.location.href.indexOf("?loc=");
+    if (loc > -1) {
+      var href =  window.location.href.slice(loc + 5);
+      var hash = decodeURIComponent(href);
     }
 
-    function navigate_to_hash() {
-      //page to chapter/ page given by query string.
-      var hash = window.location.hash.slice(2);
-      var loc = window.location.href.indexOf("?loc=");
+    rendition.display(hash || undefined);
 
-      if (loc > -1) {
-        var page = window.location.href.indexOf('&page=');
-        if (page > -1) {
-
-          var qstring = window.location.href.slice(loc + 5);
-
-          var splt = qstring.split('&page=');
-          var href = splt[0];
-          var pg = splt[1]; 
-        }
-        else {
-          var href =  window.location.href.slice(loc + 5);
-          var pg = false;
-        }
-        var hash = decodeURIComponent(href);
-        
-        console.log(pg);
-
-        if (pg) {
-          var rendered = book.goto(hash);
-          //book.renderer.page(+pg)
-      
-          book.renderTo('viewer').then(function() {
-            book.displayChapter(+pg, true).then(function() {
-              update_title();
-              update_history();
-            });
-          });
-        }
-
-        else {
-          var rendered = book.goto(hash);
-          book.renderTo('viewer');
-        }
-        update_title();
-        return true;
-      }
-      else {
-          return false;
-      }
-
-    }
-
-    function page_next() {
-      book.nextPage().then(function() {
-        update_history();
-      });
-    };
-    function page_prev() {
-      book.prevPage().then(function() {
-        update_history();
-      });
-    }
-    
 
     var next = document.getElementById("next");
     next.addEventListener("click", function(e){
-      page_next();
+      rendition.next();
       e.preventDefault();
     }, false);
 
     var prev = document.getElementById("prev");
     prev.addEventListener("click", function(e){
-      page_prev();
+      rendition.prev();
       e.preventDefault();
     }, false);
 
@@ -453,48 +275,56 @@
       nav.classList.remove("open");
     }, false);
 
+    // Hidden
+    var hiddenTitle = document.getElementById("hiddenTitle");
 
-    book.on('book:ready', function() {
-      //navigate to desired page or else set query string. 
-      if (! navigate_to_hash()) {
-        update_history();
+    rendition.on("rendered", function(section){
+      var current = book.navigation && book.navigation.get(section.href);
+
+      if (current) {
+        document.title = current.label;
+
+        // TODO: this is needed to trigger the hypothesis client
+        // to inject into the iframe
+        hiddenTitle.textContent = current.label;
       }
-      //var render = book.renderTo("viewer");
-      //show book
-      <!--var intvl = setInterval(function() {-->
-        <!--var viewer = document.getElementById('viewer');-->
-        <!--var frames = document.getElementsByTagName('iframe');-->
-        <!--console.log(frames);-->
-        <!--if (frames.length > 0) {-->
-          <!--clearInterval(intvl);-->
-          <!--frames[0].style.opacity = '1';-->
-        <!--}-->
-      <!--}, 50);-->
+
+      var old = document.querySelectorAll('.active');
+      Array.prototype.slice.call(old, 0).forEach(function (link) {
+        link.classList.remove("active");
+      })
+
+      var active = document.querySelector('a[href="'+section.href+'"]');
+      if (active) {
+        active.classList.add("active");
+      }
+      // Add CFI fragment to the history
+      history.pushState({}, '', "?loc=" + encodeURIComponent(section.href));
+      // window.location.hash = "#/"+section.href
     });
 
     var keyListener = function(e){
 
       // Left Key
       if ((e.keyCode || e.which) == 37) {
-        page_prev();  
+        rendition.prev();
       }
 
       // Right Key
       if ((e.keyCode || e.which) == 39) {
-        page_next();  
+        rendition.next();
       }
 
     };
 
+    rendition.on("keyup", keyListener);
     document.addEventListener("keyup", keyListener, false);
 
-    book.getToc().then(function(toc) {
-
+    book.loaded.navigation.then(function(toc){
       var $nav = document.getElementById("toc"),
           docfrag = document.createDocumentFragment();
 
       toc.forEach(function(chapter, index) {
-
         var item = document.createElement("li");
         var link = document.createElement("a");
         link.id = "chap-" + chapter.id;
@@ -505,10 +335,7 @@
 
         link.onclick = function(){
           var url = link.getAttribute("href");
-          var rendered = book.goto(url);
-          rendered.then(function() {
-            update_history();
-          });
+          rendition.display(url);
           return false;
         };
 
@@ -516,22 +343,25 @@
 
       $nav.appendChild(docfrag);
 
+
     });
 
-    book.on('book:ready', function() {
-      var meta = book.metadata;
-      var cache = book.store.urlCache; 
-
+    book.loaded.metadata.then(function(meta){
       var $title = document.getElementById("title");
       var $author = document.getElementById("author");
       var $cover = document.getElementById("cover");
       var $nav = document.getElementById('navigation');
 
-      var cover_url = cache[book.cover]; 
-
-      $title.textContent = meta.bookTitle;
+      $title.textContent = meta.title;
       $author.textContent = meta.creator;
-      $cover.src = cover_url;
+      if (book.archive) {
+        book.archive.createUrl(book.cover)
+          .then(function (url) {
+            $cover.src = url;
+          })
+      } else {
+        $cover.src = book.cover;
+      }
 
     });
 
@@ -549,6 +379,33 @@
         }
       }, 100);
     }
+
+    book.rendition.hooks.content.register(function(contents, view) {
+        checkForAnnotator(function () {
+
+          var annotator = contents.window.annotator;
+
+          contents.window.addEventListener('scrolltorange', function (e) {
+            var range = e.detail;
+            var cfi = new ePub.CFI(range, contents.cfiBase).toString();
+            if (cfi) {
+              book.rendition.display(cfi);
+            }
+            e.preventDefault();
+          });
+
+
+          annotator.on("highlightClick", function (annotation) {
+            window.annotator.show();
+          })
+
+          annotator.on("beforeAnnotationCreated", function (annotation) {
+            window.annotator.show();
+          })
+
+        }, contents.window);
+
+    });
 
   </script>
 
