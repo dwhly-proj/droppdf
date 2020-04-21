@@ -97,6 +97,7 @@ def save_file(file, path='', extension='pdf'):
         os.makedirs(temp)
 
     filename = file._get_name()
+    filename = filename.replace("'", '').replace('"', '')
     filename = re.sub(r"[\(,\),\s]+", "-", filename)
 
     filename_noextension = '.'.join(filename.split('.')[:-1])
