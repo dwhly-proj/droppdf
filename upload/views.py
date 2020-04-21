@@ -99,6 +99,8 @@ def save_file(file, path='', extension='pdf'):
     filename = file._get_name()
     filename = re.sub(r"[\(,\),\s]+", "-", filename)
 
+    print(filename)
+
     filename_noextension = '.'.join(filename.split('.')[:-1])
     rand_key = randomword(5)
 
