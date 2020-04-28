@@ -21,16 +21,18 @@
   bottom: 0;
   overflow: hidden;
   opacity: 0.2;
-  line-height: 1.0;
 }
 
-.textLayer > span {
+.textLayer > div {
   color: transparent;
   position: absolute;
   white-space: pre;
   cursor: text;
   -webkit-transform-origin: 0% 0%;
-          transform-origin: 0% 0%;
+  -moz-transform-origin: 0% 0%;
+  -o-transform-origin: 0% 0%;
+  -ms-transform-origin: 0% 0%;
+  transform-origin: 0% 0%;
 }
 
 .textLayer .highlight {
@@ -57,224 +59,8 @@
   background-color: rgb(0, 100, 0);
 }
 
-.textLayer ::-moz-selection { background: rgb(0,0,255); }
-
 .textLayer ::selection { background: rgb(0,0,255); }
-
-.textLayer .endOfContent {
-  display: block;
-  position: absolute;
-  left: 0px;
-  top: 100%;
-  right: 0px;
-  bottom: 0px;
-  z-index: -1;
-  cursor: default;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
-}
-
-.textLayer .endOfContent.active {
-  top: 0px;
-}
-
-
-.annotationLayer section {
-  position: absolute;
-}
-
-.annotationLayer .linkAnnotation > a,
-.annotationLayer .buttonWidgetAnnotation.pushButton > a {
-  position: absolute;
-  font-size: 1em;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.annotationLayer .linkAnnotation > a:hover,
-.annotationLayer .buttonWidgetAnnotation.pushButton > a:hover {
-  opacity: 0.2;
-  background: #ff0;
-  box-shadow: 0px 2px 10px #ff0;
-}
-
-.annotationLayer .textAnnotation img {
-  position: absolute;
-  cursor: pointer;
-}
-
-.annotationLayer .textWidgetAnnotation input,
-.annotationLayer .textWidgetAnnotation textarea,
-.annotationLayer .choiceWidgetAnnotation select,
-.annotationLayer .buttonWidgetAnnotation.checkBox input,
-.annotationLayer .buttonWidgetAnnotation.radioButton input {
-  background-color: rgba(0, 54, 255, 0.13);
-  border: 1px solid transparent;
-  box-sizing: border-box;
-  font-size: 9px;
-  height: 100%;
-  margin: 0;
-  padding: 0 3px;
-  vertical-align: top;
-  width: 100%;
-}
-
-.annotationLayer .choiceWidgetAnnotation select option {
-  padding: 0;
-}
-
-.annotationLayer .buttonWidgetAnnotation.radioButton input {
-  border-radius: 50%;
-}
-
-.annotationLayer .textWidgetAnnotation textarea {
-  font: message-box;
-  font-size: 9px;
-  resize: none;
-}
-
-.annotationLayer .textWidgetAnnotation input[disabled],
-.annotationLayer .textWidgetAnnotation textarea[disabled],
-.annotationLayer .choiceWidgetAnnotation select[disabled],
-.annotationLayer .buttonWidgetAnnotation.checkBox input[disabled],
-.annotationLayer .buttonWidgetAnnotation.radioButton input[disabled] {
-  background: none;
-  border: 1px solid transparent;
-  cursor: not-allowed;
-}
-
-.annotationLayer .textWidgetAnnotation input:hover,
-.annotationLayer .textWidgetAnnotation textarea:hover,
-.annotationLayer .choiceWidgetAnnotation select:hover,
-.annotationLayer .buttonWidgetAnnotation.checkBox input:hover,
-.annotationLayer .buttonWidgetAnnotation.radioButton input:hover {
-  border: 1px solid #000;
-}
-
-.annotationLayer .textWidgetAnnotation input:focus,
-.annotationLayer .textWidgetAnnotation textarea:focus,
-.annotationLayer .choiceWidgetAnnotation select:focus {
-  background: none;
-  border: 1px solid transparent;
-}
-
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before,
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after,
-.annotationLayer .buttonWidgetAnnotation.radioButton input:checked:before {
-  background-color: #000;
-  content: '';
-  display: block;
-  position: absolute;
-}
-
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before,
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after {
-  height: 80%;
-  left: 45%;
-  width: 1px;
-}
-
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:before {
-  -webkit-transform: rotate(45deg);
-          transform: rotate(45deg);
-}
-
-.annotationLayer .buttonWidgetAnnotation.checkBox input:checked:after {
-  -webkit-transform: rotate(-45deg);
-          transform: rotate(-45deg);
-}
-
-.annotationLayer .buttonWidgetAnnotation.radioButton input:checked:before {
-  border-radius: 50%;
-  height: 50%;
-  left: 30%;
-  top: 20%;
-  width: 50%;
-}
-
-.annotationLayer .textWidgetAnnotation input.comb {
-  font-family: monospace;
-  padding-left: 2px;
-  padding-right: 0;
-}
-
-.annotationLayer .textWidgetAnnotation input.comb:focus {
-  /*
-   * Letter spacing is placed on the right side of each character. Hence, the
-   * letter spacing of the last character may be placed outside the visible
-   * area, causing horizontal scrolling. We avoid this by extending the width
-   * when the element has focus and revert this when it loses focus.
-   */
-  width: 115%;
-}
-
-.annotationLayer .buttonWidgetAnnotation.checkBox input,
-.annotationLayer .buttonWidgetAnnotation.radioButton input {
-  -webkit-appearance: none;
-     -moz-appearance: none;
-          appearance: none;
-  padding: 0;
-}
-
-.annotationLayer .popupWrapper {
-  position: absolute;
-  width: 20em;
-}
-
-.annotationLayer .popup {
-  position: absolute;
-  z-index: 200;
-  max-width: 20em;
-  background-color: #FFFF99;
-  box-shadow: 0px 2px 5px #888;
-  border-radius: 2px;
-  padding: 6px;
-  margin-left: 5px;
-  cursor: pointer;
-  font: message-box;
-  font-size: 9px;
-  word-wrap: break-word;
-}
-
-.annotationLayer .popup > * {
-  font-size: 9px;
-}
-
-.annotationLayer .popup h1 {
-  display: inline-block;
-}
-
-.annotationLayer .popup span {
-  display: inline-block;
-  margin-left: 5px;
-}
-
-.annotationLayer .popup p {
-  border-top: 1px solid #333;
-  margin-top: 2px;
-  padding-top: 2px;
-}
-
-.annotationLayer .highlightAnnotation,
-.annotationLayer .underlineAnnotation,
-.annotationLayer .squigglyAnnotation,
-.annotationLayer .strikeoutAnnotation,
-.annotationLayer .freeTextAnnotation,
-.annotationLayer .lineAnnotation svg line,
-.annotationLayer .squareAnnotation svg rect,
-.annotationLayer .circleAnnotation svg ellipse,
-.annotationLayer .polylineAnnotation svg polyline,
-.annotationLayer .polygonAnnotation svg polygon,
-.annotationLayer .caretAnnotation,
-.annotationLayer .inkAnnotation svg polyline,
-.annotationLayer .stampAnnotation,
-.annotationLayer .fileAttachmentAnnotation {
-  cursor: pointer;
-}
+.textLayer ::-moz-selection { background: rgb(0,0,255); }
 
 .pdfViewer .canvasWrapper {
   overflow: hidden;
@@ -289,9 +75,7 @@
   overflow: visible;
   border: 9px solid transparent;
   background-clip: content-box;
-  -webkit-border-image: url(images/shadow.png) 9 9 repeat;
-       -o-border-image: url(images/shadow.png) 9 9 repeat;
-          border-image: url(images/shadow.png) 9 9 repeat;
+  border-image: url(/static/viewer/web/images/shadow.png) 9 9 repeat;
   background-color: white;
 }
 
@@ -300,62 +84,9 @@
   border: none;
 }
 
-.pdfViewer.singlePageView {
-  display: inline-block;
-}
-
-.pdfViewer.singlePageView .page {
-  margin: 0;
-  border: none;
-}
-
-.pdfViewer.scrollHorizontal, .pdfViewer.scrollWrapped, .spread {
-  margin-left: 3.5px;
-  margin-right: 3.5px;
-  text-align: center;
-}
-
-.pdfViewer.scrollHorizontal, .spread {
-  white-space: nowrap;
-}
-
-.pdfViewer.removePageBorders,
-.pdfViewer.scrollHorizontal .spread,
-.pdfViewer.scrollWrapped .spread {
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.spread .page,
-.pdfViewer.scrollHorizontal .page,
-.pdfViewer.scrollWrapped .page,
-.pdfViewer.scrollHorizontal .spread,
-.pdfViewer.scrollWrapped .spread {
-  display: inline-block;
-  vertical-align: middle;
-}
-
-.spread .page,
-.pdfViewer.scrollHorizontal .page,
-.pdfViewer.scrollWrapped .page {
-  margin-left: -3.5px;
-  margin-right: -3.5px;
-}
-
-.pdfViewer.removePageBorders .spread .page,
-.pdfViewer.removePageBorders.scrollHorizontal .page,
-.pdfViewer.removePageBorders.scrollWrapped .page {
-  margin-left: 5px;
-  margin-right: 5px;
-}
-
 .pdfViewer .page canvas {
   margin: 0;
   display: block;
-}
-
-.pdfViewer .page canvas[hidden] {
-  display: none;
 }
 
 .pdfViewer .page .loadingIcon {
@@ -365,27 +96,13 @@
   top: 0;
   right: 0;
   bottom: 0;
-  background: url('images/loading-icon.gif') center no-repeat;
+  background: url('/static/viewer/web/images/loading-icon.gif') center no-repeat;
 }
 
-.pdfPresentationMode .pdfViewer {
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.pdfPresentationMode .pdfViewer .page,
-.pdfPresentationMode .pdfViewer .spread {
-  display: block;
-}
-
-.pdfPresentationMode .pdfViewer .page,
-.pdfPresentationMode .pdfViewer.removePageBorders .page {
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.pdfPresentationMode:-ms-fullscreen .pdfViewer .page {
-  margin-bottom: 100% !important;
+.pdfViewer .page .annotLink > a:hover {
+  opacity: 0.2;
+  background: #ff0;
+  box-shadow: 0px 2px 10px #ff0;
 }
 
 .pdfPresentationMode:-webkit-full-screen .pdfViewer .page {
@@ -398,13 +115,59 @@
   border: 0;
 }
 
+.pdfPresentationMode:-ms-fullscreen .pdfViewer .page {
+  margin-bottom: 100% !important;
+  border: 0;
+}
+
 .pdfPresentationMode:fullscreen .pdfViewer .page {
   margin-bottom: 100%;
   border: 0;
 }
 
-:root {
-  --sidebar-width: 200px;
+.pdfViewer .page .annotText > img {
+  position: absolute;
+  cursor: pointer;
+}
+
+.pdfViewer .page .annotTextContentWrapper {
+  position: absolute;
+  width: 20em;
+}
+
+.pdfViewer .page .annotTextContent {
+  z-index: 200;
+  float: left;
+  max-width: 20em;
+  background-color: #FFFF99;
+  box-shadow: 0px 2px 5px #333;
+  border-radius: 2px;
+  padding: 0.6em;
+  cursor: pointer;
+}
+
+.pdfViewer .page .annotTextContent > h1 {
+  font-size: 1em;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 0.2em;
+}
+
+.pdfViewer .page .annotTextContent > p {
+  padding-top: 0.2em;
+}
+
+.pdfViewer .page .annotLink > a {
+  position: absolute;
+  font-size: 1em;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pdfViewer .page .annotLink > a /* -ms-a */  {
+  background: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAA\
+                   LAAAAAABAAEAAAIBRAA7") 0 0 repeat;
 }
 
 * {
@@ -414,16 +177,14 @@
 
 html {
   height: 100%;
-  width: 100%;
   /* Font size is needed to make the activity bar the correct size. */
   font-size: 10px;
 }
 
 body {
   height: 100%;
-  width: 100%;
   background-color: #404040;
-  background-image: url(images/texture.png);
+  background-image: url(/static/viewer/web/images/texture.png);
 }
 
 body,
@@ -441,15 +202,6 @@ select {
   display: none !important;
 }
 
-#viewerContainer.pdfPresentationMode:-ms-fullscreen {
-  top: 0px !important;
-  overflow: hidden !important;
-}
-
-#viewerContainer.pdfPresentationMode:-ms-fullscreen::-ms-backdrop {
-  background-color: #000;
-}
-
 #viewerContainer.pdfPresentationMode:-webkit-full-screen {
   top: 0px;
   border-top: 2px solid transparent;
@@ -459,7 +211,6 @@ select {
   overflow: hidden;
   cursor: none;
   -webkit-user-select: none;
-          user-select: none;
 }
 
 #viewerContainer.pdfPresentationMode:-moz-full-screen {
@@ -471,19 +222,20 @@ select {
   overflow: hidden;
   cursor: none;
   -moz-user-select: none;
-       user-select: none;
 }
 
 #viewerContainer.pdfPresentationMode:-ms-fullscreen {
-  top: 0px;
+  top: 0px !important;
   border-top: 2px solid transparent;
-  background-color: #000;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow: hidden !important;
   cursor: none;
   -ms-user-select: none;
-      user-select: none;
+}
+
+#viewerContainer.pdfPresentationMode:-ms-fullscreen::-ms-backdrop {
+  background-color: #000;
 }
 
 #viewerContainer.pdfPresentationMode:fullscreen {
@@ -495,9 +247,8 @@ select {
   overflow: hidden;
   cursor: none;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .pdfPresentationMode:-webkit-full-screen a:not(.internalLink) {
@@ -509,32 +260,58 @@ select {
 }
 
 .pdfPresentationMode:-ms-fullscreen a:not(.internalLink) {
-  display: none;
+  display: none !important;
 }
 
 .pdfPresentationMode:fullscreen a:not(.internalLink) {
   display: none;
 }
 
-.pdfPresentationMode:-webkit-full-screen .textLayer > span {
+.pdfPresentationMode:-webkit-full-screen .textLayer > div {
   cursor: none;
 }
 
-.pdfPresentationMode:-moz-full-screen .textLayer > span {
+.pdfPresentationMode:-moz-full-screen .textLayer > div {
   cursor: none;
 }
 
-.pdfPresentationMode:-ms-fullscreen .textLayer > span {
+.pdfPresentationMode:-ms-fullscreen .textLayer > div {
   cursor: none;
 }
 
-.pdfPresentationMode:fullscreen .textLayer > span {
+.pdfPresentationMode:fullscreen .textLayer > div {
   cursor: none;
 }
 
 .pdfPresentationMode.pdfPresentationModeControls > *,
-.pdfPresentationMode.pdfPresentationModeControls .textLayer > span {
+.pdfPresentationMode.pdfPresentationModeControls .textLayer > div {
   cursor: default;
+}
+
+/* outer/inner center provides horizontal center */
+.outerCenter {
+  pointer-events: none;
+  position: relative;
+}
+html[dir='ltr'] .outerCenter {
+  float: right;
+  right: 50%;
+}
+html[dir='rtl'] .outerCenter {
+  float: left;
+  left: 50%;
+}
+.innerCenter {
+  pointer-events: auto;
+  position: relative;
+}
+html[dir='ltr'] .innerCenter {
+  float: right;
+  right: -50%;
+}
+html[dir='rtl'] .innerCenter {
+  float: left;
+  left: -50%;
 }
 
 #outerContainer {
@@ -545,57 +322,35 @@ select {
 
 #sidebarContainer {
   position: absolute;
-  top: 32px;
+  top: 0;
   bottom: 0;
-  width: 200px; /* Here, and elsewhere below, keep the constant value for compatibility
-                   with older browsers that lack support for CSS variables. */
-  width: var(--sidebar-width);
+  width: 200px;
   visibility: hidden;
-  z-index: 100;
-  border-top: 1px solid #333;
-
   -webkit-transition-duration: 200ms;
-
-          transition-duration: 200ms;
   -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+
 }
 html[dir='ltr'] #sidebarContainer {
   -webkit-transition-property: left;
   transition-property: left;
   left: -200px;
-  left: calc(-1 * var(--sidebar-width));
 }
 html[dir='rtl'] #sidebarContainer {
   -webkit-transition-property: right;
   transition-property: right;
   right: -200px;
-  right: calc(-1 * var(--sidebar-width));
 }
 
-.loadingInProgress #sidebarContainer {
-  top: 36px;
-}
-
-#outerContainer.sidebarResizing #sidebarContainer {
-  /* Improve responsiveness and avoid visual glitches when the sidebar is resized. */
-  -webkit-transition-duration: 0s;
-          transition-duration: 0s;
-  /* Prevent e.g. the thumbnails being selected when the sidebar is resized. */
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
-}
-
-#outerContainer.sidebarMoving #sidebarContainer,
-#outerContainer.sidebarOpen #sidebarContainer {
+#outerContainer.sidebarMoving > #sidebarContainer,
+#outerContainer.sidebarOpen > #sidebarContainer {
   visibility: visible;
 }
-html[dir='ltr'] #outerContainer.sidebarOpen #sidebarContainer {
+html[dir='ltr'] #outerContainer.sidebarOpen > #sidebarContainer {
   left: 0px;
 }
-html[dir='rtl'] #outerContainer.sidebarOpen #sidebarContainer {
+html[dir='rtl'] #outerContainer.sidebarOpen > #sidebarContainer {
   right: 0px;
 }
 
@@ -606,6 +361,20 @@ html[dir='rtl'] #outerContainer.sidebarOpen #sidebarContainer {
   bottom: 0;
   left: 0;
   min-width: 320px;
+  -webkit-transition-duration: 200ms;
+  -webkit-transition-timing-function: ease;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+html[dir='ltr'] #outerContainer.sidebarOpen > #mainContainer {
+  -webkit-transition-property: left;
+  transition-property: left;
+  left: 200px;
+}
+html[dir='rtl'] #outerContainer.sidebarOpen > #mainContainer {
+  -webkit-transition-property: right;
+  transition-property: right;
+  right: 200px;
 }
 
 #sidebarContent {
@@ -614,7 +383,7 @@ html[dir='rtl'] #outerContainer.sidebarOpen #sidebarContainer {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   position: absolute;
-  width: 100%;
+  width: 200px;
   background-color: hsla(0,0%,0%,.1);
 }
 html[dir='ltr'] #sidebarContent {
@@ -636,36 +405,11 @@ html[dir='rtl'] #sidebarContent {
   left: 0;
   outline: none;
 }
-#viewerContainer:not(.pdfPresentationMode) {
-  -webkit-transition-duration: 200ms;
-          transition-duration: 200ms;
-  -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
-}
 html[dir='ltr'] #viewerContainer {
   box-shadow: inset 1px 0 0 hsla(0,0%,100%,.05);
 }
 html[dir='rtl'] #viewerContainer {
   box-shadow: inset -1px 0 0 hsla(0,0%,100%,.05);
-}
-
-#outerContainer.sidebarResizing #viewerContainer {
-  /* Improve responsiveness and avoid visual glitches when the sidebar is resized. */
-  -webkit-transition-duration: 0s;
-          transition-duration: 0s;
-}
-
-html[dir='ltr'] #outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentationMode) {
-  -webkit-transition-property: left;
-  transition-property: left;
-  left: 200px;
-  left: var(--sidebar-width);
-}
-html[dir='rtl'] #outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentationMode) {
-  -webkit-transition-property: right;
-  transition-property: right;
-  right: 200px;
-  right: var(--sidebar-width);
 }
 
 .toolbar {
@@ -681,12 +425,10 @@ html[dir='rtl'] #outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentatio
 }
 
 #toolbarSidebar {
-  width: 100%;
+  width: 200px;
   height: 32px;
   background-color: #424242; /* fallback */
-  background-image: url(images/texture.png),
-                    -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,30%,.99)), to(hsla(0,0%,25%,.95)));
-  background-image: url(images/texture.png),
+  background-image: url(/static/viewer/web/images/texture.png),
                     linear-gradient(hsla(0,0%,30%,.99), hsla(0,0%,25%,.95));
 }
 html[dir='ltr'] #toolbarSidebar {
@@ -702,38 +444,23 @@ html[dir='rtl'] #toolbarSidebar {
               0 0 1px hsla(0,0%,0%,.1);
 }
 
-#sidebarResizer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  z-index: 200;
-  cursor: ew-resize;
-}
-html[dir='ltr'] #sidebarResizer {
-  right: -6px;
-}
-html[dir='rtl'] #sidebarResizer {
-  left: -6px;
-}
-
 #toolbarContainer, .findbar, .secondaryToolbar {
   position: relative;
   height: 32px;
   background-color: #474747; /* fallback */
-  background-image: url(images/texture.png),
-                    -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,32%,.99)), to(hsla(0,0%,27%,.95)));
-  background-image: url(images/texture.png),
+  background-image: url(/static/viewer/web/images/texture.png),
                     linear-gradient(hsla(0,0%,32%,.99), hsla(0,0%,27%,.95));
 }
 html[dir='ltr'] #toolbarContainer, .findbar, .secondaryToolbar {
-  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+  box-shadow: inset 1px 0 0 hsla(0,0%,100%,.08),
+              inset 0 1px 1px hsla(0,0%,0%,.15),
               inset 0 -1px 0 hsla(0,0%,100%,.05),
               0 1px 0 hsla(0,0%,0%,.15),
               0 1px 1px hsla(0,0%,0%,.1);
 }
 html[dir='rtl'] #toolbarContainer, .findbar, .secondaryToolbar {
-  box-shadow: inset 0 1px 1px hsla(0,0%,0%,.15),
+  box-shadow: inset -1px 0 0 hsla(0,0%,100%,.08),
+              inset 0 1px 1px hsla(0,0%,0%,.15),
               inset 0 -1px 0 hsla(0,0%,100%,.05),
               0 1px 0 hsla(0,0%,0%,.15),
               0 1px 1px hsla(0,0%,0%,.1);
@@ -764,13 +491,15 @@ html[dir='rtl'] #toolbarContainer, .findbar, .secondaryToolbar {
 }
 
 @-webkit-keyframes progressIndeterminate {
-  0% { left: -142px; }
-  100% { left: 0; }
+  0% { left: 0%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
 }
 
 @keyframes progressIndeterminate {
-  0% { left: -142px; }
-  100% { left: 0; }
+  0% { left: 0%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
 }
 
 #loadingBar .progress.indeterminate {
@@ -779,28 +508,27 @@ html[dir='rtl'] #toolbarContainer, .findbar, .secondaryToolbar {
   transition: none;
 }
 
-#loadingBar .progress.indeterminate .glimmer {
+#loadingBar .indeterminate .glimmer {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  width: calc(100% + 150px);
+  width: 50px;
 
-  background: repeating-linear-gradient(135deg,
-                                        #bbb 0, #999 5px,
-                                        #999 45px, #ddd 55px,
-                                        #ddd 95px, #bbb 100px);
+  background-image: linear-gradient(to right, #999 0%, #fff 50%, #999 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 
-  -webkit-animation: progressIndeterminate 950ms linear infinite;
-
-          animation: progressIndeterminate 950ms linear infinite;
+  -webkit-animation: progressIndeterminate 2s linear infinite;
+  animation: progressIndeterminate 2s linear infinite;
 }
 
 .findbar, .secondaryToolbar {
   top: 32px;
   position: absolute;
   z-index: 10000;
-  height: auto;
+  height: 32px;
+
   min-width: 16px;
   padding: 0px 6px 0px 6px;
   margin: 4px 2px 4px 2px;
@@ -811,52 +539,21 @@ html[dir='rtl'] #toolbarContainer, .findbar, .secondaryToolbar {
   cursor: default;
 }
 
-.findbar {
-  min-width: 300px;
-}
-.findbar > div {
-  height: 32px;
-}
-.findbar.wrapContainers > div {
-  clear: both;
-}
-.findbar.wrapContainers > div#findbarMessageContainer {
-  height: auto;
-}
 html[dir='ltr'] .findbar {
   left: 68px;
 }
+
 html[dir='rtl'] .findbar {
   right: 68px;
 }
 
 .findbar label {
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
 }
 
-#findInput {
-  width: 200px;
-}
-#findInput::-webkit-input-placeholder {
-  color: hsl(0, 0%, 75%);
-}
-#findInput::-moz-placeholder {
-  font-style: italic;
-}
-#findInput:-ms-input-placeholder {
-  font-style: italic;
-}
-#findInput::-ms-input-placeholder {
-  font-style: italic;
-}
-#findInput::placeholder {
-  font-style: italic;
-}
 #findInput[data-status="pending"] {
-  background-image: url(images/loading-small.png);
+  background-image: url(/static/viewer/web/images/loading-small.png);
   background-repeat: no-repeat;
   background-position: right;
 }
@@ -882,11 +579,6 @@ html[dir='rtl'] .secondaryToolbar {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   margin-bottom: -4px;
-}
-
-#secondaryToolbarButtonContainer.hiddenScrollModeButtons > .scrollModeButtons,
-#secondaryToolbarButtonContainer.hiddenSpreadModeButtons > .spreadModeButtons {
-  display: none !important;
 }
 
 .doorHanger,
@@ -940,51 +632,45 @@ html[dir='ltr'] .doorHangerRight:before {
   margin-right: -9px;
 }
 
-#findResultsCount {
-  background-color: hsl(0, 0%, 85%);
-  color: hsl(0, 0%, 32%);
-  text-align: center;
-  padding: 3px 4px;
-}
-
 #findMsg {
   font-style: italic;
   color: #A6B7D0;
-}
-#findMsg:empty {
-  display: none;
 }
 
 #findInput.notFound {
   background-color: rgb(255, 102, 102);
 }
 
-#toolbarViewerMiddle {
-  position: absolute;
-  left: 50%;
-  -webkit-transform: translateX(-50%);
-          transform: translateX(-50%);
+html[dir='ltr'] #toolbarViewerLeft {
+  margin-left: -1px;
+}
+html[dir='rtl'] #toolbarViewerRight {
+  margin-right: -1px;
 }
 
 html[dir='ltr'] #toolbarViewerLeft,
 html[dir='rtl'] #toolbarViewerRight {
-  float: left;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 html[dir='ltr'] #toolbarViewerRight,
 html[dir='rtl'] #toolbarViewerLeft {
-  float: right;
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 html[dir='ltr'] #toolbarViewerLeft > *,
 html[dir='ltr'] #toolbarViewerMiddle > *,
 html[dir='ltr'] #toolbarViewerRight > *,
-html[dir='ltr'] .findbar * {
+html[dir='ltr'] .findbar > * {
   position: relative;
   float: left;
 }
 html[dir='rtl'] #toolbarViewerLeft > *,
 html[dir='rtl'] #toolbarViewerMiddle > *,
 html[dir='rtl'] #toolbarViewerRight > *,
-html[dir='rtl'] .findbar * {
+html[dir='rtl'] .findbar > * {
   position: relative;
   float: right;
 }
@@ -1028,6 +714,10 @@ html[dir='rtl'] .splitToolbarButton > .toolbarButton {
   opacity: .5;
 }
 
+.toolbarButton.group {
+  margin-right: 0;
+}
+
 .splitToolbarButton.toggled .toolbarButton {
   margin: 0;
 }
@@ -1037,7 +727,6 @@ html[dir='rtl'] .splitToolbarButton > .toolbarButton {
 .splitToolbarButton.toggled > .toolbarButton,
 .toolbarButton.textButton {
   background-color: hsla(0,0%,0%,.12);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   border: 1px solid hsla(0,0%,0%,.35);
@@ -1046,18 +735,17 @@ html[dir='rtl'] .splitToolbarButton > .toolbarButton {
               0 0 1px hsla(0,0%,100%,.15) inset,
               0 1px 0 hsla(0,0%,100%,.05);
   -webkit-transition-property: background-color, border-color, box-shadow;
-  transition-property: background-color, border-color, box-shadow;
   -webkit-transition-duration: 150ms;
-          transition-duration: 150ms;
   -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
+  transition-property: background-color, border-color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 
 }
 .splitToolbarButton > .toolbarButton:hover,
 .splitToolbarButton > .toolbarButton:focus,
 .dropdownToolbarButton:hover,
 .overlayButton:hover,
-.overlayButton:focus,
 .toolbarButton.textButton:hover,
 .toolbarButton.textButton:focus {
   background-color: hsla(0,0%,0%,.2);
@@ -1108,11 +796,11 @@ html[dir='rtl'] .splitToolbarButtonSeparator {
   margin: 1px 0;
   box-shadow: 0 0 0 1px hsla(0,0%,100%,.03);
   -webkit-transition-property: padding;
-  transition-property: padding;
   -webkit-transition-duration: 10ms;
-          transition-duration: 10ms;
   -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
+  transition-property: padding;
+  transition-duration: 10ms;
+  transition-timing-function: ease;
 }
 
 .toolbarButton,
@@ -1127,17 +815,16 @@ html[dir='rtl'] .splitToolbarButtonSeparator {
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   /* Opera does not support user-select, use <... unselectable="on"> instead */
   cursor: default;
   -webkit-transition-property: background-color, border-color, box-shadow;
-  transition-property: background-color, border-color, box-shadow;
   -webkit-transition-duration: 150ms;
-          transition-duration: 150ms;
   -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
+  transition-property: background-color, border-color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 }
 
 html[dir='ltr'] .toolbarButton,
@@ -1158,7 +845,6 @@ html[dir='rtl'] .dropdownToolbarButton {
 .secondaryToolbarButton:hover,
 .secondaryToolbarButton:focus {
   background-color: hsla(0,0%,0%,.12);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   border: 1px solid hsla(0,0%,0%,.35);
@@ -1173,36 +859,34 @@ html[dir='rtl'] .dropdownToolbarButton {
 .dropdownToolbarButton:hover:active,
 .secondaryToolbarButton:hover:active {
   background-color: hsla(0,0%,0%,.2);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   border-color: hsla(0,0%,0%,.35) hsla(0,0%,0%,.4) hsla(0,0%,0%,.45);
   box-shadow: 0 1px 1px hsla(0,0%,0%,.1) inset,
               0 0 1px hsla(0,0%,0%,.2) inset,
               0 1px 0 hsla(0,0%,100%,.05);
   -webkit-transition-property: background-color, border-color, box-shadow;
-  transition-property: background-color, border-color, box-shadow;
   -webkit-transition-duration: 10ms;
-          transition-duration: 10ms;
   -webkit-transition-timing-function: linear;
-          transition-timing-function: linear;
+  transition-property: background-color, border-color, box-shadow;
+  transition-duration: 10ms;
+  transition-timing-function: linear;
 }
 
 .toolbarButton.toggled,
 .splitToolbarButton.toggled > .toolbarButton.toggled,
 .secondaryToolbarButton.toggled {
   background-color: hsla(0,0%,0%,.3);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   border-color: hsla(0,0%,0%,.4) hsla(0,0%,0%,.45) hsla(0,0%,0%,.5);
   box-shadow: 0 1px 1px hsla(0,0%,0%,.1) inset,
               0 0 1px hsla(0,0%,0%,.2) inset,
               0 1px 0 hsla(0,0%,100%,.05);
   -webkit-transition-property: background-color, border-color, box-shadow;
-  transition-property: background-color, border-color, box-shadow;
   -webkit-transition-duration: 10ms;
-          transition-duration: 10ms;
   -webkit-transition-timing-function: linear;
-          transition-timing-function: linear;
+  transition-property: background-color, border-color, box-shadow;
+  transition-duration: 10ms;
+  transition-timing-function: linear;
 }
 
 .toolbarButton.toggled:hover:active,
@@ -1218,9 +902,9 @@ html[dir='rtl'] .dropdownToolbarButton {
 .dropdownToolbarButton {
   width: 120px;
   max-width: 120px;
-  padding: 0;
+  padding: 3px 2px 2px;
   overflow: hidden;
-  background: url(images/toolbarButton-menuArrows.png) no-repeat;
+  background: url(/static/viewer/web/images/toolbarButton-menuArrows.png) no-repeat;
 }
 html[dir='ltr'] .dropdownToolbarButton {
   background-position: 95%;
@@ -1234,7 +918,7 @@ html[dir='rtl'] .dropdownToolbarButton {
   font-size: 12px;
   color: hsl(0,0%,95%);
   margin: 0;
-  padding: 3px 2px 2px;
+  padding: 0;
   border: none;
   background: rgba(0,0,0,0); /* Opera does not support 'transparent' <select> background */
 }
@@ -1270,6 +954,12 @@ html[dir='rtl'] .toolbarButton:first-child {
   height: 1px;
 }
 
+.toolbarButtonFlexibleSpacer {
+  -webkit-box-flex: 1;
+  -moz-box-flex: 1;
+  min-width: 30px;
+}
+
 html[dir='ltr'] #findPrevious {
   margin-left: 3px;
 }
@@ -1302,77 +992,79 @@ html[dir="rtl"] .secondaryToolbarButton::before {
 }
 
 html[dir='ltr'] .toolbarButton#sidebarToggle::before {
-  content: url(images/toolbarButton-sidebarToggle.png);
+  content: url(/static/viewer/web/images/toolbarButton-sidebarToggle.png);
 }
 html[dir='rtl'] .toolbarButton#sidebarToggle::before {
-  content: url(images/toolbarButton-sidebarToggle-rtl.png);
+  content: url(/static/viewer/web/images/toolbarButton-sidebarToggle-rtl.png);
 }
 
 html[dir='ltr'] .toolbarButton#secondaryToolbarToggle::before {
-  content: url(images/toolbarButton-secondaryToolbarToggle.png);
+  content: url(/static/viewer/web/images/toolbarButton-secondaryToolbarToggle.png);
 }
 html[dir='rtl'] .toolbarButton#secondaryToolbarToggle::before {
-  content: url(images/toolbarButton-secondaryToolbarToggle-rtl.png);
+  content: url(/static/viewer/web/images/toolbarButton-secondaryToolbarToggle-rtl.png);
 }
 
 html[dir='ltr'] .toolbarButton.findPrevious::before {
-  content: url(images/findbarButton-previous.png);
+  content: url(/static/viewer/web/images/findbarButton-previous.png);
 }
 html[dir='rtl'] .toolbarButton.findPrevious::before {
-  content: url(images/findbarButton-previous-rtl.png);
+  content: url(/static/viewer/web/images/findbarButton-previous-rtl.png);
 }
 
 html[dir='ltr'] .toolbarButton.findNext::before {
-  content: url(images/findbarButton-next.png);
+  content: url(/static/viewer/web/images/findbarButton-next.png);
 }
 html[dir='rtl'] .toolbarButton.findNext::before {
-  content: url(images/findbarButton-next-rtl.png);
+  content: url(/static/viewer/web/images/findbarButton-next-rtl.png);
 }
 
 html[dir='ltr'] .toolbarButton.pageUp::before {
-  content: url(images/toolbarButton-pageUp.png);
+  content: url(/static/viewer/web/images/toolbarButton-pageUp.png);
 }
 html[dir='rtl'] .toolbarButton.pageUp::before {
-  content: url(images/toolbarButton-pageUp-rtl.png);
+  content: url(/static/viewer/web/images/toolbarButton-pageUp-rtl.png);
 }
 
 html[dir='ltr'] .toolbarButton.pageDown::before {
-  content: url(images/toolbarButton-pageDown.png);
+  content: url(/static/viewer/web/images/toolbarButton-pageDown.png);
 }
 html[dir='rtl'] .toolbarButton.pageDown::before {
-  content: url(images/toolbarButton-pageDown-rtl.png);
+  content: url(/static/viewer/web/images/toolbarButton-pageDown-rtl.png);
 }
 
 .toolbarButton.zoomOut::before {
-  content: url(images/toolbarButton-zoomOut.png);
+  content: url(/static/viewer/web/images/toolbarButton-zoomOut.png);
 }
 
 .toolbarButton.zoomIn::before {
-  content: url(images/toolbarButton-zoomIn.png);
+  content: url(/static/viewer/web/images/toolbarButton-zoomIn.png);
 }
 
 .toolbarButton.presentationMode::before,
 .secondaryToolbarButton.presentationMode::before {
-  content: url(images/toolbarButton-presentationMode.png);
+  content: url(/static/viewer/web/images/toolbarButton-presentationMode.png);
 }
 
 .toolbarButton.print::before,
 .secondaryToolbarButton.print::before {
-  content: url(images/toolbarButton-print.png);
+  content: url(/static/viewer/web/images/toolbarButton-print.png);
 }
 
 .toolbarButton.openFile::before,
 .secondaryToolbarButton.openFile::before {
-  content: url(images/toolbarButton-openFile.png);
+  content: url(/static/viewer/web/images/toolbarButton-openFile.png);
 }
 
 .toolbarButton.download::before,
 .secondaryToolbarButton.download::before {
-  content: url(images/toolbarButton-download.png);
+  content: url(/static/viewer/web/images/toolbarButton-download.png);
 }
 
 .toolbarButton.bookmark,
 .secondaryToolbarButton.bookmark {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
   box-sizing: border-box;
   outline: none;
   padding-top: 4px;
@@ -1389,44 +1081,26 @@ html[dir='rtl'] .toolbarButton.pageDown::before {
 
 .toolbarButton.bookmark::before,
 .secondaryToolbarButton.bookmark::before {
-  content: url(images/toolbarButton-bookmark.png);
+  content: url(/static/viewer/web/images/toolbarButton-bookmark.png);
 }
 
 #viewThumbnail.toolbarButton::before {
-  content: url(images/toolbarButton-viewThumbnail.png);
+  content: url(/static/viewer/web/images/toolbarButton-viewThumbnail.png);
 }
 
 html[dir="ltr"] #viewOutline.toolbarButton::before {
-  content: url(images/toolbarButton-viewOutline.png);
+  content: url(/static/viewer/web/images/toolbarButton-viewOutline.png);
 }
 html[dir="rtl"] #viewOutline.toolbarButton::before {
-  content: url(images/toolbarButton-viewOutline-rtl.png);
+  content: url(/static/viewer/web/images/toolbarButton-viewOutline-rtl.png);
 }
 
 #viewAttachments.toolbarButton::before {
-  content: url(images/toolbarButton-viewAttachments.png);
+  content: url(/static/viewer/web/images/toolbarButton-viewAttachments.png);
 }
 
 #viewFind.toolbarButton::before {
-  content: url(images/toolbarButton-search.png);
-}
-
-.toolbarButton.pdfSidebarNotification::after {
-  position: absolute;
-  display: inline-block;
-  top: 1px;
-  /* Create a filled circle, with a diameter of 9 pixels, using only CSS: */
-  content: '';
-  background-color: #70DB55;
-  height: 9px;
-  width: 9px;
-  border-radius: 50%;
-}
-html[dir='ltr'] .toolbarButton.pdfSidebarNotification::after {
-  left: 17px;
-}
-html[dir='rtl'] .toolbarButton.pdfSidebarNotification::after {
-  right: 17px;
+  content: url(/static/viewer/web/images/toolbarButton-search.png);
 }
 
 .secondaryToolbarButton {
@@ -1462,55 +1136,27 @@ html[dir="rtl"] .secondaryToolbarButton > span {
 }
 
 .secondaryToolbarButton.firstPage::before {
-  content: url(images/secondaryToolbarButton-firstPage.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-firstPage.png);
 }
 
 .secondaryToolbarButton.lastPage::before {
-  content: url(images/secondaryToolbarButton-lastPage.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-lastPage.png);
 }
 
 .secondaryToolbarButton.rotateCcw::before {
-  content: url(images/secondaryToolbarButton-rotateCcw.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-rotateCcw.png);
 }
 
 .secondaryToolbarButton.rotateCw::before {
-  content: url(images/secondaryToolbarButton-rotateCw.png);
-}
-
-.secondaryToolbarButton.selectTool::before {
-  content: url(images/secondaryToolbarButton-selectTool.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-rotateCw.png);
 }
 
 .secondaryToolbarButton.handTool::before {
-  content: url(images/secondaryToolbarButton-handTool.png);
-}
-
-.secondaryToolbarButton.scrollVertical::before {
-  content: url(images/secondaryToolbarButton-scrollVertical.png);
-}
-
-.secondaryToolbarButton.scrollHorizontal::before {
-  content: url(images/secondaryToolbarButton-scrollHorizontal.png);
-}
-
-.secondaryToolbarButton.scrollWrapped::before {
-  content: url(images/secondaryToolbarButton-scrollWrapped.png);
-}
-
-.secondaryToolbarButton.spreadNone::before {
-  content: url(images/secondaryToolbarButton-spreadNone.png);
-}
-
-.secondaryToolbarButton.spreadOdd::before {
-  content: url(images/secondaryToolbarButton-spreadOdd.png);
-}
-
-.secondaryToolbarButton.spreadEven::before {
-  content: url(images/secondaryToolbarButton-spreadEven.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-handTool.png);
 }
 
 .secondaryToolbarButton.documentProperties::before {
-  content: url(images/secondaryToolbarButton-documentProperties.png);
+  content: url(/static/viewer/web/images/secondaryToolbarButton-documentProperties.png);
 }
 
 .verticalToolbarSeparator {
@@ -1540,13 +1186,12 @@ html[dir='rtl'] .verticalToolbarSeparator {
 .toolbarField {
   padding: 3px 6px;
   margin: 4px 0 4px 0;
+  border: 1px solid transparent;
   border-radius: 2px;
   background-color: hsla(0,0%,100%,.09);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
-  border-width: 1px;
-  border-style: solid;
+  border: 1px solid hsla(0,0%,0%,.35);
   border-color: hsla(0,0%,0%,.32) hsla(0,0%,0%,.38) hsla(0,0%,0%,.42);
   box-shadow: 0 1px 0 hsla(0,0%,0%,.05) inset,
               0 1px 0 hsla(0,0%,100%,.05);
@@ -1554,12 +1199,9 @@ html[dir='rtl'] .verticalToolbarSeparator {
   font-size: 12px;
   line-height: 14px;
   outline-style: none;
-  -webkit-transition-property: background-color, border-color, box-shadow;
   transition-property: background-color, border-color, box-shadow;
-  -webkit-transition-duration: 150ms;
-          transition-duration: 150ms;
-  -webkit-transition-timing-function: ease;
-          transition-timing-function: ease;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 }
 
 .toolbarField[type=checkbox] {
@@ -1575,7 +1217,7 @@ html[dir='rtl'] .verticalToolbarSeparator {
 }
 
 .toolbarField.pageNumber.visiblePageIsLoading {
-  background-image: url(images/loading-small.png);
+  background-image: url(/static/viewer/web/images/loading-small.png);
   background-repeat: no-repeat;
   background-position: 1px;
 }
@@ -1607,35 +1249,23 @@ html[dir='rtl'] .verticalToolbarSeparator {
   line-height: 14px;
   text-align: left;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
   cursor: default;
 }
 
 #thumbnailView {
   position: absolute;
-  width: calc(100% - 60px);
+  width: 120px;
   top: 0;
   bottom: 0;
-  padding: 10px 30px 0;
+  padding: 10px 40px 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-#thumbnailView > a:active,
-#thumbnailView > a:focus {
-  outline: 0;
-}
-
 .thumbnail {
-  margin: 0 10px 5px 10px;
-}
-html[dir='ltr'] .thumbnail {
   float: left;
-}
-html[dir='rtl'] .thumbnail {
-  float: right;
+  margin-bottom: 5px;
 }
 
 #thumbnailView > a:last-of-type > .thumbnail {
@@ -1648,10 +1278,11 @@ html[dir='rtl'] .thumbnail {
 
 .thumbnail:not([data-loaded]) {
   border: 1px dashed rgba(255, 255, 255, 0.5);
-  margin: -1px 9px 4px 9px;
+  margin: -1px -1px 4px -1px;
 }
 
 .thumbnailImage {
+  transition-duration: 150ms;
   border: 1px solid transparent;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   opacity: 0.8;
@@ -1663,6 +1294,7 @@ html[dir='rtl'] .thumbnail {
 .thumbnailSelectionRing {
   border-radius: 2px;
   padding: 7px;
+  transition-duration: 150ms;
 }
 
 a:focus > .thumbnail > .thumbnailSelectionRing > .thumbnailImage,
@@ -1673,7 +1305,6 @@ a:focus > .thumbnail > .thumbnailSelectionRing > .thumbnailImage,
 a:focus > .thumbnail > .thumbnailSelectionRing,
 .thumbnail:hover > .thumbnailSelectionRing {
   background-color: hsla(0,0%,100%,.15);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   box-shadow: 0 1px 0 hsla(0,0%,100%,.05) inset,
@@ -1689,7 +1320,6 @@ a:focus > .thumbnail > .thumbnailSelectionRing,
 
 .thumbnail.selected > .thumbnailSelectionRing {
   background-color: hsla(0,0%,100%,.3);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   box-shadow: 0 1px 0 hsla(0,0%,100%,.05) inset,
@@ -1701,15 +1331,13 @@ a:focus > .thumbnail > .thumbnailSelectionRing,
 #outlineView,
 #attachmentsView {
   position: absolute;
-  width: calc(100% - 8px);
+  width: 192px;
   top: 0;
   bottom: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
 }
 
 #outlineView {
@@ -1719,12 +1347,10 @@ a:focus > .thumbnail > .thumbnailSelectionRing,
   padding: 3px 4px 0;
 }
 
-html[dir='ltr'] .outlineWithDeepNesting > .outlineItem,
 html[dir='ltr'] .outlineItem > .outlineItems {
   margin-left: 20px;
 }
 
-html[dir='rtl'] .outlineWithDeepNesting > .outlineItem,
 html[dir='rtl'] .outlineItem > .outlineItems {
   margin-right: 20px;
 }
@@ -1734,18 +1360,13 @@ html[dir='rtl'] .outlineItem > .outlineItems {
   text-decoration: none;
   display: inline-block;
   min-width: 95%;
-  min-width: calc(100% - 4px); /* Subtract the right padding (left, in RTL mode)
-                                  of the container. */
   height: auto;
   margin-bottom: 1px;
   border-radius: 2px;
   color: hsla(0,0%,100%,.8);
   font-size: 13px;
   line-height: 15px;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-      -ms-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
   white-space: normal;
 }
 
@@ -1757,7 +1378,7 @@ html[dir='rtl'] .outlineItem > .outlineItems {
 }
 
 html[dir='ltr'] .outlineItem > a {
-  padding: 2px 0 5px 4px;
+  padding: 2px 0 5px 10px;
 }
 html[dir='ltr'] .attachmentsItem > button {
   padding: 2px 0 3px 7px;
@@ -1765,65 +1386,26 @@ html[dir='ltr'] .attachmentsItem > button {
 }
 
 html[dir='rtl'] .outlineItem > a {
-  padding: 2px 4px 5px 0;
+  padding: 2px 10px 5px 0;
 }
 html[dir='rtl'] .attachmentsItem > button {
   padding: 2px 7px 3px 0;
   text-align: right;
 }
 
-.outlineItemToggler {
-  position: relative;
-  height: 0;
-  width: 0;
-  color: hsla(0,0%,100%,.5);
-}
-.outlineItemToggler::before {
-  content: url(images/treeitem-expanded.png);
-  display: inline-block;
-  position: absolute;
-}
-html[dir='ltr'] .outlineItemToggler.outlineItemsHidden::before {
-  content: url(images/treeitem-collapsed.png);
-}
-html[dir='rtl'] .outlineItemToggler.outlineItemsHidden::before {
-  content: url(images/treeitem-collapsed-rtl.png);
-}
-.outlineItemToggler.outlineItemsHidden ~ .outlineItems {
-  display: none;
-}
-html[dir='ltr'] .outlineItemToggler {
-  float: left;
-}
-html[dir='rtl'] .outlineItemToggler {
-  float: right;
-}
-html[dir='ltr'] .outlineItemToggler::before {
-  right: 4px;
-}
-html[dir='rtl'] .outlineItemToggler::before {
-  left: 4px;
-}
-
-.outlineItemToggler:hover,
-.outlineItemToggler:hover + a,
-.outlineItemToggler:hover ~ .outlineItems,
 .outlineItem > a:hover,
 .attachmentsItem > button:hover {
   background-color: hsla(0,0%,100%,.02);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   box-shadow: 0 1px 0 hsla(0,0%,100%,.05) inset,
               0 0 1px hsla(0,0%,100%,.2) inset,
               0 0 1px hsla(0,0%,0%,.2);
-  border-radius: 2px;
   color: hsla(0,0%,100%,.9);
 }
 
 .outlineItem.selected {
   background-color: hsla(0,0%,100%,.08);
-  background-image: -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,100%,.05)), to(hsla(0,0%,100%,0)));
   background-image: linear-gradient(hsla(0,0%,100%,.05), hsla(0,0%,100%,0));
   background-clip: padding-box;
   box-shadow: 0 1px 0 hsla(0,0%,100%,.05) inset,
@@ -1842,8 +1424,8 @@ html[dir='rtl'] .outlineItemToggler::before {
 /* TODO: file FF bug to support ::-moz-selection:window-inactive
    so we can override the opaque grey background when the window is inactive;
    see https://bugzilla.mozilla.org/show_bug.cgi?id=706209 */
-::-moz-selection { background: rgba(0,0,255,0.3); }
 ::selection { background: rgba(0,0,255,0.3); }
+::-moz-selection { background: rgba(0,0,255,0.3); }
 
 #errorWrapper {
   background: none repeat scroll 0 0 #FF5555;
@@ -1908,10 +1490,13 @@ html[dir='rtl'] .outlineItemToggler::before {
   font-size: 12px;
   line-height: 14px;
   background-color: #474747; /* fallback */
-  background-image: url(images/texture.png),
-                    -webkit-gradient(linear, left top, left bottom, from(hsla(0,0%,32%,.99)), to(hsla(0,0%,27%,.95)));
-  background-image: url(images/texture.png),
+  background-image: url(/static/viewer/web/images/texture.png),
                     linear-gradient(hsla(0,0%,32%,.99), hsla(0,0%,27%,.95));
+  box-shadow: inset 1px 0 0 hsla(0,0%,100%,.08),
+              inset 0 1px 1px hsla(0,0%,0%,.15),
+              inset 0 -1px 0 hsla(0,0%,100%,.05),
+              0 1px 0 hsla(0,0%,0%,.15),
+              0 1px 1px hsla(0,0%,0%,.1);
   border: 1px solid hsla(0,0%,0%,.5);
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
@@ -1928,6 +1513,10 @@ html[dir='rtl'] .outlineItemToggler::before {
 .dialog .toolbarField {
   margin: 5px 0;
 }
+.dialog .toolbarField:hover,
+.dialog .toolbarField:focus {
+  border-color: hsla(0,0%,0%,.32) hsla(0,0%,0%,.38) hsla(0,0%,0%,.42);
+}
 
 .dialog .separator {
   display: block;
@@ -1941,10 +1530,6 @@ html[dir='rtl'] .outlineItemToggler::before {
 .dialog .buttonRow {
   text-align: center;
   vertical-align: middle;
-}
-
-.dialog :link {
-  color: white;
 }
 
 #passwordOverlay > .dialog {
@@ -2039,38 +1624,21 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   font-size: 10px;
 }
 
-#viewer.textLayer-visible .textLayer {
-  opacity: 1.0;
-}
-
-#viewer.textLayer-visible .canvasWrapper {
-  background-color: rgb(128,255,128);
-}
-
-#viewer.textLayer-visible .canvasWrapper canvas {
-  mix-blend-mode: screen;
-}
-
-#viewer.textLayer-visible .textLayer > span {
-  background-color: rgba(255, 255, 0, 0.1);
-  color: black;
-  border: solid 1px rgba(255, 0, 0, 0.5);
-  box-sizing: border-box;
-}
-
-#viewer.textLayer-hover .textLayer > span:hover {
+#viewer.textLayer-visible .textLayer > div,
+#viewer.textLayer-hover .textLayer > div:hover {
   background-color: white;
   color: black;
 }
 
-#viewer.textLayer-shadow .textLayer > span {
+#viewer.textLayer-shadow .textLayer > div {
   background-color: rgba(255,255,255, .6);
   color: black;
 }
 
 .grab-to-pan-grab {
-  cursor: url("images/grab.cur"), move !important;
+  cursor: url("/static/viewer/web/images/grab.cur"), move !important;
   cursor: -webkit-grab !important;
+  cursor: -moz-grab !important;
   cursor: grab !important;
 }
 .grab-to-pan-grab *:not(input):not(textarea):not(button):not(select):not(:link) {
@@ -2078,8 +1646,9 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
 }
 .grab-to-pan-grab:active,
 .grab-to-pan-grabbing {
-  cursor: url("images/grabbing.cur"), move !important;
+  cursor: url("/static/viewer/web/images/grabbing.cur"), move !important;
   cursor: -webkit-grabbing !important;
+  cursor: -moz-grabbing !important;
   cursor: grabbing !important;
 
   position: fixed;
@@ -2101,17 +1670,17 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   display: none;
 }
 
-@media screen and (-webkit-min-device-pixel-ratio: 1.1), screen and (min-resolution: 1.1dppx) {
+@media screen and (min-resolution: 2dppx) {
   /* Rules for Retina screens */
   .toolbarButton::before {
     -webkit-transform: scale(0.5);
-            transform: scale(0.5);
+    transform: scale(0.5);
     top: -5px;
   }
 
   .secondaryToolbarButton::before {
     -webkit-transform: scale(0.5);
-            transform: scale(0.5);
+    transform: scale(0.5);
     top: -4px;
   }
 
@@ -2129,178 +1698,131 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
 
   .toolbarField.pageNumber.visiblePageIsLoading,
   #findInput[data-status="pending"] {
-    background-image: url(images/loading-small@2x.png);
+    background-image: url(/static/viewer/web/images/loading-small@2x.png);
     background-size: 16px 17px;
   }
 
   .dropdownToolbarButton {
-    background: url(images/toolbarButton-menuArrows@2x.png) no-repeat;
+    background: url(/static/viewer/web/images/toolbarButton-menuArrows@2x.png) no-repeat;
     background-size: 7px 16px;
   }
 
   html[dir='ltr'] .toolbarButton#sidebarToggle::before {
-    content: url(images/toolbarButton-sidebarToggle@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-sidebarToggle@2x.png);
   }
   html[dir='rtl'] .toolbarButton#sidebarToggle::before {
-    content: url(images/toolbarButton-sidebarToggle-rtl@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-sidebarToggle-rtl@2x.png);
   }
 
   html[dir='ltr'] .toolbarButton#secondaryToolbarToggle::before {
-    content: url(images/toolbarButton-secondaryToolbarToggle@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-secondaryToolbarToggle@2x.png);
   }
   html[dir='rtl'] .toolbarButton#secondaryToolbarToggle::before {
-    content: url(images/toolbarButton-secondaryToolbarToggle-rtl@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-secondaryToolbarToggle-rtl@2x.png);
   }
 
   html[dir='ltr'] .toolbarButton.findPrevious::before {
-    content: url(images/findbarButton-previous@2x.png);
+    content: url(/static/viewer/web/images/findbarButton-previous@2x.png);
   }
   html[dir='rtl'] .toolbarButton.findPrevious::before {
-    content: url(images/findbarButton-previous-rtl@2x.png);
+    content: url(/static/viewer/web/images/findbarButton-previous-rtl@2x.png);
   }
 
   html[dir='ltr'] .toolbarButton.findNext::before {
-    content: url(images/findbarButton-next@2x.png);
+    content: url(/static/viewer/web/images/findbarButton-next@2x.png);
   }
   html[dir='rtl'] .toolbarButton.findNext::before {
-    content: url(images/findbarButton-next-rtl@2x.png);
+    content: url(/static/viewer/web/images/findbarButton-next-rtl@2x.png);
   }
 
   html[dir='ltr'] .toolbarButton.pageUp::before {
-    content: url(images/toolbarButton-pageUp@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-pageUp@2x.png);
   }
   html[dir='rtl'] .toolbarButton.pageUp::before {
-    content: url(images/toolbarButton-pageUp-rtl@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-pageUp-rtl@2x.png);
   }
 
   html[dir='ltr'] .toolbarButton.pageDown::before {
-    content: url(images/toolbarButton-pageDown@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-pageDown@2x.png);
   }
   html[dir='rtl'] .toolbarButton.pageDown::before {
-    content: url(images/toolbarButton-pageDown-rtl@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-pageDown-rtl@2x.png);
   }
 
   .toolbarButton.zoomIn::before {
-    content: url(images/toolbarButton-zoomIn@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-zoomIn@2x.png);
   }
 
   .toolbarButton.zoomOut::before {
-    content: url(images/toolbarButton-zoomOut@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-zoomOut@2x.png);
   }
 
   .toolbarButton.presentationMode::before,
   .secondaryToolbarButton.presentationMode::before {
-    content: url(images/toolbarButton-presentationMode@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-presentationMode@2x.png);
   }
 
   .toolbarButton.print::before,
   .secondaryToolbarButton.print::before {
-    content: url(images/toolbarButton-print@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-print@2x.png);
   }
 
   .toolbarButton.openFile::before,
   .secondaryToolbarButton.openFile::before {
-    content: url(images/toolbarButton-openFile@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-openFile@2x.png);
   }
 
   .toolbarButton.download::before,
   .secondaryToolbarButton.download::before {
-    content: url(images/toolbarButton-download@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-download@2x.png);
   }
 
   .toolbarButton.bookmark::before,
   .secondaryToolbarButton.bookmark::before {
-    content: url(images/toolbarButton-bookmark@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-bookmark@2x.png);
   }
 
   #viewThumbnail.toolbarButton::before {
-    content: url(images/toolbarButton-viewThumbnail@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-viewThumbnail@2x.png);
   }
 
   html[dir="ltr"] #viewOutline.toolbarButton::before {
-    content: url(images/toolbarButton-viewOutline@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-viewOutline@2x.png);
   }
   html[dir="rtl"] #viewOutline.toolbarButton::before {
-    content: url(images/toolbarButton-viewOutline-rtl@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-viewOutline-rtl@2x.png);
   }
 
   #viewAttachments.toolbarButton::before {
-    content: url(images/toolbarButton-viewAttachments@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-viewAttachments@2x.png);
   }
 
   #viewFind.toolbarButton::before {
-    content: url(images/toolbarButton-search@2x.png);
+    content: url(/static/viewer/web/images/toolbarButton-search@2x.png);
   }
 
   .secondaryToolbarButton.firstPage::before {
-    content: url(images/secondaryToolbarButton-firstPage@2x.png);
+    content: url(/static/viewer/web/images/secondaryToolbarButton-firstPage@2x.png);
   }
 
   .secondaryToolbarButton.lastPage::before {
-    content: url(images/secondaryToolbarButton-lastPage@2x.png);
+    content: url(/static/viewer/web/images/secondaryToolbarButton-lastPage@2x.png);
   }
 
   .secondaryToolbarButton.rotateCcw::before {
-    content: url(images/secondaryToolbarButton-rotateCcw@2x.png);
+    content: url(/static/viewer/web/images/secondaryToolbarButton-rotateCcw@2x.png);
   }
 
   .secondaryToolbarButton.rotateCw::before {
-    content: url(images/secondaryToolbarButton-rotateCw@2x.png);
-  }
-
-  .secondaryToolbarButton.selectTool::before {
-    content: url(images/secondaryToolbarButton-selectTool@2x.png);
+    content: url(/static/viewer/web/images/secondaryToolbarButton-rotateCw@2x.png);
   }
 
   .secondaryToolbarButton.handTool::before {
-    content: url(images/secondaryToolbarButton-handTool@2x.png);
-  }
-
-  .secondaryToolbarButton.scrollVertical::before {
-    content: url(images/secondaryToolbarButton-scrollVertical@2x.png);
-  }
-
-  .secondaryToolbarButton.scrollHorizontal::before {
-    content: url(images/secondaryToolbarButton-scrollHorizontal@2x.png);
-  }
-
-  .secondaryToolbarButton.scrollWrapped::before {
-    content: url(images/secondaryToolbarButton-scrollWrapped@2x.png);
-  }
-
-  .secondaryToolbarButton.spreadNone::before {
-    content: url(images/secondaryToolbarButton-spreadNone@2x.png);
-  }
-
-  .secondaryToolbarButton.spreadOdd::before {
-    content: url(images/secondaryToolbarButton-spreadOdd@2x.png);
-  }
-
-  .secondaryToolbarButton.spreadEven::before {
-    content: url(images/secondaryToolbarButton-spreadEven@2x.png);
+    content: url(/static/viewer/web/images/secondaryToolbarButton-handTool@2x.png);
   }
 
   .secondaryToolbarButton.documentProperties::before {
-    content: url(images/secondaryToolbarButton-documentProperties@2x.png);
-  }
-
-  .outlineItemToggler::before {
-    -webkit-transform: scale(0.5);
-            transform: scale(0.5);
-    top: -1px;
-    content: url(images/treeitem-expanded@2x.png);
-  }
-  html[dir='ltr'] .outlineItemToggler.outlineItemsHidden::before {
-    content: url(images/treeitem-collapsed@2x.png);
-  }
-  html[dir='rtl'] .outlineItemToggler.outlineItemsHidden::before {
-    content: url(images/treeitem-collapsed-rtl@2x.png);
-  }
-  html[dir='ltr'] .outlineItemToggler::before {
-    right: 0;
-  }
-  html[dir='rtl'] .outlineItemToggler::before {
-    left: 0;
+    content: url(/static/viewer/web/images/secondaryToolbarButton-documentProperties@2x.png);
   }
 }
 
@@ -2341,29 +1863,17 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
     display: none;
   }
 
-  /* Rules for browsers that support PDF.js printing */
-  body[data-pdfjsprinting] #outerContainer {
+  /* Rules for browsers that support mozPrintCallback */
+  body[data-mozPrintCallback] #outerContainer {
     display: none;
   }
-  body[data-pdfjsprinting] #printContainer {
+  body[data-mozPrintCallback] #printContainer {
     display: block;
   }
-  #printContainer {
-    height: 100%;
-  }
-  /* wrapper around (scaled) print canvas elements */
-  #printContainer > div {
+  #printContainer canvas {
     position: relative;
     top: 0;
     left: 0;
-    width: 1px;
-    height: 1px;
-    overflow: visible;
-    page-break-after: always;
-    page-break-inside: avoid;
-  }
-  #printContainer canvas,
-  #printContainer img {
     display: block;
   }
 }
@@ -2374,27 +1884,64 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   display: none;
 }
 
-@media all and (max-width: 900px) {
-  #toolbarViewerMiddle {
-    display: table;
-    margin: auto;
-    left: auto;
-    position: inherit;
-    -webkit-transform: none;
-            transform: none;
+@media all and (max-width: 960px) {
+  html[dir='ltr'] #outerContainer.sidebarMoving .outerCenter,
+  html[dir='ltr'] #outerContainer.sidebarOpen .outerCenter {
+    float: left;
+    left: 205px;
+  }
+  html[dir='rtl'] #outerContainer.sidebarMoving .outerCenter,
+  html[dir='rtl'] #outerContainer.sidebarOpen .outerCenter {
+    float: right;
+    right: 205px;
   }
 }
 
-@media all and (max-width: 840px) {
+@media all and (max-width: 900px) {
+  .sidebarOpen .hiddenLargeView {
+    display: none;
+  }
+  .sidebarOpen .visibleLargeView {
+    display: inherit;
+  }
+}
+
+@media all and (max-width: 860px) {
+  .sidebarOpen .hiddenMediumView {
+    display: none;
+  }
+  .sidebarOpen .visibleMediumView {
+    display: inherit;
+  }
+}
+
+@media all and (max-width: 770px) {
+  #sidebarContainer {
+    top: 32px;
+    z-index: 100;
+  }
+  .loadingInProgress #sidebarContainer {
+    top: 37px;
+  }
   #sidebarContent {
+    top: 32px;
     background-color: hsla(0,0%,0%,.7);
   }
 
-  html[dir='ltr'] #outerContainer.sidebarOpen #viewerContainer {
-    left: 0px !important;
+  html[dir='ltr'] #outerContainer.sidebarOpen > #mainContainer {
+    left: 0px;
   }
-  html[dir='rtl'] #outerContainer.sidebarOpen #viewerContainer {
-    right: 0px !important;
+  html[dir='rtl'] #outerContainer.sidebarOpen > #mainContainer {
+    right: 0px;
+  }
+
+  html[dir='ltr'] .outerCenter {
+    float: left;
+    left: 205px;
+  }
+  html[dir='rtl'] .outerCenter {
+    float: right;
+    right: 205px;
   }
 
   #outerContainer .hiddenLargeView,
@@ -2407,7 +1954,7 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   }
 }
 
-@media all and (max-width: 770px) {
+@media all and (max-width: 700px) {
   #outerContainer .hiddenLargeView {
     display: none;
   }
@@ -2416,7 +1963,7 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   }
 }
 
-@media all and (max-width: 700px) {
+@media all and (max-width: 660px) {
   #outerContainer .hiddenMediumView {
     display: none;
   }
@@ -2425,26 +1972,30 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
   }
 }
 
-@media all and (max-width: 640px) {
-  .hiddenSmallView, .hiddenSmallView * {
+@media all and (max-width: 600px) {
+  .hiddenSmallView {
     display: none;
   }
   .visibleSmallView {
     display: inherit;
   }
+  html[dir='ltr'] #outerContainer.sidebarMoving .outerCenter,
+  html[dir='ltr'] #outerContainer.sidebarOpen .outerCenter,
+  html[dir='ltr'] .outerCenter {
+    left: 156px;
+  }
+  html[dir='rtl'] #outerContainer.sidebarMoving .outerCenter,
+  html[dir='rtl'] #outerContainer.sidebarOpen .outerCenter,
+  html[dir='rtl'] .outerCenter {
+    right: 156px;
+  }
   .toolbarButtonSpacer {
     width: 0;
   }
-  html[dir='ltr'] .findbar {
-    left: 38px;
-  }
-  html[dir='rtl'] .findbar {
-    right: 38px;
-  }
 }
 
-@media all and (max-width: 535px) {
-  #scaleSelectContainer {
+@media all and (max-width: 510px) {
+  #scaleSelectContainer, #pageNumberLabel {
     display: none;
   }
 }
