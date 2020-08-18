@@ -1,5 +1,8 @@
 $(document).ready(function(){
-    var player;
+    var player, duration;
+
+    var subtitle_elements = [];
+    var times = [];
 
     var source = 'https://www.youtube.com/embed/'
     source += window.videoId; 
@@ -8,17 +11,10 @@ $(document).ready(function(){
     //source += window.location; 
     source += '&widgetid=1';
 
-    console.log(source);
-
     $('#video-player-iframe').prop('src', source);
-
-    console.log($('#video-player-iframe'))
 
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('video-player-iframe', {
-            //height: '390',
-            //width: '640',
-            //videoId: window.videoId, 
             events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange
@@ -27,24 +23,38 @@ $(document).ready(function(){
     }
 
     function onPlayerReady(event) {
-        //event.target.playVideo();
+        player.playVideo();
     }
 
     var done = false;
     function onPlayerStateChange(event) {
-        //if (event.data == YT.PlayerState.PLAYING && !done) {
-            //setTimeout(stopVideo, 6000);
-            //done = true;
-        //}
     }
 
     function stopVideo() {
         player.stopVideo();
     }
 
+
     window.player = player;
     window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
     window.onPlayerReady = onPlayerReady;
     window.onPlayerStateChange = onPlayerStateChange;
 
-});    
+
+    window.updatePlayerTime = function(s) {
+        console.log(player);
+        player.seekTo(s, true);
+    }
+
+    setInterval(function() {
+        //TODO scroll as video plays
+        //var sub = $('.sub'); 
+        //var t = player.getCurrentTime();
+
+        //console.log(t);
+
+        //$(sub[20]).get(0).scrollIntoView();
+
+    }, 5000);
+
+});

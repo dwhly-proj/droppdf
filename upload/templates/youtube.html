@@ -12,14 +12,36 @@
     <script src="https://hypothes.is/embed.js" async></script>
 
 	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
-	<!--<script src="{% static 'js/moment.min.js' %}"></script>-->
+
 	<script src="{% static 'js/youtube.js' %}"></script>
-	<!--<script src="{% static 'drag&dropfileupload/jquery-ui.js' %}"></script>-->
-	<!--<script src="{% static 'drag&dropfileupload/dropzone.js' %}"></script>-->
 
     <style>
         body {
             font-family: "Gill Sans", sans-serif;
+        }
+
+        header {
+            background-color: #2C2C2C;
+            position: absolue;
+            height: 3em;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-item: center;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a {
+            color: #42812D;
+            text-decoration: none;
         }
 
         .main-content {
@@ -60,6 +82,12 @@
             color: #87878E; 
             min-width: 5em;
             max-width: 5em;
+            user-select: none;
+        }
+
+        .sub-text:hover {
+            cursor: pointer;
+            color: #42812D;
         }
 
         .player-box {
@@ -116,7 +144,11 @@
 </head>
 
 <body>
-    <header>DocDrop</header>
+    <header>
+        <div>
+            <a href="/">DocDrop.org</a>
+        </div>
+    </header>
     <hr>
 
     <div class="main-content">
@@ -128,7 +160,7 @@
                         <div class="sub-time">
                             {{ sub.start_display }}
                         </div>
-                        <div class="sub-text">
+                        <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
                             {{ sub.text }}
                         </div>
                     </div>
@@ -144,9 +176,6 @@
         </div>
 
     </div>
-
-<!--{{ transcript }}-->
-
 
 
 <script>

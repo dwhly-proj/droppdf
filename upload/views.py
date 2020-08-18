@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 from django.shortcuts import render
 from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.template import RequestContext
 from PDFUpload import settings
 
@@ -196,7 +196,10 @@ def youtube_video(request, video_id):
     #return HttpResponse(video_id)
     condensed_transcript = []
 
-    transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    except:
+        raise Http404('<h1>Transcript not available for video or video not located.</h1>')
 
     subseconds = 0
     condensed_entry = None
