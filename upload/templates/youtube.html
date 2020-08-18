@@ -1,0 +1,187 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop Video Annotator</title>
+
+	<script src="https://www.youtube.com/iframe_api"></script>
+
+    <script src="https://hypothes.is/embed.js" async></script>
+
+	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+
+	<script src="{% static 'js/youtube.js' %}"></script>
+
+    <style>
+        body {
+            font-family: "Gill Sans", sans-serif;
+        }
+
+        header {
+            background-color: #2C2C2C;
+            position: absolue;
+            height: 3em;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-item: center;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a {
+            color: #42812D;
+            text-decoration: none;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+
+        .sub-box {
+            max-width: 300px;
+            padding-left: 20px;
+            padding-right: 20px;
+            max-height: 80vh;
+            overflow-y: scroll;
+            scrollbar-width: thin; /* Firefox */
+            border: 1px solid #c2c2c2;
+            border-radius: 3px;
+        }
+
+        .sub-box::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sub {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding-top: .5em;
+            padding-bottom: .5em;
+        }
+
+        .sub-time {
+            color: #87878E; 
+            min-width: 5em;
+            max-width: 5em;
+            user-select: none;
+        }
+
+        .sub-text:hover {
+            cursor: pointer;
+            color: #42812D;
+        }
+
+        .player-box {
+            width: 55vw;
+        }
+
+        #video-player {
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden; 
+            min-width: 100%;
+            max-width: 100%;
+            height: 0;
+            padding-bottom: 56.25%;
+        }
+
+        #video-player-iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (max-width: 1080px) {
+            .main-content {
+            }
+            .sub-box {
+                max-width: 200px;
+            }
+        }
+
+        @media (max-width: 960px) {
+            .main-content {
+                width: 98%;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .player-box {
+                width: 90vw;
+            }
+            .main-content {
+                width: 100%;
+                flex-direction: column-reverse;
+            }
+            .sub-box {
+                max-width: 87%;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a href="/">DocDrop.org</a>
+        </div>
+    </header>
+    <hr>
+
+    <div class="main-content">
+
+        <div class="sub-box" dir="rtl">
+            <div class="subs" dir="ltr">
+                {% for sub in transcript %}
+                    <div class="sub">
+                        <div class="sub-time">
+                            {{ sub.start_display }}
+                        </div>
+                        <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
+                            {{ sub.text }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="player-box">
+            <div id="video-player">
+                <iframe id="video-player-iframe">
+                </iframe>
+            </div>
+        </div>
+
+    </div>
+
+
+<script>
+    window.videoId = '{{ video_id }}';
+</script>
+
+</body>
+
+

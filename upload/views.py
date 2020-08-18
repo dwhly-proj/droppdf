@@ -1,10 +1,12 @@
 # encoding=utf8
+import time
+from youtube_transcript_api import YouTubeTranscriptApi
 
 from django.shortcuts import redirect
 from django.shortcuts import render
 from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.template import RequestContext
 from PDFUpload import settings
 
@@ -190,10 +192,56 @@ def ocr(request):
     return HttpResponse(new_filename)
 
 
+def youtube_video(request, video_id):
+    #return HttpResponse(video_id)
+    condensed_transcript = []
+
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+    except:
+        raise Http404('<h1>Transcript not available for video or video not located.</h1>')
+
+    subseconds = 0
+    condensed_entry = None
+
+    for entry in transcript:
+        start = entry.get('start')
+        text = entry.get('text', '')
+        duration = entry.get('duration', 0)
+
+        text = text.encode('utf-8', 'ignore')
+        text = text.replace('\n', ' ')
+
+        try:
+            duration = float(duration)
+        except:
+            continue
+
+        if condensed_entry is None:
+            condensed_entry = {'start': start, 'text': text, 'duration': duration}
+
+        else:
+            condensed_entry['duration'] += duration
+            condensed_entry['text'] += ' ' + text 
+
+        if condensed_entry.get('duration', 0) > 5:
+            condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
+                    time.gmtime(condensed_entry.get('start', 0))) 
+
+            condensed_transcript.append(condensed_entry)
+            subseconds = 0
+            condensed_entry = None
+
+
+    return render_to_response('youtube.html', {'transcript': condensed_transcript,
+        'video_id': video_id})
+
+
 def count_pages(filename):
     rxcountpages = re.compile(r"/Type\s*/Page([^s]|$)", re.MULTILINE|re.DOTALL)
     data = file(filename,"rb").read()
     return len(rxcountpages.findall(data))
+
 
 def docx_to_pdf(infilename, outfilename):
 
