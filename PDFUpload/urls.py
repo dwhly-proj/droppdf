@@ -25,5 +25,6 @@ urlpatterns = [
     url(r'^ocr/', upload_views.ocr, name="ocr"),
     url(r'^csv/(?P<filename>.+)/$', upload_views.csvAsTable, name="csv"),
     url(r'^epub/(?P<filename>.+)/$', upload_views.epub, name="epub"),
+    url(r'video/(?P<video_id>.+)/$', upload_views.youtube_video, name='youtube_video'),
     url(r'pdf_annotator/', annotator_views.pdf_annotate, name='pdf_annotator')
 ]

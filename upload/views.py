@@ -1,4 +1,5 @@
 # encoding=utf8
+from youtube_transcript_api import YouTubeTranscriptApi
 
 from django.shortcuts import redirect
 from django.shortcuts import render
@@ -190,10 +191,20 @@ def ocr(request):
     return HttpResponse(new_filename)
 
 
+def youtube_video(request, video_id):
+    #return HttpResponse(video_id)
+    transcript = YouTubeTranscriptApi.get_transcript(video_id)
+
+    #print(rslt[0])
+
+    return render_to_response('youtube.html', {'transcript': transcript})
+
+
 def count_pages(filename):
     rxcountpages = re.compile(r"/Type\s*/Page([^s]|$)", re.MULTILINE|re.DOTALL)
     data = file(filename,"rb").read()
     return len(rxcountpages.findall(data))
+
 
 def docx_to_pdf(infilename, outfilename):
 
