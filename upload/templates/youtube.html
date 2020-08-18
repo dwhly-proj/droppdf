@@ -1,1 +1,118 @@
-{{ transcript }}
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop Video Annotator</title>
+
+	<script src="https://www.youtube.com/iframe_api"></script>
+
+    <script src="https://hypothes.is/embed.js" async></script>
+
+	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+	<!--<script src="{% static 'js/moment.min.js' %}"></script>-->
+	<script src="{% static 'js/youtube.js' %}"></script>
+	<!--<script src="{% static 'drag&dropfileupload/jquery-ui.js' %}"></script>-->
+	<!--<script src="{% static 'drag&dropfileupload/dropzone.js' %}"></script>-->
+
+    <style>
+        body {
+            font-family: "Gill Sans", sans-serif;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+
+        .sub-box {
+            max-width: 300px;
+            padding-left: 20px;
+            padding-right: 20px;
+            max-height: 100vh;
+            overflow-y: scroll;
+            scrollbar-width: thin; /* Firefox */
+        }
+
+        .sub-box::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sub {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding-top: .5em;
+            padding-bottom: .5em;
+        }
+
+        .sub-time {
+            color: #87878E; 
+            min-width: 5em;
+            max-width: 5em;
+        }
+
+        @media (max-width: 1080px) {
+            .main-content {
+                justify-content: flex-start;
+            }
+            .sub-box {
+            }
+        }
+
+        @media (max-width: 960px) {
+            row-margin {
+                width: 98%;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <header>DocDrop</header>
+    <hr>
+
+    <div class="main-content">
+
+        <div class="sub-box" dir="rtl">
+            <div class="subs" dir="ltr">
+                {% for sub in transcript %}
+                    <div class="sub">
+                        <div class="sub-time">
+                            {{ sub.start_display }}
+                        </div>
+                        <div class="sub-text">
+                            {{ sub.text }}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="player-box">
+            <div id="video-player">
+            </div>
+        </div>
+
+    </div>
+
+<!--{{ transcript }}-->
+
+
+
+<script>
+    window.videoId = '{{ video_id }}';
+</script>
+
+</body>
+
+
