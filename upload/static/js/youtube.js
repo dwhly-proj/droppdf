@@ -105,11 +105,7 @@ $(document).ready(function(){
 
             var text = $(sub).find('.sub-text').first().text();
 
-            console.log(text)
-
             var r = new RegExp(t, 'i')
-
-            console.log(text.search(r));
 
             if (text.search(r) === -1) {
                 $(sub).hide();
