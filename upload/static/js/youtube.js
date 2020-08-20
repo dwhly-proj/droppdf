@@ -10,6 +10,12 @@ $(document).ready(function(){
     //var subtitle_elements = [];
     var subtitle_elements = $('.sub');
 
+    var body_width = document.body.clientWidth
+
+    $(window).resize(function() {
+        body_width = document.body.clientWidth
+    });
+
     //$('.sub').each(function(i, v) {
         //subtitle_elements.push(v);
     //});
@@ -115,7 +121,8 @@ $(document).ready(function(){
 
 
     setInterval(function() {
-        if (! keep_sync && ! show_highlight) {
+        if ((! keep_sync && ! show_highlight) || body_width < 635) {
+            $('.highlight').removeClass('highlight');
             return;
         };
 
