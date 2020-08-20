@@ -260,7 +260,6 @@ svg {
 }
 
 #viewer.loading {
-  background: white url('../assets/ajax-loader.gif') center center no-repeat;
 }
 
 .arrow {

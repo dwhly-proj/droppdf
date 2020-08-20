@@ -7,7 +7,7 @@
 
 	<title>DocDrop Video Annotator</title>
 
-	<script src="https://www.youtube.com/iframe_api"></script>
+	<!--<script src="https://www.youtube.com/iframe_api"></script>-->
 
     <script src="https://hypothes.is/embed.js" async></script>
 
@@ -39,9 +39,28 @@
             align-item: center;
         }
 
-        header a {
+        a {
             color: #42812D;
             text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .action-char {
+            font-size: 1.1em;
+            z-index: 1000;
+        }
+
+        .action-char:hover {
+            cursor: pointer;
+        }
+
+        .controls {
+            width: 94%;
+            margin: 0 auto;
+            padding-bottom: 5px;
         }
 
         .main-content {
@@ -68,6 +87,10 @@
         .sub-box::-webkit-scrollbar {
             width: 6px;
         }
+        
+        .subs {
+            position: relative;
+        }
 
         .sub {
             display: flex;
@@ -76,6 +99,10 @@
             justify-content: flex-start;
             padding-top: .5em;
             padding-bottom: .5em;
+        }
+
+        .highlight {
+            color:#867D27 !important;
         }
 
         .sub-time {
@@ -126,7 +153,10 @@
             }
         }
 
-        @media (max-width: 620px) {
+        @media (max-width: 635px) {
+            .prefs {
+                display: none;
+            },
             .player-box {
                 width: 90vw;
             }
@@ -151,28 +181,68 @@
     </header>
     <hr>
 
-    <div class="main-content">
+    <div class="controls">
+        <div style="display: flex; flex-direction: row; justify-content: flex-start;">
+            <a href="javascript:void(0)" class="action-char" id="scroll-sub"
+            onclick="scrollSubs()">
+                ⏬
+            </a>
+            &nbsp;
+            &nbsp;
+            &nbsp;
+            &nbsp;
+            <input style="border-radius: 3px; padding: 3px; border: 0px; border-bottom: 1px solid #42812D; opacity: .7"
+            size="20"
+            placeholder="&nbsp;search" 
+            id="youtube-url"
+            onchange="searchSubs($(this).val())">
+             </input>
+        </div>
+    </div>
 
+    <div class="main-content">
         <div class="sub-box" dir="rtl">
-            <div class="subs" dir="ltr">
-                {% for sub in transcript %}
-                    <div class="sub">
-                        <div class="sub-time">
-                            {{ sub.start_display }}
-                        </div>
-                        <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
-                            {{ sub.text }}
-                        </div>
+            <div dir="ltr">
+                <div class="subs" dir="ltr">
+                    <div style="position: relative; padding-top: 1.5em; padding-bottom: 1em;">
+                        {% for sub in transcript %}
+                            <div class="sub">
+                                <div class="sub-time">
+                                    {{ sub.start_display }}
+                                </div>
+                                <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
+                                    {{ sub.text }}
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
-                {% endfor %}
+                </div>
             </div>
         </div>
 
         <div class="player-box">
             <div id="video-player">
-                <iframe id="video-player-iframe">
+                <iframe id="video-player-iframe" type="text/html" src="{{ iframe_src }}">
                 </iframe>
             </div>
+            <table border="0" style="font-size: .8em" class="prefs">
+                <tr>
+                    <td>
+                        <span>ScrollSync</span>
+                    </td>
+                    <td>
+                        <input type="checkbox" checked onchange="toggleSync();">
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span>Highlight</span>
+                    </td>
+                    <td>
+                        <input type="checkbox" checked onchange="toggleHighlight();">
+                    </td>
+                </tr>
+            </table>
         </div>
 
     </div>
@@ -180,6 +250,7 @@
 
 <script>
     window.videoId = '{{ video_id }}';
+    window.startTimes = {{ start_times }};
 </script>
 
 </body>
