@@ -203,6 +203,7 @@ def youtube_video(request, video_id):
 
     subseconds = 0
     condensed_entry = None
+    start_times = [];
 
     for entry in transcript:
         start = entry.get('start')
@@ -224,17 +225,29 @@ def youtube_video(request, video_id):
             condensed_entry['duration'] += duration
             condensed_entry['text'] += ' ' + text 
 
-        if condensed_entry.get('duration', 0) > 5:
+        if condensed_entry.get('duration', 0) > 23:
             condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
                     time.gmtime(condensed_entry.get('start', 0))) 
+
+            s = condensed_entry.get('start', 0)
+            start_times.append(s)
 
             condensed_transcript.append(condensed_entry)
             subseconds = 0
             condensed_entry = None
 
 
+    source = 'https://www.youtube.com/embed/'
+    source += video_id
+    source += '?enablejsapi=1'
+    #source += '?enablejsapi=1&origin='
+    #source += 'https://docdrop.org'
+    source += '&widgetid=1'
+    source += '&start=0&name=me'
+
+
     return render_to_response('youtube.html', {'transcript': condensed_transcript,
-        'video_id': video_id})
+        'video_id': video_id, 'start_times': start_times, 'iframe_src': source})
 
 
 def count_pages(filename):
