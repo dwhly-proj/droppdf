@@ -9,11 +9,11 @@ $(document).ready(function(){
 
     var subtitle_elements = $('.sub');
 
-    var body_width = document.body.clientWidth
+    //var body_width = document.body.clientWidth
 
-    $(window).resize(function() {
-        body_width = document.body.clientWidth
-    });
+    //$(window).resize(function() {
+        //body_width = document.body.clientWidth
+    //});
 
     var times = [];
 
@@ -117,10 +117,11 @@ $(document).ready(function(){
 
 
     setInterval(function() {
-        if ((! keep_sync && ! show_highlight) || body_width < 635) {
+        if (! keep_sync && ! show_highlight) {
             $('.highlight').removeClass('highlight');
             return;
         };
+
 
         if (! player || ! player.getPlayerState) {
             return;
@@ -162,9 +163,7 @@ $(document).ready(function(){
                 return;
             };
 
-            var to = $('.sub-box').scrollTop();
-
-            $('.sub-box').scrollTop(to + $(el).offset().top - 93);
+            $('.sub-box').first().scrollTop($(el).position().top);
 
             current_sub = el;
         };
