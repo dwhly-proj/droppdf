@@ -2,6 +2,7 @@
 upload/static/drop-pdf/*
 
 /static/drop-pdf/*
+/static
 
 
 # Byte-compiled / optimized / DLL files

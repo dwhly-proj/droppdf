@@ -7,7 +7,6 @@ $(document).ready(function(){
     var show_highlight = true;
     var scroll_sub_down = true;
 
-    //var subtitle_elements = [];
     var subtitle_elements = $('.sub');
 
     var body_width = document.body.clientWidth
@@ -16,16 +15,13 @@ $(document).ready(function(){
         body_width = document.body.clientWidth
     });
 
-    //$('.sub').each(function(i, v) {
-        //subtitle_elements.push(v);
-    //});
-
     var times = [];
 
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
     var firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
 
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('video-player-iframe', {
