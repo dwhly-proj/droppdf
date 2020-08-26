@@ -199,7 +199,8 @@ def youtube_video(request, video_id):
     try:
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
     except:
-        raise Http404('<h1>Transcript not available for video or video not located.</h1>')
+        return render_to_response('youtube_not_found.html', {})
+        #raise Http404('<h1>Transcript not available for video or video not located.</h1>')
 
     subseconds = 0
     condensed_entry = None
@@ -245,9 +246,12 @@ def youtube_video(request, video_id):
     source += '&widgetid=1'
     source += '&start=0&name=me'
 
+    canonical_url = 'https://www.youtube.com/watch?v='
+    canonical_url += video_id 
 
     return render_to_response('youtube.html', {'transcript': condensed_transcript,
-        'video_id': video_id, 'start_times': start_times, 'iframe_src': source})
+        'video_id': video_id, 'start_times': start_times, 'canonical_url': canonical_url, 
+        'iframe_src': source})
 
 
 def count_pages(filename):
