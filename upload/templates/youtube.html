@@ -57,6 +57,17 @@
             cursor: pointer;
         }
 
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .2em;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
         .action-char {
             font-size: 1.1em;
             z-index: 1000;
@@ -76,11 +87,24 @@
             justify-content: space-around;
         }
 
+        .left-col {
+            position: relative;
+            max-width: 360px;
+            display: flex;
+            box-sizing: border-box;
+            flex: 1;
+            flex-direction: column;
+        }
+
         .sub-box {
-            max-width: 300px;
+            box-sizing: border-box;
             padding-left: 20px;
             padding-right: 20px;
+            margin-left: 1px;
             position: relative;
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
             max-height: 80vh;
             overflow-y: scroll;
             scrollbar-width: thin; /* Firefox */
@@ -105,8 +129,33 @@
             padding-bottom: .5em;
         }
 
+        .sub-label {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding-top: .5em;
+            padding-bottom: .5em;
+        }
+
+        .control-box {
+            position: relative;
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: space-between; 
+            padding-top: .5em;
+        }
+
         .highlight {
             color:#867D27 !important;
+        }
+
+        .search-highlight {
+            background-color: #F8FACD; 
         }
 
         .sub-time {
@@ -161,11 +210,13 @@
                 min-width: 93%;
                 padding: 5px;
             }
-            .sub-box {
-                border: none;
+            .left-col {
                 width: 93%;
                 max-width: 93%;
                 min-width: 93%;
+            }
+            .sub-box {
+                border: none;
                 padding: 5px;
             }
         }
@@ -192,34 +243,39 @@
         </div>
     </header>
 
-    <!--<div class="controls">-->
-        <!--<div style="display: flex; flex-direction: row; justify-content: flex-start;">-->
-            <!--<a href="javascript:void(0)" class="action-char" id="scroll-sub"-->
-            <!--onclick="scrollSubs()">-->
-                <!--⏬-->
-            <!--</a>-->
-            <!--<input style="border-radius: 3px; padding: 3px; border: 0px; border-bottom: 1px solid #42812D; opacity: .7"-->
-            <!--size="20"-->
-            <!--placeholder="&nbsp;search" -->
-            <!--id="youtube-url"-->
-            <!--onchange="searchSubs($(this).val())">-->
-             <!--</input>-->
-        <!--</div>-->
-    <!--</div>-->
-
     <div class="main-content">
-        <!--<div class="sub-box" dir="rtl">-->
-        <div class="sub-box">
-            {% for sub in transcript %}
-            <div class="sub" dir="ltr">
-                <div class="sub-time">
-                    {{ sub.start_display }}
+
+        <div class="left-col">
+            <div class="sub-box">
+                <div class="sub-label">
+                    <div class="sub-time">&nbsp;</div>
+                    <div class="sub-text">Beginning of transcript</div>
                 </div>
-                <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
-                    {{ sub.text }}
+                {% for sub in transcript %}
+                <div class="sub" dir="ltr">
+                    <div class="sub-time">
+                        {{ sub.start_display }}
+                    </div>
+                    <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
+                        {{ sub.text }}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="sub-label">
+                    <div class="sub-time">&nbsp;</div>
+                    <div class="sub-text">End of transcript</div>
                 </div>
             </div>
-            {% endfor %}
+            <div class="control-box">
+                <div class="button"
+                onclick="scrollSubs();">
+                    <i class="fa fa-arrow-up"></i>Top
+                </div>
+                <div class="button"
+                onclick="scrollSubs('down');">
+                    <i class="fa fa-arrow-down"></i>Bottom
+                </div>
+            </div>
         </div>
 
         <div class="player-box">
@@ -227,21 +283,27 @@
                 <iframe id="video-player-iframe" type="text/html" src="{{ iframe_src }}">
                 </iframe>
             </div>
+            <br>
             <table border="0" style="font-size: .8em" class="prefs">
                 <tr>
                     <td>
-                        <span>ScrollSync</span>
+                        <span>Auto scroll while playing</span>
                     </td>
                     <td>
                         <input type="checkbox" checked onchange="toggleSync();">
                     </td>
+                    <td>
+                        <div class="button" onclick="syncScroll();">Sync</div>
+                    </td>
                 </tr>
                 <tr>
                     <td>
-                        <span>Highlight</span>
+                        <span>Highlight while playing</span>
                     </td>
                     <td>
                         <input type="checkbox" checked onchange="toggleHighlight();">
+                    </td>
+                    <td>
                     </td>
                 </tr>
             </table>

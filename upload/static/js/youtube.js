@@ -9,12 +9,6 @@ $(document).ready(function(){
 
     var subtitle_elements = $('.sub');
 
-    //var body_width = document.body.clientWidth
-
-    //$(window).resize(function() {
-        //body_width = document.body.clientWidth
-    //});
-
     var times = [];
 
     var tag = document.createElement('script');
@@ -70,17 +64,11 @@ $(document).ready(function(){
     window.onPlayerReady = onPlayerReady;
     window.onPlayerStateChange = onPlayerStateChange;
 
-    window.scrollSubs = function() {
-        var sel = $('#scroll-sub');
-
-        if (scroll_sub_down) {
+    window.scrollSubs = function(d) {
+        if (d == 'down') {
             $('.sub-box').scrollTop(100000);
-            scroll_sub_down = false;
-            $(sel).text('⏫');
         } else {
             $('.sub-box').scrollTop(0);
-            scroll_sub_down = true;
-            $(sel).text('⏬');
         };
     };
 
@@ -96,12 +84,33 @@ $(document).ready(function(){
         show_highlight = ! show_highlight;
     };
 
+    window.syncScroll = function() {
+        var t = player.getCurrentTime();
+
+        if (t) {
+            index = _getCurrentTimeIndex(window.startTimes, t);
+
+            //if (index == 0) {
+                //$('.sub-box').scrollTop(0);
+            //}
+
+            el = subtitle_elements[index];
+
+            $('.sub-box').scrollTop(0, 0);
+
+            $('.sub-box').scrollTop($(el).position().top);
+        }
+    };
+
     window.searchSubs = function(t) {
         $('.sub').show();
+
+        $('.search-highlight').removeClass('.search-highlight');
 
         if (t.length < 3) {
             return;
         }
+
 
         $(subtitle_elements).each(function(i,sub) {
 
@@ -136,9 +145,9 @@ $(document).ready(function(){
         if (t) {
             index = _getCurrentTimeIndex(window.startTimes, t);
 
-            if (index == 0) {
-                $('.sub-box').scrollTop(0);
-            }
+            //if (index == 0) {
+                //$('.sub-box').scrollTop(0);
+            //}
 
             el = subtitle_elements[index];
 
@@ -163,7 +172,9 @@ $(document).ready(function(){
                 return;
             };
 
-            $('.sub-box').first().scrollTop($(el).position().top);
+            $('.sub-box').scrollTop(0, 0);
+
+            $('.sub-box').scrollTop($(el).position().top);
 
             current_sub = el;
         };
