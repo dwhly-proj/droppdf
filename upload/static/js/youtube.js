@@ -105,21 +105,54 @@ $(document).ready(function(){
     window.searchSubs = function(t) {
         $('.sub').show();
 
-        $('.search-highlight').removeClass('.search-highlight');
+        $('.search-highlight').each(function(i, v) {
+            $(v).before($(v).text());
+            $(v).remove();
+        });
 
         if (t.length < 3) {
             return;
         }
 
-
         $(subtitle_elements).each(function(i,sub) {
+            var new_content = '';
+            var match_start, match_stop, pre, post
+            var current_startpoint = 0;
+            var new_subtext = $('<div class="sub-text"></div>');
 
             var text = $(sub).find('.sub-text').first().text();
 
-            var r = new RegExp(t, 'i')
+            var r = new RegExp(t, 'ig')
 
             if (text.search(r) === -1) {
+                //$(sub).find('.sub-text').replaceWith(new_subtext);
+                //var subtext = $(sub).find('.sub-text');
+
+                //$(subtext).find('.search-highlight').each(function(i, v) {
+                    //console.log('x', i, v);
+
+                    //$(v).before($(v).text());
+                    //$(v).remove();
+                //});
+
                 $(sub).hide();
+            }
+            else {
+                while ((match = r.exec(text)) !== null) {
+                    match_start = match.index;
+                    match_stop = r.lastIndex;
+
+                    pre = text.substring(current_startpoint, match_start)
+                    post = text.substring(match_stop)
+
+                    $(new_subtext).append(pre);
+                    $(new_subtext).append('<span class="search-highlight">' + match[0] + '</span>');
+
+                    var current_startpoint = match_stop;
+                }
+                $(new_subtext).append(post);
+
+                $(sub).find('.sub-text').replaceWith(new_subtext);
             }
         });
     };
