@@ -120,20 +120,16 @@ $(document).ready(function(){
             var current_startpoint = 0;
             var new_subtext = $('<div class="sub-text"></div>');
 
-            var text = $(sub).find('.sub-text').first().text();
+            var subtext = $(sub).find('.sub-text').first();
+            var text = $(subtext).text();
+            var clicktrigger = $(subtext).attr('onclick')
+
+            //console.log('AA')
+            //console.log(subtext, clicktrigger)
 
             var r = new RegExp(t, 'ig')
 
             if (text.search(r) === -1) {
-                //$(sub).find('.sub-text').replaceWith(new_subtext);
-                //var subtext = $(sub).find('.sub-text');
-
-                //$(subtext).find('.search-highlight').each(function(i, v) {
-                    //console.log('x', i, v);
-
-                    //$(v).before($(v).text());
-                    //$(v).remove();
-                //});
 
                 $(sub).hide();
             }
@@ -152,7 +148,11 @@ $(document).ready(function(){
                 }
                 $(new_subtext).append(post);
 
-                $(sub).find('.sub-text').replaceWith(new_subtext);
+                $(sub).find('.sub-text')
+                    .off('click')
+                    .replaceWith(new_subtext);
+
+                $(new_subtext).attr('onclick', clicktrigger);
             }
         });
     };
