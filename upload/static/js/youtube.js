@@ -102,7 +102,10 @@ $(document).ready(function(){
         }
     };
 
-    window.searchSubs = function(t) {
+    window.searchSubs = function(t, clear) {
+        var substart_text = $('#substart-text');
+        var subend_text = $('#subend-text');
+
         $('.sub').show();
 
         $('.search-highlight').each(function(i, v) {
@@ -111,8 +114,15 @@ $(document).ready(function(){
         });
 
         if (t.length < 3) {
+            $(substart_text).text('Beginning of transcript');
+            $(subend_text).text('End of transcript');
+
+            if (clear) {
+                $('#search-input').val('');
+            };
+
             return;
-        }
+        };
 
         $(subtitle_elements).each(function(i,sub) {
             var new_content = '';
@@ -123,9 +133,6 @@ $(document).ready(function(){
             var subtext = $(sub).find('.sub-text').first();
             var text = $(subtext).text();
             var clicktrigger = $(subtext).attr('onclick')
-
-            //console.log('AA')
-            //console.log(subtext, clicktrigger)
 
             var r = new RegExp(t, 'ig')
 
@@ -155,6 +162,9 @@ $(document).ready(function(){
                 $(new_subtext).attr('onclick', clicktrigger);
             }
         });
+
+        $(substart_text).text('Beginning of search for ' + t);
+        $(subend_text).text('End of search for ' + t);
     };
 
 
