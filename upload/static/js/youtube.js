@@ -102,7 +102,10 @@ $(document).ready(function(){
         }
     };
 
-    window.searchSubs = function(t) {
+    window.searchSubs = function(t, clear) {
+        var substart_text = $('#substart-text');
+        var subend_text = $('#subend-text');
+
         $('.sub').show();
 
         $('.search-highlight').each(function(i, v) {
@@ -111,8 +114,15 @@ $(document).ready(function(){
         });
 
         if (t.length < 3) {
+            $(substart_text).text('Beginning of transcript');
+            $(subend_text).text('End of transcript');
+
+            if (clear) {
+                $('#search-input').val('');
+            };
+
             return;
-        }
+        };
 
         $(subtitle_elements).each(function(i,sub) {
             var new_content = '';
@@ -120,20 +130,13 @@ $(document).ready(function(){
             var current_startpoint = 0;
             var new_subtext = $('<div class="sub-text"></div>');
 
-            var text = $(sub).find('.sub-text').first().text();
+            var subtext = $(sub).find('.sub-text').first();
+            var text = $(subtext).text();
+            var clicktrigger = $(subtext).attr('onclick')
 
             var r = new RegExp(t, 'ig')
 
             if (text.search(r) === -1) {
-                //$(sub).find('.sub-text').replaceWith(new_subtext);
-                //var subtext = $(sub).find('.sub-text');
-
-                //$(subtext).find('.search-highlight').each(function(i, v) {
-                    //console.log('x', i, v);
-
-                    //$(v).before($(v).text());
-                    //$(v).remove();
-                //});
 
                 $(sub).hide();
             }
@@ -152,9 +155,16 @@ $(document).ready(function(){
                 }
                 $(new_subtext).append(post);
 
-                $(sub).find('.sub-text').replaceWith(new_subtext);
+                $(sub).find('.sub-text')
+                    .off('click')
+                    .replaceWith(new_subtext);
+
+                $(new_subtext).attr('onclick', clicktrigger);
             }
         });
+
+        $(substart_text).text('Beginning of search for ' + t);
+        $(subend_text).text('End of search for ' + t);
     };
 
 

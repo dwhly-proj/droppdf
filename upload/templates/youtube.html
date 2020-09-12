@@ -6,7 +6,7 @@
 	<meta charset="utf-8">
 
 	<title>DocDrop Video Annotator</title>
-    <link rel="canonical" href="{{ url }}">
+    <link rel="canonical" href="{{ canonical_url }}">
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
@@ -69,6 +69,14 @@
             cursor: pointer;
         }
 
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
         .action-char {
             font-size: 1.1em;
             z-index: 1000;
@@ -108,15 +116,25 @@
             max-width: 100%;
             max-height: 80vh;
             overflow-y: scroll;
-            scrollbar-width: thin; /* Firefox */
+            scrollbar-width: thin;
             border: 1px solid #c2c2c2;
             border-radius: 3px;
         }
 
         .sub-box::-webkit-scrollbar {
-            width: 6px;
+            width: 10px; 
         }
-        
+
+        .sub-box::-webkit-scrollbar-track {
+            background: #f1f1f1;
+
+        }
+
+        .sub-box::-webkit-scrollbar-thumb {
+            background-color: #c2c2c2;
+            border: 1px solid #fff;
+        }
+
         .subs {
             position: relative;
         }
@@ -167,7 +185,7 @@
         }
 
         .sub-text:hover {
-            cursor: pointer;
+            cursor: default;
             color: #42812D;
         }
 
@@ -236,12 +254,13 @@
             <a class="homelink" href="/">docdrop</a>
         </div>
         <div>
-            <input style="padding: 3px; border: 0px; border-bottom: 1px solid #000; opacity: .7"
+            <input style="padding: 3px; border: 0px; border-bottom: 1px solid #000; opacity: .7; margin-right: 1em;"
             size="20"
-            placeholder="&nbsp;search" 
-            id="youtube-url"
+            placeholder="&nbsp;search transcript" 
+            id="search-input"
             onchange="searchSubs($(this).val())">
-             </input>
+            </input>
+            <i class="fa fa-times-circle" onclick="searchSubs('', true)"></i>
         </div>
     </header>
 
@@ -250,8 +269,7 @@
         <div class="left-col">
             <div class="sub-box">
                 <div class="sub-label">
-                    <div class="sub-time">&nbsp;</div>
-                    <div class="sub-text">Beginning of transcript</div>
+                    <div id="substart-text" class="sub-text italic">Beginning of transcript</div>
                 </div>
                 {% for sub in transcript %}
                 <div class="sub" dir="ltr">
@@ -264,8 +282,7 @@
                 </div>
                 {% endfor %}
                 <div class="sub-label">
-                    <div class="sub-time">&nbsp;</div>
-                    <div class="sub-text">End of transcript</div>
+                    <div id="subend-text" class="sub-text italic">End of transcript</div>
                 </div>
             </div>
             <div class="control-box">
