@@ -330,7 +330,7 @@
                     return;
             };
 
-            if (url.indexOf('youtu.be') != -1) {
+            if ( (url.indexOf('youtu.be') != -1) && (url.indexOf('youtube') == -1) )  {
                 video = url.split('/').slice(-1).pop(); 
             } else {
                 match = RegExp('[?&]' + 'v=([^&]*)').exec(url);

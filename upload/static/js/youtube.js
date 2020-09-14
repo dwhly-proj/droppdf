@@ -188,10 +188,6 @@ $(document).ready(function(){
         if (t) {
             index = _getCurrentTimeIndex(window.startTimes, t);
 
-            //if (index == 0) {
-                //$('.sub-box').scrollTop(0);
-            //}
-
             el = subtitle_elements[index];
 
             if (el == current_sub) {
