@@ -193,7 +193,6 @@ def ocr(request):
 
 
 def youtube_video(request, video_id):
-    #return HttpResponse(video_id)
     condensed_transcript = []
 
     try:
@@ -261,7 +260,6 @@ def count_pages(filename):
 
 
 def docx_to_pdf(infilename, outfilename):
-
     # Extract the text from the DOCX file object infile and write it to 
     # a PDF file.
 
@@ -311,3 +309,7 @@ def csv_from_excel(excel_file, csv_name):
     for rownum in xrange(worksheet.nrows):
         wr.writerow([unicode(entry).encode("utf-8") for entry in worksheet.row_values(rownum)])
     your_csv_file.close()
+
+
+def refingerprint(request):
+    return render_to_response('refingerprint.html')

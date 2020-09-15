@@ -1,0 +1,151 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop Video Annotator</title>
+    <link rel="canonical" href="{{ canonical_url }}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+
+	<script src="{% static 'drag&dropfileupload/dropzone.js' %}"></script>
+
+	<script src="{% static 'js/refingerprint.js' %}"></script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        header {
+            position: absolue;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #42812D;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .2em;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
+        .action-char {
+            font-size: 1.1em;
+            z-index: 1000;
+        }
+
+        .action-char:hover {
+            cursor: pointer;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .form-box {
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .form-box div {
+            background-color: red;
+            min-width: 200px;
+        }
+
+        .dropzone {
+            width: 200px;
+            height: 50px;
+            border: 2px dashed #000;
+            border-radius: 5px;
+            background: white;
+        }
+
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div>
+            <p>
+            To create one or more uniquely-fingerprinted copies of your PDF, start by choosing the number of copies you need, then upload your PDF.
+            </p>
+        </div>
+
+        <div class="form-box">
+            <div>
+                <span>Copies</span>
+                <input type="number">
+            </div>
+            <div class="dropzone"></div>
+        </div>
+
+    </div>
+
+</body>
+</html>
