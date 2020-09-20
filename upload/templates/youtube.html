@@ -5,7 +5,7 @@
 <head>
 	<meta charset="utf-8">
 
-	<title>DocDrop Video Annotator</title>
+    <title>Video: {{ title }} (DocDrop)</title>
     <link rel="canonical" href="{{ canonical_url }}">
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
@@ -62,11 +62,25 @@
             border: 1px solid #000;
             border-radius: 2px;
             font-size: .8em;
-            padding: .2em;
+            padding: .25em;
+            user-select: none;
         }
 
         .button:hover {
             cursor: pointer;
+        }
+
+        .button i {
+            margin-left: .25em;
+            margin-right: .25em;
+        }
+
+        .play-button {
+            width: 4.5em;
+        }
+
+        .button-spacer {
+            width: .25em;
         }
 
         .bold {
@@ -166,7 +180,14 @@
             flex-direction: row;
             flex-wrap: nowrap;
             justify-content: space-between; 
-            padding-top: .5em;
+            padding-bottom: 1em;
+        }
+
+        .control-box-subsection {
+            display: flex;
+            flex-direction: row;
+            padding-left: .25em;
+            padding-right: .25em;
         }
 
         .highlight {
@@ -185,7 +206,7 @@
         }
 
         .sub-text:hover {
-            cursor: default;
+            cursor: text;
             color: #42812D;
         }
 
@@ -233,7 +254,6 @@
                 width: 93%;
                 max-width: 93%;
                 min-width: 93%;
-                flex-direction: column-reverse;
             }
             .sub-box {
                 border: none;
@@ -267,6 +287,48 @@
     <div class="main-content">
 
         <div class="left-col">
+
+            <div class="control-box">
+
+                <div class="control-box-subsection">
+                    <div class="button play-button"
+                    id="play-button"
+                    style="display: none">
+                        <i class="fa fa-play"></i>Play
+                    </div>
+                    <div class="button play-button"
+                    id="pause-button"
+                    style="display: none"
+                    onclick="pauseVideo();">
+                        <i class="fa fa-pause"></i>Pause
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    id="autoscroll-button"
+                    onclick="toggleSync();">
+                        <i class="fa fa-thumbs-up"></i>Auto Scroll
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    onclick="syncScroll();">
+                        <i class="fa fa-refresh"></i>Sync
+                    </div>
+                </div>
+
+                <div class="control-box-subsection">
+                    <div class="button"
+                    onclick="scrollSubs();">
+                        <i class="fa fa-arrow-up"></i>Top
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    onclick="scrollSubs('down');">
+                        <i class="fa fa-arrow-down"></i>Bottom
+                    </div>
+                </div>
+
+            </div>
+
             <div class="sub-box">
                 <div class="sub-label">
                     <div id="substart-text" class="sub-text italic">Beginning of transcript</div>
@@ -285,16 +347,7 @@
                     <div id="subend-text" class="sub-text italic">End of transcript</div>
                 </div>
             </div>
-            <div class="control-box">
-                <div class="button"
-                onclick="scrollSubs();">
-                    <i class="fa fa-arrow-up"></i>Top
-                </div>
-                <div class="button"
-                onclick="scrollSubs('down');">
-                    <i class="fa fa-arrow-down"></i>Bottom
-                </div>
-            </div>
+
         </div>
 
         <div class="player-box">
@@ -303,29 +356,29 @@
                 </iframe>
             </div>
             <br>
-            <table border="0" style="font-size: .8em" class="prefs">
-                <tr>
-                    <td>
-                        <span>Auto scroll while playing</span>
-                    </td>
-                    <td>
-                        <input type="checkbox" checked onchange="toggleSync();">
-                    </td>
-                    <td>
-                        <div class="button" onclick="syncScroll();">Sync</div>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span>Highlight while playing</span>
-                    </td>
-                    <td>
-                        <input type="checkbox" checked onchange="toggleHighlight();">
-                    </td>
-                    <td>
-                    </td>
-                </tr>
-            </table>
+            <!--<table border="0" style="font-size: .8em" class="prefs">-->
+                <!--<tr>-->
+                    <!--<td>-->
+                        <!--<span>Auto scroll while playing</span>-->
+                    <!--</td>-->
+                    <!--<td>-->
+                        <!--<input type="checkbox" checked onchange="toggleSync();">-->
+                    <!--</td>-->
+                    <!--<td>-->
+                        <!--<div class="button" onclick="syncScroll();">Sync</div>-->
+                    <!--</td>-->
+                <!--</tr>-->
+                <!--<tr>-->
+                    <!--<td>-->
+                        <!--<span>Highlight while playing</span>-->
+                    <!--</td>-->
+                    <!--<td>-->
+                        <!--<input type="checkbox" checked onchange="toggleHighlight();">-->
+                    <!--</td>-->
+                    <!--<td>-->
+                    <!--</td>-->
+                <!--</tr>-->
+            <!--</table>-->
         </div>
 
     </div>

@@ -1,6 +1,8 @@
 # encoding=utf8
 import time
+
 from youtube_transcript_api import YouTubeTranscriptApi
+import requests
 
 from django.shortcuts import redirect
 from django.shortcuts import render
@@ -248,9 +250,23 @@ def youtube_video(request, video_id):
     canonical_url = 'https://www.youtube.com/watch?v='
     canonical_url += video_id 
 
+    noembed_url = 'https://noembed.com/embed?url=' + canonical_url 
+    r = requests.get(noembed_url)
+
+    title = ''
+    if r.status_code == 200:
+        try:
+            video_info = r.json()
+            if video_info:
+                title = video_info.get('title')
+
+        except:
+            pass
+
+
     return render_to_response('youtube.html', {'transcript': condensed_transcript,
         'video_id': video_id, 'start_times': start_times, 'canonical_url': canonical_url, 
-        'iframe_src': source})
+        'iframe_src': source, 'title': title})
 
 
 def count_pages(filename):

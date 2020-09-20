@@ -4,12 +4,14 @@ $(document).ready(function(){
     var current_sub;
 
     var keep_sync = true;
-    var show_highlight = true;
+
     var scroll_sub_down = true;
 
     var subtitle_elements = $('.sub');
 
     var times = [];
+
+    var has_been_started_by_user = false;
 
     var tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -19,28 +21,50 @@ $(document).ready(function(){
 
     function onYouTubeIframeAPIReady() {
         player = new YT.Player('video-player-iframe', {
+            playerVars: {
+                'autoplay': 1,
+                'mute': 1
+            },
             events: {
             'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange
+            'onStateChange': onStateChange
             }
         });
         window.player = player;
-    }
+    };
 
     function onPlayerReady(event) {
-        setTimeout(function() {
-            if (player) {
-                player.playVideo();
-            }
-            else {
-                return onPlayerReady(event);
-            }
-        }, 100);
-    }
+        //binding button (or inline "onclick") don't seem to work initially if 
+        //instantiated before player is ready.
+        //(sometimes)
 
-    var done = false;
-    function onPlayerStateChange(event) {
-    }
+        //external play button doesn't work initially if not muted.
+        //a recent change in both chrome and firefox apparently.
+        //we can start the video (muted) externally, but unmuting caused video to stop
+        //player.mute();
+
+        $('#play-button').on('click', function() {
+            window.playVideo();
+        });
+    };
+
+    function onStateChange(event) {
+        if (event.data === YT.PlayerState.PLAYING) {
+            $('#play-button').hide();
+            $('#pause-button').show();
+
+            has_been_started_by_user = true;
+        };
+
+        if (! has_been_started_by_user) {
+            return;
+        };
+
+        if (event.data === YT.PlayerState.PAUSED) {
+            $('#play-button').show();
+            $('#pause-button').hide();
+        }
+    };
 
     function stopVideo() {
         player.stopVideo();
@@ -62,7 +86,21 @@ $(document).ready(function(){
     window.player = player;
     window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
     window.onPlayerReady = onPlayerReady;
-    window.onPlayerStateChange = onPlayerStateChange;
+    window.onStateChange = onStateChange;
+
+    window.playVideo = function() {
+        player.playVideo();
+
+        $('#play-button').hide();
+        $('#pause-button').show();
+    };
+
+    window.pauseVideo = function() {
+        player.pauseVideo();
+
+        $('#pause-button').hide();
+        $('#play-button').show();
+    };
 
     window.scrollSubs = function(d) {
         if (d == 'down') {
@@ -77,22 +115,29 @@ $(document).ready(function(){
     };
 
     window.toggleSync = function() {
-        keep_sync = ! keep_sync;
-    };
+        var b = $('#autoscroll-button');
 
-    window.toggleHighlight = function() {
-        show_highlight = ! show_highlight;
+        keep_sync = ! keep_sync;
+
+        if (keep_sync) {
+            $(b).find('i')
+                .removeClass('fa-ban')
+                .addClass('fa-thumbs-up')
+
+        } else {
+            $(b).find('i')
+                .removeClass('fa-thumbs-up')
+                .addClass('fa-ban')
+        }
     };
 
     window.syncScroll = function() {
+        console.log('syncing');
+
         var t = player.getCurrentTime();
 
         if (t) {
             index = _getCurrentTimeIndex(window.startTimes, t);
-
-            //if (index == 0) {
-                //$('.sub-box').scrollTop(0);
-            //}
 
             el = subtitle_elements[index];
 
@@ -126,7 +171,7 @@ $(document).ready(function(){
 
         $(subtitle_elements).each(function(i,sub) {
             var new_content = '';
-            var match_start, match_stop, pre, post
+            var match_sjart, match_stop, pre, post
             var current_startpoint = 0;
             var new_subtext = $('<div class="sub-text"></div>');
 
@@ -167,13 +212,25 @@ $(document).ready(function(){
         $(subend_text).text('End of search for ' + t);
     };
 
+    //pause video when current sub mousedown (for H highlight to prevent scroll leaving sub).
+    $('.sub-text').mousedown(function() {
+        if (! keep_sync) {
+            //if autoscroll isn't enabled, don't pause vid.
+            return true;
+        };
+
+        //is sub the current one?
+        if ($(this).parent().hasClass('highlight')) {
+            pauseVideo();
+        }
+    });
+
 
     setInterval(function() {
-        if (! keep_sync && ! show_highlight) {
+        if (! keep_sync) {
             $('.highlight').removeClass('highlight');
             return;
         };
-
 
         if (! player || ! player.getPlayerState) {
             return;
@@ -191,21 +248,15 @@ $(document).ready(function(){
             el = subtitle_elements[index];
 
             if (el == current_sub) {
-                if (!show_highlight) {
-                    $('.highlight').removeClass('highlight');
-                } else {
-                    if (! $(el).hasClass('highlight')) {
-                        $(el).addClass('highlight');
-                    }
+                if (! $(el).hasClass('highlight')) {
+                    $(el).addClass('highlight');
                 }
 
                 return;
             };
 
             $('.highlight').removeClass('highlight');
-            if (show_highlight) {
-                $(el).addClass('highlight');
-            };
+            $(el).addClass('highlight');
 
             if (! keep_sync) {
                 return;
