@@ -120,12 +120,16 @@ $(document).ready(function(){
         keep_sync = ! keep_sync;
 
         if (keep_sync) {
-            $(b).find('i')
+            $(b)
+                .removeClass('button-off')
+                .find('i')
                 .removeClass('fa-ban')
                 .addClass('fa-thumbs-up')
 
         } else {
-            $(b).find('i')
+            $(b)
+                .addClass('button-off')
+                .find('i')
                 .removeClass('fa-thumbs-up')
                 .addClass('fa-ban')
         }
