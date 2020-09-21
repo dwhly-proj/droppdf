@@ -1,15 +1,24 @@
 # encoding=utf8
 import time
+import os
+import hashlib
+import binascii
+import io
+
+from pdfrw import PdfReader, PdfWriter
 
 from youtube_transcript_api import YouTubeTranscriptApi
 import requests
 
+
 from django.shortcuts import redirect
 from django.shortcuts import render
 from django.shortcuts import render_to_response
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, Http404
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.http import HttpResponse, Http404, JsonResponse
 from django.template import RequestContext
+
+
 from PDFUpload import settings
 
 #configs.py contains secrets that shouldn't be in the public repo
@@ -327,5 +336,42 @@ def csv_from_excel(excel_file, csv_name):
     your_csv_file.close()
 
 
+#TODO CSRF token not working. need to fix this without breaking site, it may have
+#been disabled by someone earlier but is important.
+@ensure_csrf_cookie
 def refingerprint(request):
     return render_to_response('refingerprint.html')
+
+
+@csrf_exempt
+def refingerprint_upload(request):
+    pdf_file = request.FILES.get('pdf_file')
+    copy_count = request.POST.get('copy_count', 1)
+
+    try:
+        copy_count = int(copy_count)
+    except:
+        copy_count = 1
+
+    if pdf_file is not None:
+        filename = pdf_file.name
+
+        file_content = pdf_file.read()
+
+        for copy_index in range(copy_count):
+            content = PdfReader(io.BytesIO(file_content))
+
+            #add some random meta data
+            content.Info.randomMetaData = binascii.b2a_hex(os.urandom(20)).upper()
+
+            #change id to random id
+            md = hashlib.md5(filename)
+            md.update(str(time.time()))
+            md.update(os.urandom(10))
+
+            content.ID = [md.hexdigest().upper(), md.hexdigest().upper()]
+
+            PdfWriter("/tmp/edit.pdf", trailer=content).write()
+
+
+    return JsonResponse({'result': 'ok'})

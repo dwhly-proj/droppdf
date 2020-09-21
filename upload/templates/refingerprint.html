@@ -14,8 +14,6 @@
 
 	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
 
-	<script src="{% static 'drag&dropfileupload/dropzone.js' %}"></script>
-
 	<script src="{% static 'js/refingerprint.js' %}"></script>
 
     <style>
@@ -62,11 +60,25 @@
             border: 1px solid #000;
             border-radius: 2px;
             font-size: .8em;
-            padding: .2em;
+            padding: .25em;
+            user-select: none;
         }
 
         .button:hover {
             cursor: pointer;
+        }
+
+        .button i {
+            margin-left: .25em;
+            margin-right: .25em;
+        }
+
+        .button.disabled {
+            opacity: .3;
+        }
+
+        .button.disabled:hover {
+            cursor: not-allowed !important;
         }
 
         .bold {
@@ -96,26 +108,12 @@
             justify-content: flex-start;
         }
 
-        .form-box {
-            margin: 0 auto;
+        .option-box {
             display: flex;
             flex: 1;
             flex-direction: row;
             flex-wrap: wrap;
-            justify-content: space-between;
-        }
-
-        .form-box div {
-            background-color: red;
-            min-width: 200px;
-        }
-
-        .dropzone {
-            width: 200px;
-            height: 50px;
-            border: 2px dashed #000;
-            border-radius: 5px;
-            background: white;
+            justify-content: flex-start; 
         }
 
 
@@ -137,25 +135,42 @@
             </p>
         </div>
 
-        <div>
-            <span>Copies</span>
-            <select id="copy-count">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10</option>
-            </select>
+        <form id="data" method="post" enctype="multipart/form-data">
+
+        <div class="option-box">
+            <div>
+                <span>Copies</span>
+                <select id="copy-count">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+            </div>
+            <div style="width: 2em"></div>
+            <input type="file" id="pdf-file">
         </div>
 
-        <div class="dropzone"></div>
+        <div style="padding-top: 1em; padding-bottom: 1em;">
+            <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
+                <i class="fa fa-upload"></i>
+                Refingerprint
+            </div>
+        </div>
+
+        <div class="result-box">
+            <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none">
+                <i class="fa fa-wrench fa-spin"></i>
+            </div>
+            <div id="result-copies">
+            </div>
+        </div>
 
     </div>
+
+    <script>
+        CSRF_TOKEN = '{{ csrf_token }}';
+    </script>
 
 </body>
 </html>

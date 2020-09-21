@@ -24,6 +24,7 @@ urlpatterns = [
     url(r'^pdf/(?P<filename>.+\.pdf)/$', upload_views.pdf, name="pdf"),
     url(r'^ocr/', upload_views.ocr, name="ocr"),
     url(r'^refingerprint/', upload_views.refingerprint, name="refingerprint"),
+    url(r'^refingerprint_upload/', upload_views.refingerprint_upload, name="refingerprint_upload"),
     url(r'^csv/(?P<filename>.+)/$', upload_views.csvAsTable, name="csv"),
     url(r'^epub/(?P<filename>.+)/$', upload_views.epub, name="epub"),
     url(r'video/(?P<video_id>.+)/$', upload_views.youtube_video, name='youtube_video'),
