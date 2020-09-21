@@ -1,0 +1,176 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop Video Annotator</title>
+    <link rel="canonical" href="{{ canonical_url }}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+
+	<script src="{% static 'js/refingerprint.js' %}"></script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        header {
+            position: absolue;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #42812D;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .25em;
+            user-select: none;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
+        .button i {
+            margin-left: .25em;
+            margin-right: .25em;
+        }
+
+        .button.disabled {
+            opacity: .3;
+        }
+
+        .button.disabled:hover {
+            cursor: not-allowed !important;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
+        .action-char {
+            font-size: 1.1em;
+            z-index: 1000;
+        }
+
+        .action-char:hover {
+            cursor: pointer;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .option-box {
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: flex-start; 
+        }
+
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div>
+            <p>
+            To create one or more uniquely-fingerprinted copies of your PDF, start by choosing the number of copies you need, then upload your PDF.
+            </p>
+        </div>
+
+        <form id="data" method="post" enctype="multipart/form-data">
+
+        <div class="option-box">
+            <div>
+                <span>Copies</span>
+                <select id="copy-count">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+            </div>
+            <div style="width: 2em"></div>
+            <input type="file" id="pdf-file">
+        </div>
+
+        <div style="padding-top: 1em; padding-bottom: 1em;">
+            <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
+                <i class="fa fa-upload"></i>
+                Refingerprint
+            </div>
+        </div>
+
+        <div class="result-box">
+            <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none">
+                <i class="fa fa-wrench fa-spin"></i>
+            </div>
+            <div id="result-copies">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        CSRF_TOKEN = '{{ csrf_token }}';
+    </script>
+
+</body>
+</html>

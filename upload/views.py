@@ -1,13 +1,24 @@
 # encoding=utf8
 import time
+import os
+import hashlib
+import binascii
+import io
+
+from pdfrw import PdfReader, PdfWriter
+
 from youtube_transcript_api import YouTubeTranscriptApi
+import requests
+
 
 from django.shortcuts import redirect
 from django.shortcuts import render
 from django.shortcuts import render_to_response
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, Http404
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.http import HttpResponse, Http404, JsonResponse
 from django.template import RequestContext
+
+
 from PDFUpload import settings
 
 #configs.py contains secrets that shouldn't be in the public repo
@@ -193,7 +204,6 @@ def ocr(request):
 
 
 def youtube_video(request, video_id):
-    #return HttpResponse(video_id)
     condensed_transcript = []
 
     try:
@@ -249,9 +259,23 @@ def youtube_video(request, video_id):
     canonical_url = 'https://www.youtube.com/watch?v='
     canonical_url += video_id 
 
+    noembed_url = 'https://noembed.com/embed?url=' + canonical_url 
+    r = requests.get(noembed_url)
+
+    title = ''
+    if r.status_code == 200:
+        try:
+            video_info = r.json()
+            if video_info:
+                title = video_info.get('title')
+
+        except:
+            pass
+
+
     return render_to_response('youtube.html', {'transcript': condensed_transcript,
         'video_id': video_id, 'start_times': start_times, 'canonical_url': canonical_url, 
-        'iframe_src': source})
+        'iframe_src': source, 'title': title})
 
 
 def count_pages(filename):
@@ -261,7 +285,6 @@ def count_pages(filename):
 
 
 def docx_to_pdf(infilename, outfilename):
-
     # Extract the text from the DOCX file object infile and write it to 
     # a PDF file.
 
@@ -311,3 +334,44 @@ def csv_from_excel(excel_file, csv_name):
     for rownum in xrange(worksheet.nrows):
         wr.writerow([unicode(entry).encode("utf-8") for entry in worksheet.row_values(rownum)])
     your_csv_file.close()
+
+
+#TODO CSRF token not working. need to fix this without breaking site, it may have
+#been disabled by someone earlier but is important.
+@ensure_csrf_cookie
+def refingerprint(request):
+    return render_to_response('refingerprint.html')
+
+
+@csrf_exempt
+def refingerprint_upload(request):
+    pdf_file = request.FILES.get('pdf_file')
+    copy_count = request.POST.get('copy_count', 1)
+
+    try:
+        copy_count = int(copy_count)
+    except:
+        copy_count = 1
+
+    if pdf_file is not None:
+        filename = pdf_file.name
+
+        file_content = pdf_file.read()
+
+        for copy_index in range(copy_count):
+            content = PdfReader(io.BytesIO(file_content))
+
+            #add some random meta data
+            content.Info.randomMetaData = binascii.b2a_hex(os.urandom(20)).upper()
+
+            #change id to random id
+            md = hashlib.md5(filename)
+            md.update(str(time.time()))
+            md.update(os.urandom(10))
+
+            content.ID = [md.hexdigest().upper(), md.hexdigest().upper()]
+
+            PdfWriter("/tmp/edit.pdf", trailer=content).write()
+
+
+    return JsonResponse({'result': 'ok'})
