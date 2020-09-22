@@ -373,5 +373,4 @@ def refingerprint_upload(request):
 
             PdfWriter("/tmp/edit.pdf", trailer=content).write()
 
-
     return JsonResponse({'result': 'ok'})
