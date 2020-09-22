@@ -21,6 +21,7 @@
     <style>
         body {
             font-family: sans-serif;
+            padding-bottom: 1vh;
         }
 
         header {
@@ -80,6 +81,16 @@
             color: #fff;
         }
 
+        .button-inactive {
+            background-color: #c2c2c2;
+            border-color: #c2c2c2;
+            opacity: .3;
+        }
+
+        .button-inactive:hover {
+            cursor: not-allowed;
+        }
+
         .play-button {
             width: 4.5em;
         }
@@ -117,11 +128,11 @@
 
         .left-col {
             position: relative;
-            max-width: 360px;
             display: flex;
             box-sizing: border-box;
             flex: 1;
             flex-direction: column;
+            padding-right: 1.5em; 
         }
 
         .sub-box {
@@ -299,6 +310,10 @@
                     style="display: none">
                         <i class="fa fa-play"></i>Play
                     </div>
+                    <div class="button play-button button-inactive"
+                     id="play-button-waiting">
+                        Waiting..
+                    </div>
                     <div class="button play-button"
                     id="pause-button"
                     style="display: none"
@@ -334,7 +349,7 @@
 
             <div class="sub-box">
                 <div class="sub-label">
-                    <div id="substart-text" class="sub-text italic">Beginning of transcript</div>
+                    <div id="substart-text" class="sub-text italic">Click play in the YouTube player to begin</div>
                 </div>
                 {% for sub in transcript %}
                 <div class="sub" dir="ltr">
@@ -359,29 +374,6 @@
                 </iframe>
             </div>
             <br>
-            <!--<table border="0" style="font-size: .8em" class="prefs">-->
-                <!--<tr>-->
-                    <!--<td>-->
-                        <!--<span>Auto scroll while playing</span>-->
-                    <!--</td>-->
-                    <!--<td>-->
-                        <!--<input type="checkbox" checked onchange="toggleSync();">-->
-                    <!--</td>-->
-                    <!--<td>-->
-                        <!--<div class="button" onclick="syncScroll();">Sync</div>-->
-                    <!--</td>-->
-                <!--</tr>-->
-                <!--<tr>-->
-                    <!--<td>-->
-                        <!--<span>Highlight while playing</span>-->
-                    <!--</td>-->
-                    <!--<td>-->
-                        <!--<input type="checkbox" checked onchange="toggleHighlight();">-->
-                    <!--</td>-->
-                    <!--<td>-->
-                    <!--</td>-->
-                <!--</tr>-->
-            <!--</table>-->
         </div>
 
     </div>

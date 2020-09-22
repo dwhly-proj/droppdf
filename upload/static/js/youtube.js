@@ -49,8 +49,11 @@ $(document).ready(function(){
     };
 
     function onStateChange(event) {
+        var st = $('#substart-text');
+
         if (event.data === YT.PlayerState.PLAYING) {
             $('#play-button').hide();
+            $('#play-button-waiting').hide();
             $('#pause-button').show();
 
             has_been_started_by_user = true;
@@ -58,6 +61,10 @@ $(document).ready(function(){
 
         if (! has_been_started_by_user) {
             return;
+        };
+
+        if ($(st).text().indexOf('Click play') != -1) {
+            $(st).text('Beginning of transcript');
         };
 
         if (event.data === YT.PlayerState.PAUSED) {
