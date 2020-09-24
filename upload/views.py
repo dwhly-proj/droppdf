@@ -345,8 +345,11 @@ def refingerprint(request):
 
 @csrf_exempt
 def refingerprint_upload(request):
+    processed_files = []
+
     pdf_file = request.FILES.get('pdf_file')
     copy_count = request.POST.get('copy_count', 1)
+    suffix = request.POST.get('suffix', '')
 
     try:
         copy_count = int(copy_count)
@@ -354,11 +357,31 @@ def refingerprint_upload(request):
         copy_count = 1
 
     if pdf_file is not None:
-        filename = pdf_file.name
+        s = os.path.splitext(pdf_file.name)
+        filename = s[0] 
+        extension = s[1] 
+
 
         file_content = pdf_file.read()
+        rand_key = randomword(5)
 
         for copy_index in range(copy_count):
+            save_filename = filename + '-' + suffix + '-' + rand_key + '-' + str(copy_index + 1) + extension
+
+            file_path = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf', save_filename)
+
+
+            static_link = os.path.join('/pdf', save_filename)
+            download_link = os.path.join('/static/drop-pdf', save_filename)
+
+            download_href = '<a href="%s" download><i class="fa fa-download download-icon"></i></a>' % download_link
+            docdrop_href = '<a href="%s" target="_blank"><i class="fa fa-file-pdf-o file-icon"></i></a>' % static_link
+            name_display = '<div class="small">%s</div>' % save_filename 
+
+            wrapper = '<div class="file-wrapper">%s%s%s</div>' % (download_href, docdrop_href, name_display)
+
+            processed_files.append(wrapper)
+
             content = PdfReader(io.BytesIO(file_content))
 
             #add some random meta data
@@ -371,7 +394,6 @@ def refingerprint_upload(request):
 
             content.ID = [md.hexdigest().upper(), md.hexdigest().upper()]
 
-            PdfWriter("/tmp/edit.pdf", trailer=content).write()
+            PdfWriter(file_path, trailer=content).write()
 
-
-    return JsonResponse({'result': 'ok'})
+    return JsonResponse({'result': 'ok', 'files': processed_files})
