@@ -2,8 +2,6 @@
     var in_process = false;
 
     function _showError(m) {
-        console.log(m);
-
         $('#upload-error')
             .text(m)
             .show();
@@ -42,8 +40,6 @@
         if (file) {
             var check_error = _checkFileError(file);
 
-            console.log('aaa', check_error);
-
             if (check_error) {
                 return _showError(check_error);
             }
@@ -58,6 +54,23 @@
         $('#upload-button').removeClass('disabled');
         $('#wait-icon').hide();
         $('#pdf-file').prop('disabled', false);
+
+        $('#pdf-file').val(null);
+        $('#filename').text('');
+
+        $('#copy-count').val(1);
+
+        in_process = false;
+    };
+
+    function _showProcessed(file_htmls) {
+        var el = $('#result-copies');
+
+        $(el).empty();
+
+        $.each(file_htmls, function(i, v) {
+            $(el).append(v);
+        });
     };
 
     function _uploadPDF() {
@@ -88,6 +101,7 @@
         formData.append('pdf_file', file); 
 
         formData.append('copy_count', $('#copy-count').val());
+        formData.append('suffix', $('#file-suffix').val());
 
         $.ajax({
             url : '/refingerprint_upload/',
@@ -96,12 +110,20 @@
             cache: false,
             contentType: false,
             processData: false,
-            dataType: 'multipart/form-data',
+            dataType: 'json',
+            //dataType: 'multipart/form-data',
             success: function(response) {
-                _restoreReady();
+                console.log(response);
+
+                if (response.files) {
+                    _restoreReady();
+                    _showProcessed(response.files);
+                } else {
+                    _showError('error processing the request')
+                }
             },
             error: function(e) {
-                console.log(e)
+                console.log('error', e)
                 _restoreReady();
             }
         });

@@ -5,8 +5,7 @@
 <head>
 	<meta charset="utf-8">
 
-	<title>DocDrop Video Annotator</title>
-    <link rel="canonical" href="{{ canonical_url }}">
+	<title>DocDrop PDF Refingerprinter</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
@@ -192,6 +191,31 @@
             opacity: 0;
         }
 
+        #result-copies {
+            padding: .5em;
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: flex-start; 
+        }
+
+        .file-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; 
+            padding: 1em;
+        }
+
+        .file-wrapper .download-icon {
+            font-size: .8em;
+        }
+
+        .file-wrapper .file-icon {
+            font-size: 3em;
+            padding: 5px;
+        }
+
     </style>
 
 </head>
@@ -218,9 +242,9 @@
                         <option value="2">2</option>
                         <option value="3">3</option>
                         <option value="4">4</option>
-                        <option value="4">5</option>
-                        <option value="4">6</option>
-                        <option value="4">7</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
                     </select>
                 </div>
                 <div style="width: 2em"></div>
@@ -263,8 +287,8 @@
 
         <div class="right-column">
             <div class="result-box">
-                <div id="result-copies">
-                </div>
+                <div class="option-box"></div>
+                <div id="result-copies"></div>
             </div>
         </div>
 
