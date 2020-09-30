@@ -79,3 +79,5 @@ ENV/
 #pdf_annotator secrets
 pdf_annotator/configs.py
 
+#uploaded refingerprinted files
+static/fingerprints/*
