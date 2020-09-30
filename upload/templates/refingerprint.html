@@ -5,7 +5,7 @@
 <head>
 	<meta charset="utf-8">
 
-	<title>DocDrop PDF Refingerprinter</title>
+	<title>DocDrop PDF Fingerprinter</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
@@ -233,55 +233,82 @@
         </div>
 
         <div class="left-column">
+            <form id="param-form" action="/fingerprinter/upload/" method="POST" enctype="multipart/form-data">
 
-            <div class="option-box">
-                <div>
-                    <span>Copies</span>
-                    <select id="copy-count">
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                        <option value="7">7</option>
-                    </select>
-                </div>
-                <div style="width: 2em"></div>
-                <div>
-                    <input id="file-suffix" placeholder="File Suffix (optional)">
-                </div>
-            </div>
-
-            <div style="position: relative">
-                <div id="drag-box">
-                    <h3>Drag PDF Here</h3>
-                    <div class="small">
-                        (or click to select file)
+                <div class="option-box">
+                    <div>
+                        <span>Copies</span>
+                        <select id="copy-count" name="copy-count">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                            <option value="13">13</option>
+                            <option value="14">14</option>
+                            <option value="15">15</option>
+                            <option value="16">16</option>
+                            <option value="17">17</option>
+                            <option value="18">18</option>
+                            <option value="19">19</option>
+                            <option value="20">20</option>
+                            <option value="21">21</option>
+                            <option value="22">22</option>
+                            <option value="23">23</option>
+                            <option value="24">24</option>
+                            <option value="25">25</option>
+                            <option value="26">26</option>
+                            <option value="27">27</option>
+                            <option value="28">28</option>
+                            <option value="29">29</option>
+                            <option value="30">30</option>
+                        </select>
                     </div>
-                    <h4 id="filename"></h4>
-
-                    <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none;">
-                        <i class="fa fa-wrench fa-spin"></i>
+                    <div style="width: 2em"></div>
+                    <div>
+                        <input id="file-suffix" name="file-suffix" placeholder="File Suffix (optional)">
                     </div>
                 </div>
 
-                <input type="file" id="pdf-file" onchange="updateFileName()">
+                <div style="position: relative">
+                    <div id="drag-box">
+                        <h3>Drag PDF Here</h3>
+                        <div class="small">
+                            (or click to select file)
+                        </div>
+                        <h4 id="filename"></h4>
 
-            </div>
+                        <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none;">
+                            <i class="fa fa-wrench fa-spin"></i>
+                        </div>
+                    </div>
 
-            <div style="height: 1em;"></div>
+                    <input type="file" id="pdf-file" name="pdf-file" onchange="updateFileName()">
 
-            <div>
-                <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
-                    <i class="fa fa-upload"></i>
-                    Refingerprint
                 </div>
 
-                <div id="upload-error" class="small error" style="display: none;">
+                <div style="height: 1em;"></div>
+
+                <div>
+                    <!--<div id="upload-button" class="button" style="width: 8em" onclick="$('#param-form').submit()">-->
+                    <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
+                        <i class="fa fa-upload"></i>
+                        Refingerprint
+                    </div>
+
+                    <div id="upload-error" class="small error" style="display: none;">
+                    </div>
+
                 </div>
 
-            </div>
+            </form>
 
         </div>
 

@@ -4,6 +4,7 @@ import os
 import hashlib
 import binascii
 import io
+import shutil
 
 from pdfrw import PdfReader, PdfWriter
 
@@ -20,6 +21,7 @@ from django.template import RequestContext
 
 
 from PDFUpload import settings
+
 
 #configs.py contains secrets that shouldn't be in the public repo
 #so handle it if the file isn't there... don't prevent the whole app from running
@@ -62,7 +64,7 @@ def index(request):
     scopes = SCOPES
     return render_to_response('index.html', locals())
 
-def pdf(request, filename):
+def pdf(request, filename, filefolder=None):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
 
@@ -134,7 +136,6 @@ def save_file(file, path='', extension='pdf'):
         txt_path = temp + "/" + file_text
 
         if not os.path.exists(txt_path):
-
             print 'no text'
             return 'none-' + str(page_num) + "-" + filename
         with open(temp + "/" + file_text, 'rb') as f:
@@ -339,17 +340,17 @@ def csv_from_excel(excel_file, csv_name):
 #TODO CSRF token not working. need to fix this without breaking site, it may have
 #been disabled by someone earlier but is important.
 @ensure_csrf_cookie
-def refingerprint(request):
+def fingerprinter(request):
     return render_to_response('refingerprint.html')
 
 
 @csrf_exempt
-def refingerprint_upload(request):
+def fingerprinter_upload(request):
     processed_files = []
 
-    pdf_file = request.FILES.get('pdf_file')
-    copy_count = request.POST.get('copy_count', 1)
-    suffix = request.POST.get('suffix', '')
+    pdf_file = request.FILES.get('pdf-file')
+    copy_count = request.POST.get('copy-count', 1)
+    suffix = request.POST.get('file-suffix', '')
 
     try:
         copy_count = int(copy_count)
@@ -357,30 +358,46 @@ def refingerprint_upload(request):
         copy_count = 1
 
     if pdf_file is not None:
+        #make save directory 
+        rand_path = randomword(9)
+        fingerprint_dir = os.path.join(settings.BASE_DIR, settings.STATIC_ROOT, 
+                'fingerprints', rand_path)
+        os.makedirs(fingerprint_dir)
+
         s = os.path.splitext(pdf_file.name)
         filename = s[0] 
         extension = s[1] 
 
-
         file_content = pdf_file.read()
-        rand_key = randomword(5)
+
+        content = PdfReader(io.BytesIO(file_content))
+
+        if content.ID is None:
+            file_id = 'No ID'
+        else:
+            file_id = str(content.ID[0])
+
+        file_info = {'filename': pdf_file.name, 'size': pdf_file.size, 'id': file_id}
 
         for copy_index in range(copy_count):
-            save_filename = filename + '-' + suffix + '-' + rand_key + '-' + str(copy_index + 1) + extension
+            if suffix and suffix != '':
+                save_filename = filename + '-' + suffix + '-' + str(copy_index + 1) + extension
+            else:
+                save_filename = filename + '-' + str(copy_index + 1) + extension
 
-            file_path = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf', save_filename)
-
+            #file_path = os.path.join(settings.BASE_DIR, 'static', 'drop-pdf', save_filename)
+            file_path = os.path.join(fingerprint_dir, save_filename)
 
             static_link = os.path.join('/pdf', save_filename)
             download_link = os.path.join('/static/drop-pdf', save_filename)
 
-            download_href = '<a href="%s" download><i class="fa fa-download download-icon"></i></a>' % download_link
-            docdrop_href = '<a href="%s" target="_blank"><i class="fa fa-file-pdf-o file-icon"></i></a>' % static_link
-            name_display = '<div class="small">%s</div>' % save_filename 
+            #download_href = '<a href="%s" download><i class="fa fa-download download-icon"></i></a>' % download_link
+            #docdrop_href = '<a href="%s" target="_blank"><i class="fa fa-file-pdf-o file-icon"></i></a>' % static_link
+            #name_display = '<div class="small">%s</div>' % save_filename 
 
-            wrapper = '<div class="file-wrapper">%s%s%s</div>' % (download_href, docdrop_href, name_display)
+            #wrapper = '<div class="file-wrapper">%s%s%s</div>' % (download_href, docdrop_href, name_display)
 
-            processed_files.append(wrapper)
+            #processed_files.append(wrapper)
 
             content = PdfReader(io.BytesIO(file_content))
 
@@ -396,4 +413,40 @@ def refingerprint_upload(request):
 
             PdfWriter(file_path, trailer=content).write()
 
-    return JsonResponse({'result': 'ok', 'files': processed_files})
+            #copy file into online annotator with unique name
+            annotation_name = rand_path + '-' + filename + '-' + suffix + '-' \
+                    + str(copy_index + 1) + extension
+
+            annotation_path = os.path.join(settings.BASE_DIR, settings.STATIC_ROOT, 
+                    'drop-pdf', annotation_name)
+
+            shutil.copy(file_path, annotation_path)
+
+            #For some reason nested directories do not provide files from static.
+            #We need to clean up double "settings" file and sanify the basic setup but
+            #For now serve the file from a dedicated URL.
+
+            copy_info = { 'filename': save_filename, 'download_link': '',
+                    'docdrop_link': annotation_name, 'id': content.ID[0]}
+
+            processed_files.append(copy_info)
+
+    else:
+        raise Http404('file not provided')
+            
+
+    data = {'processed_files': processed_files, 'file_info': file_info}
+
+    print(data)
+
+    return render_to_response('refingerprint_results.html', data)
+
+    #return JsonResponse({'result': 'ok', 'files': processed_files})
+
+
+def fingerprinter_download(request, directory_name, filename):
+    pass
+
+
+def fingerprinter_compressed(request, directory_name):
+    pass
