@@ -115,8 +115,18 @@ def save_file(file, path='', extension='pdf'):
         os.makedirs(temp)
 
     filename = file._get_name()
+
+    #handle non ascii chars in file name
+    if isinstance(filename, unicode):
+        try:
+            filename = unidecode(filename)
+        except:
+            filename = re.sub(r'[^\x00-\x7F]+','.', filename)
+
+
     filename = filename.replace("'", '').replace('"', '')
     filename = re.sub(r"[\(,\),\s]+", "-", filename)
+
 
     filename_noextension = '.'.join(filename.split('.')[:-1])
     rand_key = randomword(5)
