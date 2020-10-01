@@ -5,6 +5,8 @@
 <head>
 	<meta charset="utf-8">
 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>Video: {{ title }} (DocDrop)</title>
     <link rel="canonical" href="{{ canonical_url }}">
 
@@ -21,7 +23,7 @@
     <style>
         body {
             font-family: sans-serif;
-            padding-bottom: 1vh;
+            padding-bottom: .5vh;
         }
 
         header {
@@ -118,7 +120,6 @@
 
         .main-content {
             width: 94%;
-            margin: 0 auto;
             display: flex;
             flex: 1;
             flex-direction: row;
@@ -254,6 +255,8 @@
         }
 
         @media (max-width: 960px) {
+            body {
+            }
             .main-content {
                 width: 100%;
                 flex-direction: column-reverse;
@@ -265,18 +268,43 @@
                 padding: 5px;
             }
             .left-col {
-                width: 93%;
-                max-width: 93%;
-                min-width: 93%;
+                width: 94%;
+                max-width: 94%;
+                min-width: 94%;
+                padding: 5px;
             }
             .sub-box {
                 border: none;
                 padding: 5px;
+                padding-left: 0px;
+                padding-right: 0px;
+                max-height: 32vh;
             }
         }
 
-        @media (max-width: 635px) {
-        }
+        @media only screen and (min-width:530px) and (max-width:960px){
+            .sub-box {
+                max-height: 24vh;
+            }
+        }   
+
+        @media only screen and (min-width:620px) and (max-width:960px){
+            .sub-box {
+                max-height: 22vh;
+            }
+        }   
+
+        @media only screen and (min-width:768px) and (max-width:960px){
+            .sub-box {
+                max-height: 20vh;
+            }
+        }   
+
+        @media only screen and (min-width:840px) and (max-width:960px){
+            .sub-box {
+                max-height: 18vh;
+            }
+        }   
 
     </style>
 
