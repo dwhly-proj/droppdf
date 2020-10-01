@@ -5,7 +5,7 @@
 <head>
 	<meta charset="utf-8">
 
-	<title>DocDrop PDF Fingerprinter</title>
+	<title>DocDrop | PDF Fingerprinter</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
@@ -47,12 +47,19 @@
         }
 
         a {
-            color: #42812D;
+            color: #000;
             text-decoration: none;
         }
 
         a:hover {
             cursor: pointer;
+        }
+
+        th, td {
+            text-align: left;
+            padding: .3em;
+            padding-left: 1em;
+            padding-right: 1em;
         }
 
         .small {
@@ -100,13 +107,7 @@
         .main-content {
             width: 94%;
             margin: 0 auto;
-            display: flex;
-            flex: 1;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: flex-start;
         }
-
 
     </style>
 
@@ -121,15 +122,17 @@
 
     <div class="main-content">
         <div>
-            You submitted: "{{ file_info.filename }}" {{ file_info.size }} bytes with fingerprint {{ file_info.id }} for refingerprinting.
+            You submitted: "{{ file_info.filename }}" {{ file_info.size }} bytes with fingerprint <code>{{ file_info.id }}</code> for refingerprinting.
         </div>
+
+        <br>
 
         <table>
             <thead>
                 <tr>
                     <th>Filename</th>
                     <th>Download</th>
-                    <th>Annotation</th>
+                    <th>Docdrop Link</th>
                     <th>Fingerprint</th>
                 </tr>
             </thead>
@@ -137,21 +140,53 @@
                 {% for copy in processed_files %}
                 <tr>
                     <td>{{ copy.filename }}</td>
-                    <td>{{ copy.download_link }} </td>
-                    <td><a href="/pdf/{{ copy.docdrop_link }}/">
-                            view on docdrop
+                    <td>
+                        <a href="javascript:void(0)" 
+                        onclick="downloadFile('{{ copy.download_path }}')">
+                            <i class="fa fa-download"></i>
                         </a>
                     </td>
-                    <td>{{ copy.id }}</td>
+                    <td><a href="/pdf/{{ copy.docdrop_link }}/" target="_blank">
+                            <i class="fa fa-file-pdf-o"></i>
+                        </a>
+                    </td>
+                    <td><code>{{ copy.id }}</code></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        <br>
+
+        <a href="javascript:void(0)" 
+        onclick="downloadZip('{{ file_info.directory_name }}')">
+        </a>
+
+        <div class="button" style="width: 10em"
+        onclick="downloadZip('{{ file_info.directory_name }}')">
+            <i class="fa fa-file-archive-o"></i>
+            Download Zipfile
+        </div>
 
     </div>
 
     <script>
-        CSRF_TOKEN = '{{ csrf_token }}';
+        function downloadFile(path) {
+            var p = path.split('/');
+            var directory_name = p[0]; 
+            var filename = p[1]; 
+            var url = '/fingerprinter/download/'; 
+            url += directory_name + '/'
+            url += filename + '/'
+
+            window.open(url)
+        };
+
+        function downloadZip(directory_name) {
+            var url = '/fingerprinter/compressed/'; 
+            url += directory_name;
+
+            window.open(url)
+        }
     </script>
 
 </body>
