@@ -7,6 +7,8 @@ import io
 import shutil
 import zipfile
 
+from unidecode import unidecode
+
 from pdfrw import PdfReader, PdfWriter
 
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -113,8 +115,18 @@ def save_file(file, path='', extension='pdf'):
         os.makedirs(temp)
 
     filename = file._get_name()
+
+    #handle non ascii chars in file name
+    if isinstance(filename, unicode):
+        try:
+            filename = unidecode(filename)
+        except:
+            filename = re.sub(r'[^\x00-\x7F]+','.', filename)
+
+
     filename = filename.replace("'", '').replace('"', '')
     filename = re.sub(r"[\(,\),\s]+", "-", filename)
+
 
     filename_noextension = '.'.join(filename.split('.')[:-1])
     rand_key = randomword(5)
@@ -367,7 +379,16 @@ def fingerprinter_upload(request):
         os.makedirs(fingerprint_dir)
 
         s = os.path.splitext(pdf_file.name)
-        filename = s[0] 
+        filename = s[0]
+
+        #handle non ascii chars in file name
+        #(strangly only wsgi seems to choke on those)
+        if isinstance(filename, unicode):
+            try:
+                filename = unidecode(filename)
+            except:
+                filename = re.sub(r'[^\x00-\x7F]+','.', filename)
+
         extension = s[1] 
 
         file_content = pdf_file.read()
