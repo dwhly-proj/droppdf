@@ -250,6 +250,56 @@
             body {
                 height: 97vh;
                 max-height: 97vh;
+                min-height: 640px;
+                display: flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                justify-content: flex-start;
+            }
+            .main-content {
+                width: 100vw;
+                max-width: 100%;
+                min-height: 640px;
+                flex-wrap: nowrap;
+                flex: 1;
+                flex-direction: column-reverse;
+            }
+            .player-box {
+                width: 93%;
+                max-width: 93%;
+                min-width: 93%;
+                padding: 5px;
+            }
+            .left-col {
+                padding: 5px;
+            }
+            .sub-box {
+                flex: 1;
+                flex-basis: 0;
+                width: 94%;
+                max-width: 94%;
+                min-width: 94%;
+                border: none;
+                padding: 5px;
+                padding-left: 0px;
+                padding-right: 3px;
+            }
+            .control-box {
+                position: relative;
+                width: 93%;
+                min-width: 93%;
+                max-width: 93%;
+            }
+        }
+
+        @media only screen 
+        and (device-width : 414px) 
+        and (device-height : 896px) 
+        and (-webkit-device-pixel-ratio : 3)
+        and (orientation : portrait) {
+            body {
+                height: 97vh;
+                max-height: 97vh;
                 display: flex;
                 flex-direction: column;
                 flex-wrap: nowrap;
