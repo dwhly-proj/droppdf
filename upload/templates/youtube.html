@@ -179,6 +179,11 @@
             padding-bottom: .5em;
         }
 
+        .sub-text {
+            flex: 1;
+            flex-basis: 0;
+        }
+
         .sub-label {
             display: flex;
             flex-direction: row;
@@ -247,7 +252,7 @@
             height: 100%;
         }
 
-        @media (max-width: 960px) {
+        @media (max-width: 992px) {
             body {
                 height: 97vh;
                 max-height: 97vh;
@@ -271,24 +276,25 @@
             }
             .left-col {
                 padding: 5px;
+                width: 94%;
+                max-width: 94%;
+                min-width: 94%;
+                overflow-x: hidden;
             }
             .sub-box {
                 flex: 1;
                 flex-basis: 0;
-                width: 94%;
-                max-width: 94%;
-                min-width: 94%;
                 min-height: 200px;
                 border: none;
                 padding: 5px;
                 padding-left: 0px;
                 padding-right: 3px;
+                overflow-x: hidden;
             }
             .control-box {
                 position: relative;
-                width: 93%;
-                min-width: 93%;
-                max-width: 93%;
+                min-width: 100%;
+                max-width: 100%;
             }
         }
 
