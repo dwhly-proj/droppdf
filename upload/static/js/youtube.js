@@ -162,6 +162,7 @@ $(document).ready(function(){
         var substart_text = $('#substart-text');
         var subend_text = $('#subend-text');
         var hit_count = 0;
+        var match_text = 'matches';
 
         $('.sub').show();
 
@@ -170,7 +171,8 @@ $(document).ready(function(){
             $(v).remove();
         });
 
-        if (clear || t.length < 1 || t == ' ') {
+        //no search, clear results
+        if (clear || t.length < 1 || t.replace(/\s\s+/g, ' ') == ' ') {
             $(substart_text).text('Beginning of transcript');
             $(subend_text).text('End of transcript');
             $('#search-input').val('');
@@ -228,8 +230,12 @@ $(document).ready(function(){
             }
         });
 
-        $(substart_text).text('Beginning of search for ' + t + ' (' + hit_count + ' matches)');
-        $(subend_text).text('End of search for ' + t + ' (' + hit_count + ' matches)');
+        if (hit_count == 1) {
+            match_text = 'match';
+        };
+
+        $(substart_text).text('Beginning of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
+        $(subend_text).text('End of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
     };
 
     //pause video when current sub mousedown (for H highlight to prevent scroll leaving sub).
