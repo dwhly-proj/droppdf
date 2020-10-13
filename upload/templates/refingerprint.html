@@ -120,40 +120,10 @@
             justify-content: flex-start;
         }
 
-        .left-column {
-            width: 50%;
-            display: flex;
-            flex: 1;
-            flex-direction: column;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-        }
-
-        .right-column {
-            width: 50%;
-            display: flex;
-            flex: 1;
-            flex-direction: column;
-            flex-wrap: wrap;
-            justify-content: flex-start;
+        .main-content form {
+            width: 100%;
         }
         
-        .result-box {
-            margin: .5em;
-            width: 100%;
-            min-width: 100%;
-            box-sizing: border-box;
-        }
-
-        .result-copies {
-            box-sizing: border-box;
-            display: flex;
-            flex: 1;
-            flex-direction: column;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-        }
-
         .option-box {
             display: flex;
             flex: 1;
@@ -166,9 +136,8 @@
 
         #drag-box {
             width: 100%;
-            height: 30vw;
+            height: 100%;
             min-width: 300px;
-            max-width: 600px;
             min-height: 300px;
             max-height: 600px;
             position: absolute;
@@ -232,92 +201,82 @@
             To create one or more uniquely-fingerprinted copies of your PDF, start by choosing the number of copies you need, enter an optional suffix for the file group (if desired), then upload your PDF.
         </div>
 
-        <div class="left-column">
-            <form id="param-form" action="/fingerprinter/upload/" method="POST" enctype="multipart/form-data">
+        <form id="param-form" action="/fingerprinter/upload/" method="POST" enctype="multipart/form-data">
 
-                <div class="option-box">
-                    <div>
-                        <span>Copies</span>
-                        <select id="copy-count" name="copy-count">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10</option>
-                            <option value="11">11</option>
-                            <option value="12">12</option>
-                            <option value="13">13</option>
-                            <option value="14">14</option>
-                            <option value="15">15</option>
-                            <option value="16">16</option>
-                            <option value="17">17</option>
-                            <option value="18">18</option>
-                            <option value="19">19</option>
-                            <option value="20">20</option>
-                            <option value="21">21</option>
-                            <option value="22">22</option>
-                            <option value="23">23</option>
-                            <option value="24">24</option>
-                            <option value="25">25</option>
-                            <option value="26">26</option>
-                            <option value="27">27</option>
-                            <option value="28">28</option>
-                            <option value="29">29</option>
-                            <option value="30">30</option>
-                        </select>
-                    </div>
-                    <div style="width: 2em"></div>
-                    <div>
-                        <input id="file-suffix" name="file-suffix" placeholder="File Suffix (optional)">
-                    </div>
-                </div>
-
-                <div style="position: relative">
-                    <div id="drag-box">
-                        <h3>Drag PDF Here</h3>
-                        <div class="small">
-                            (or click to select file)
-                        </div>
-                        <h4 id="filename"></h4>
-
-                        <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none;">
-                            <i class="fa fa-wrench fa-spin"></i>
-                        </div>
-                    </div>
-
-                    <input type="file" id="pdf-file" name="pdf-file" onchange="updateFileName()">
-
-                </div>
-
-                <div style="height: 1em;"></div>
-
+            <div class="option-box">
                 <div>
-                    <!--<div id="upload-button" class="button" style="width: 8em" onclick="$('#param-form').submit()">-->
-                    <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
-                        <i class="fa fa-upload"></i>
-                        Refingerprint
-                    </div>
+                    <span>Copies</span>
+                    <select id="copy-count" name="copy-count">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                        <option value="13">13</option>
+                        <option value="14">14</option>
+                        <option value="15">15</option>
+                        <option value="16">16</option>
+                        <option value="17">17</option>
+                        <option value="18">18</option>
+                        <option value="19">19</option>
+                        <option value="20">20</option>
+                        <option value="21">21</option>
+                        <option value="22">22</option>
+                        <option value="23">23</option>
+                        <option value="24">24</option>
+                        <option value="25">25</option>
+                        <option value="26">26</option>
+                        <option value="27">27</option>
+                        <option value="28">28</option>
+                        <option value="29">29</option>
+                        <option value="30">30</option>
+                    </select>
+                </div>
+                <div style="width: 2em"></div>
+                <div>
+                    <input id="file-suffix" name="file-suffix" placeholder="File Suffix (optional)">
+                </div>
+            </div>
 
-                    <div id="upload-error" class="small error" style="display: none;">
+            <div style="position: relative">
+                <div id="drag-box">
+                    <h3>Drag PDF Here</h3>
+                    <div class="small">
+                        (or click to select file)
                     </div>
+                    <h4 id="filename"></h4>
 
+                    <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none;">
+                        <i class="fa fa-wrench fa-spin"></i>
+                    </div>
                 </div>
 
-            </form>
+                <input type="file" id="pdf-file" name="pdf-file" onchange="updateFileName()">
 
-        </div>
-
-        <div class="right-column">
-            <div class="result-box">
-                <div class="option-box"></div>
-                <div id="result-copies"></div>
             </div>
-        </div>
+
+            <div style="height: 1em;"></div>
+
+            <div>
+                <!--<div id="upload-button" class="button" style="width: 8em" onclick="$('#param-form').submit()">-->
+                <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
+                    <i class="fa fa-upload"></i>
+                    Refingerprint
+                </div>
+
+                <div id="upload-error" class="small error" style="display: none;">
+                </div>
+
+            </div>
+
+        </form>
 
     </div>
 
