@@ -111,7 +111,7 @@ $(document).ready(function(){
 
     window.scrollSubs = function(d) {
         if (d == 'down') {
-            $('.sub-box').scrollTop(100000);
+            $('.sub-box').scrollTop(1000000);
         } else {
             $('.sub-box').scrollTop(0);
         };

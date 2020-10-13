@@ -250,7 +250,7 @@ def youtube_video(request, video_id):
             condensed_entry['duration'] += duration
             condensed_entry['text'] += ' ' + text 
 
-        if condensed_entry.get('duration', 0) > 23:
+        if condensed_entry.get('duration', 0) >= 23:
             condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
                     time.gmtime(condensed_entry.get('start', 0))) 
 
@@ -260,6 +260,16 @@ def youtube_video(request, video_id):
             condensed_transcript.append(condensed_entry)
             subseconds = 0
             condensed_entry = None
+
+        #last entry
+        elif entry == transcript[-1]:
+            condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
+                    time.gmtime(condensed_entry.get('start', 0))) 
+
+            s = condensed_entry.get('start', 0)
+            start_times.append(s)
+
+            condensed_transcript.append(condensed_entry)
 
 
     source = 'https://www.youtube.com/embed/'
