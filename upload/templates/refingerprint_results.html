@@ -178,7 +178,7 @@
             url += directory_name + '/'
             url += filename + '/'
 
-            window.open(url)
+            window.open(url, "_blank")
         };
 
         function downloadZip(directory_name, archive_name) {
@@ -186,7 +186,7 @@
             url += directory_name;
             url += '/?archive_name=' + encodeURI(archive_name);
 
-            window.open(url)
+            window.open(url, "_blank")
         };
     </script>
 

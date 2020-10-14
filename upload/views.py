@@ -449,8 +449,8 @@ def fingerprinter_upload(request):
             PdfWriter(file_path, trailer=content).write()
 
             #copy file into online annotator with unique name
-            annotation_name = rand_path + '-' + filename + '-' + suffix + '-' \
-                    + str(copy_index + 1) + extension
+            annotation_name = filename + '-' + suffix + '-' \
+                    + str(copy_index + 1) + '-' + rand_path + extension
 
             annotation_path = os.path.join(settings.BASE_DIR, settings.STATIC_ROOT, 
                     'drop-pdf', annotation_name)
@@ -512,7 +512,7 @@ def fingerprinter_compressed(request, directory_name):
            file_data = f.read()
 
         response = HttpResponse(file_data, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="%s"' % archive_name + '.zip'
+        response['Content-Disposition'] = 'attachment; filename="%s.zip"' % archive_name
         os.remove(tmp_zip)
 
     except IOError:

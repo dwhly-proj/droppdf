@@ -277,7 +277,6 @@ $(document).ready(function(){
                 if (! $(el).hasClass('highlight')) {
                     $(el).addClass('highlight');
                 }
-
                 return;
             };
 
