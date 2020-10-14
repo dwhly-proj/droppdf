@@ -250,7 +250,7 @@ def youtube_video(request, video_id):
             condensed_entry['duration'] += duration
             condensed_entry['text'] += ' ' + text 
 
-        if condensed_entry.get('duration', 0) > 23:
+        if condensed_entry.get('duration', 0) >= 23:
             condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
                     time.gmtime(condensed_entry.get('start', 0))) 
 
@@ -260,6 +260,16 @@ def youtube_video(request, video_id):
             condensed_transcript.append(condensed_entry)
             subseconds = 0
             condensed_entry = None
+
+        #last entry
+        elif entry == transcript[-1]:
+            condensed_entry['start_display'] = time.strftime('%H:%M:%S', 
+                    time.gmtime(condensed_entry.get('start', 0))) 
+
+            s = condensed_entry.get('start', 0)
+            start_times.append(s)
+
+            condensed_transcript.append(condensed_entry)
 
 
     source = 'https://www.youtube.com/embed/'
@@ -389,6 +399,8 @@ def fingerprinter_upload(request):
             except:
                 filename = re.sub(r'[^\x00-\x7F]+','.', filename)
 
+        print(filename);
+
         extension = s[1] 
 
         file_content = pdf_file.read()
@@ -437,8 +449,8 @@ def fingerprinter_upload(request):
             PdfWriter(file_path, trailer=content).write()
 
             #copy file into online annotator with unique name
-            annotation_name = rand_path + '-' + filename + '-' + suffix + '-' \
-                    + str(copy_index + 1) + extension
+            annotation_name = filename + '-' + suffix + '-' \
+                    + str(copy_index + 1) + '-' + rand_path + extension
 
             annotation_path = os.path.join(settings.BASE_DIR, settings.STATIC_ROOT, 
                     'drop-pdf', annotation_name)
@@ -449,7 +461,7 @@ def fingerprinter_upload(request):
             #We need to clean up double "settings" file and sanify the basic setup but
             #For now serve the file from a dedicated URL.
 
-            copy_info = {'filename': save_filename, 
+            copy_info = {'filename': save_filename,
                     'download_path': os.path.join(rand_path, save_filename),
                     'docdrop_link': annotation_name, 'id': content.ID[0]}
 
@@ -459,7 +471,8 @@ def fingerprinter_upload(request):
         raise Http404('file not provided')
             
 
-    data = {'processed_files': processed_files, 'file_info': file_info}
+    data = {'processed_files': processed_files, 'file_info': file_info,
+            'archive_name': filename}
 
     return render_to_response('refingerprint_results.html', data)
 
@@ -486,6 +499,8 @@ def fingerprinter_compressed(request, directory_name):
     directory_path = os.path.join(settings.BASE_DIR, 'static/fingerprints',
             directory_name)
 
+    archive_name = request.GET["archive_name"]
+
     tmp_name = '/tmp/%s' % directory_name
     tmp_zip = tmp_name + '.zip'
 
@@ -497,7 +512,7 @@ def fingerprinter_compressed(request, directory_name):
            file_data = f.read()
 
         response = HttpResponse(file_data, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="%s"' % directory_name + '.zip'
+        response['Content-Disposition'] = 'attachment; filename="%s.zip"' % archive_name
         os.remove(tmp_zip)
 
     except IOError:

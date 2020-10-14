@@ -111,7 +111,7 @@ $(document).ready(function(){
 
     window.scrollSubs = function(d) {
         if (d == 'down') {
-            $('.sub-box').scrollTop(100000);
+            $('.sub-box').scrollTop(1000000);
         } else {
             $('.sub-box').scrollTop(0);
         };
@@ -161,6 +161,8 @@ $(document).ready(function(){
     window.searchSubs = function(t, clear) {
         var substart_text = $('#substart-text');
         var subend_text = $('#subend-text');
+        var hit_count = 0;
+        var match_text = 'matches';
 
         $('.sub').show();
 
@@ -169,16 +171,24 @@ $(document).ready(function(){
             $(v).remove();
         });
 
-        if (t.length < 3) {
+        //no search, clear results
+        if (clear || t.length < 1 || t.replace(/\s\s+/g, ' ') == ' ') {
             $(substart_text).text('Beginning of transcript');
             $(subend_text).text('End of transcript');
-
-            if (clear) {
-                $('#search-input').val('');
-            };
-
+            $('#search-input').val('');
             return;
         };
+
+        //if (t.length < 3) {
+            //$(substart_text).text('Beginning of transcript');
+            //$(subend_text).text('End of transcript');
+
+            //if (clear) {
+                //$('#search-input').val('');
+            //};
+
+            //return;
+        //};
 
         $(subtitle_elements).each(function(i,sub) {
             var new_content = '';
@@ -198,6 +208,7 @@ $(document).ready(function(){
             }
             else {
                 while ((match = r.exec(text)) !== null) {
+                    hit_count += 1;
                     match_start = match.index;
                     match_stop = r.lastIndex;
 
@@ -219,8 +230,12 @@ $(document).ready(function(){
             }
         });
 
-        $(substart_text).text('Beginning of search for ' + t);
-        $(subend_text).text('End of search for ' + t);
+        if (hit_count == 1) {
+            match_text = 'match';
+        };
+
+        $(substart_text).text('Beginning of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
+        $(subend_text).text('End of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
     };
 
     //pause video when current sub mousedown (for H highlight to prevent scroll leaving sub).
@@ -262,7 +277,6 @@ $(document).ready(function(){
                 if (! $(el).hasClass('highlight')) {
                     $(el).addClass('highlight');
                 }
-
                 return;
             };
 
