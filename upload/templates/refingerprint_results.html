@@ -162,7 +162,7 @@
         </a>
 
         <div class="button" style="width: 10em"
-        onclick="downloadZip('{{ file_info.directory_name }}')">
+        onclick="downloadZip('{{ file_info.directory_name }}', '{{ archive_name }}')">
             <i class="fa fa-file-archive-o"></i>
             Download Zipfile
         </div>
@@ -181,12 +181,13 @@
             window.open(url)
         };
 
-        function downloadZip(directory_name) {
-            var url = '/fingerprinter/compressed/'; 
+        function downloadZip(directory_name, archive_name) {
+            var url = '/fingerprinter/compressed/';
             url += directory_name;
+            url += '/?archive_name=' + encodeURI(archive_name);
 
             window.open(url)
-        }
+        };
     </script>
 
 </body>
