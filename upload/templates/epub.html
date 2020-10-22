@@ -8,6 +8,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ filename }}</title>
 
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'UA-181082912-1');
+  </script>
+
   <script src="{% static 'epubjs/epub.min.js' %}"></script>
   <script src="{% static 'epubjs/jszip.min.js' %}"></script>
 

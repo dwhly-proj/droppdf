@@ -9,6 +9,17 @@
 
     <title>Video: {{ title }} (DocDrop)</title>
 
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-181082912-1');
+    </script>
+
+
     <link rel="canonical" href="{{ canonical_url }}">
 
     <link rel="canonical" href="http://docdrop.org/video/{{ video_id }}/">
