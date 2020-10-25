@@ -143,8 +143,6 @@ $(document).ready(function(){
     };
 
     window.syncScroll = function() {
-        console.log('syncing');
-
         var t = player.getCurrentTime();
 
         if (t) {
@@ -178,17 +176,6 @@ $(document).ready(function(){
             $('#search-input').val('');
             return;
         };
-
-        //if (t.length < 3) {
-            //$(substart_text).text('Beginning of transcript');
-            //$(subend_text).text('End of transcript');
-
-            //if (clear) {
-                //$('#search-input').val('');
-            //};
-
-            //return;
-        //};
 
         $(subtitle_elements).each(function(i,sub) {
             var new_content = '';
@@ -234,8 +221,8 @@ $(document).ready(function(){
             match_text = 'match';
         };
 
-        $(substart_text).text('Beginning of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
-        $(subend_text).text('End of search for ' + t + ' (' + hit_count + ' ' + match_text + ')');
+        $(substart_text).text('Beginning of search for "' + t + '" (' + hit_count + ' ' + match_text + ')');
+        $(subend_text).text('End of search for "' + t + '" (' + hit_count + ' ' + match_text + ')');
     };
 
     //pause video when current sub mousedown (for H highlight to prevent scroll leaving sub).
@@ -250,7 +237,6 @@ $(document).ready(function(){
             pauseVideo();
         }
     });
-
 
     setInterval(function() {
         if (! keep_sync) {
@@ -295,5 +281,40 @@ $(document).ready(function(){
         };
 
     }, 1000);
+
+
+    /* if from a hypothesis share link, advance video time to time of first H highlight */ 
+
+    if (window.location.href.indexOf('via.hypothesis.is') != -1) {
+        var h_highlights = $('.sub-box').find('.hypothesis-highlight');
+        var first_h_highlight, timestamp_el, timstamp_text, spl; 
+        var first_h_hl_time = 0;
+
+        if (h_highlights.length > 1) {
+            first_h_highlight = h_highlights[0];
+
+            timestamp_el = $(first_h_highlight)
+                            .parent()
+                            .parent()
+                            .find('.sub-time')
+
+            if (timestamp_el) {
+                timestamp_text = timestamp_el[0].text();
+
+                if (timestamp_text.length) {
+                    spl = timestamp_text.split(':');
+
+                    first_h_hl_time += +spl[0] * 60 * 60
+                    first_h_hl_time += +spl[1] * 60
+                    first_h_hl_time += +spl[2]
+
+                    updatePlayerTime(first_h_hl_time);
+
+                    syncScroll();
+                };
+            }
+
+        };
+    }
 
 });

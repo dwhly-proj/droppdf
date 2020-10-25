@@ -81,3 +81,4 @@ pdf_annotator/configs.py
 
 #uploaded refingerprinted files
 static/fingerprints/*
+upload/static/fingerprints/
