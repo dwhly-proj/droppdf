@@ -284,8 +284,12 @@ $(document).ready(function(){
 
 
     /* if from a hypothesis share link, advance video time to time of first H highlight */ 
+    
+    //hypothesis share apparently overwrites location href in code? 
+    if (eval('window.location.href').indexOf('via.hypothes.is') != -1) {
 
-    if (window.location.href.indexOf('via.hypothesis.is') != -1) {
+        console.log('from share');
+
         var h_highlights = $('.sub-box').find('.hypothesis-highlight');
         var first_h_highlight, timestamp_el, timstamp_text, spl; 
         var first_h_hl_time = 0;
