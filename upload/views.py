@@ -203,18 +203,18 @@ def save_file(file, path='', extension='pdf'):
         return filename_w_key
 
 
-def ocr(request):
-    temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"
-    filename = request.GET["filename"]
+#def ocr(request):
+    #temp = settings.BASE_DIR + settings.STATIC_URL + "drop-pdf"
+    #filename = request.GET["filename"]
     
-    start = int(round(time.time() * 1000))
-    os.system("pypdfocr " + temp + "/" + str(filename))
-    end = int(round(time.time() * 1000))
-    print "%.2gs" % (end-start)
+    #start = int(round(time.time() * 1000))
+    #os.system("pypdfocr " + temp + "/" + str(filename))
+    #end = int(round(time.time() * 1000))
+    #print "%.2gs" % (end-start)
 
-    new_filename = filename.split(".pdf")[0] + "_ocr" + ".pdf"
+    #new_filename = filename.split(".pdf")[0] + "_ocr" + ".pdf"
 
-    return HttpResponse(new_filename)
+    #return HttpResponse(new_filename)
 
 
 def youtube_video(request, video_id):
