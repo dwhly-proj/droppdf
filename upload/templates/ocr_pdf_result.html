@@ -1,0 +1,190 @@
+{% load staticfiles %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop | PDF Fingerprinter</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
+
+	<script src="{% static 'js/ocr_pdf.js' %}"></script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        header {
+            position: absolue;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #000;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        th, td {
+            text-align: left;
+            padding: .3em;
+            padding-left: 1em;
+            padding-right: 1em;
+        }
+
+        .small {
+            font-size: .8em;
+        }
+
+        .error {
+            padding-top: 1em;
+            color: red;
+        }
+
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .25em;
+            user-select: none;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
+        .button i {
+            margin-left: .25em;
+            margin-right: .25em;
+        }
+
+        .button.disabled {
+            opacity: .3;
+        }
+
+        .button.disabled:hover {
+            cursor: not-allowed !important;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div>
+            You submitted: "{{ file_info.filename }}", {{ file_info.size }} bytes for OCR.
+        </div>
+
+        <br>
+
+        <table style="display: none">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Download</th>
+                    <th>Docdrop Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span id="filename"></span></td>
+                    <td>
+                        <a id="file-download-link" href="javascript:void(0)">
+                            <i class="fa fa-download"></i>
+                        </a>
+                    </td>
+                    <td>
+                        <a id="file-docdrop-link" href="#" target="_blank">
+                            <i class="fa fa-file-pdf-o"></i>
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div id="in-progress">
+            <div style="font-size: 2em">
+                <i class="fa fa-spinner fa-spin"></i>
+            </div>
+            <p>
+                OCR in progress. This may take a moment depending on file size. A download link will appear when processing is complete.
+            </p>
+        </div>
+
+        <br>
+
+    </div>
+
+    <script>
+        function downloadFile(path) {
+            var p = path.split('/');
+            var directory_name = p[0]; 
+            var filename = p[1]; 
+            var url = '/fingerprinter/download/'; 
+            url += directory_name + '/'
+            url += filename + '/'
+
+            window.open(url, "_blank")
+        };
+
+        function downloadZip(directory_name, archive_name) {
+            var url = '/fingerprinter/compressed/';
+            url += directory_name;
+            url += '/?archive_name=' + encodeURI(archive_name);
+
+            window.open(url, "_blank")
+        };
+    </script>
+
+</body>
+</html>

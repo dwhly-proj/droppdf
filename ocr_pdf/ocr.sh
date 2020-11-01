@@ -6,4 +6,7 @@ filename=$1
 
 outfile="${filename/'.pdf'/'_ocr.pdf'}"
 
-ocrmypdf $1 $outfile
+#if ocr fails because it has text, just copy the file with new name 
+if ocrmypdf $1 $outfile | grep -q 'page already has text'; then
+    cp $filename $outfile
+fi
