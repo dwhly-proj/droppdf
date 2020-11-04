@@ -1,6 +1,7 @@
 # encoding=utf8
 import time
 import os
+import subprocess
 import hashlib
 import binascii
 import io
@@ -246,7 +247,7 @@ def ocr_pdf_result(request):
     filename = filename.replace("'", '').replace('"', '')
     filename = re.sub(r"[\(,\),\s]+", "-", filename)
 
-    extension = '.'.join(filename.split('.')[-1])
+    extension = filename.split('.')[-1]
 
     if extension != 'pdf':
         processing_error = 'Not a pdf'
@@ -261,31 +262,51 @@ def ocr_pdf_result(request):
     save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
             'drop-pdf', filename)
 
+    #ocr_name = filename.replace('.pdf', '_ocr.pdf')
+    ocr_name = filename_noextension + '-' + rand_key + '_ocr.pdf'
+
     #save file
-    if processing_error is not None:
+    if processing_error is None:
+        print('XX', save_path, processing_error)
+
         fd = open(save_path, 'wb')
-        for chunk in file.chunks():
+        for chunk in pdf_file.chunks():
             fd.write(chunk)
         fd.close()
 
-
     #TODO this can be discarded when system is upgraded and there is a native ocrmypdf command
+    print('YY', settings.BASE_DIR)
     # also when there aren't two settings.py files and BASE_DIR is consistant in deploy 
     if 'ocr_pdf' in os.listdir(settings.BASE_DIR):
         cmd_path = os.path.join(settings.BASE_DIR, 'ocr_pdf', 'ocr.sh')
 
     elif 'ocr_pdf' in os.listdir(os.path.dirname(settings.BASE_DIR)):
-        cmd_path = os.path.join('..', settings.BASE_DIR, 'ocr_pdf', 'ocr.sh')
+        cmd_path = os.path.join(os.path.dirname(settings.BASE_DIR), 'ocr_pdf', 'ocr.sh')
 
     else:
-        processing_error = 'cannot find save directory'
+        processing_error = 'cannot find parser directory'
 
-    data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size}}
+    if not processing_error:
+        cmd = [cmd_path, save_path]
 
+        p = subprocess.Popen(cmd)
 
-    print(pdf_file)
-    print(pdf_file.name)
-    print(pdf_file.size)
+        #run ocr
+        #cmd =  '%s %s' % (cmd_path, save_path)
+        #print(cmd)
+        #t = subprocess.check_output(cmd_path, shell=True)
+        #t = subprocess.check_output(cmd_path, stdout=subprocess.PIPE)
+        #print(t)
+
+        #os.system(cmd)
+
+    data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
+        'ocr_name': ocr_name}}
+
+    #print(pdf_file)
+    #print(pdf_file.name)
+    #print(pdf_file.size)
+    #print(ocr_name)
 
     return render_to_response('ocr_pdf_result.html', data)
 
