@@ -1,6 +1,7 @@
 # encoding=utf8
 import time
 import os
+import subprocess
 import hashlib
 import binascii
 import io
@@ -217,6 +218,96 @@ def ocr(request):
     return HttpResponse(new_filename)
 
 
+@ensure_csrf_cookie
+def ocr_pdf(request):
+    return render_to_response('ocr_pdf.html')
+
+
+#def ocr_pdf_submit(request):
+    #pdf_file = request.FILES.get('pdf-file')
+
+    #print(pdf_file)
+
+    #return render_to_response('ocr_pdf_result.html')
+
+@csrf_exempt
+def ocr_pdf_result(request):
+    pdf_file = request.FILES.get('pdf-file')
+
+    processing_error = None
+
+    filename = pdf_file.name
+
+    if isinstance(filename, unicode):
+        try:
+            filename = unidecode(filename)
+        except:
+            filename = re.sub(r'[^\x00-\x7F]+','.', filename)
+
+    filename = filename.replace("'", '').replace('"', '')
+    filename = re.sub(r"[\(,\),\s]+", "-", filename)
+
+    extension = filename.split('.')[-1]
+
+    if extension != 'pdf':
+        processing_error = 'Not a pdf'
+        #return HttpResponse(status=422)
+
+    filename_noextension = '.'.join(filename.split('.')[:-1])
+
+    rand_key = randomword(5)
+
+    filename = filename_noextension + "-" + rand_key + '.' + extension
+
+    save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
+            'drop-pdf', filename)
+
+    ocr_file_name = filename_noextension + '-' + rand_key + '_ocr.pdf'
+
+    #save file
+    if processing_error is None:
+        fd = open(save_path, 'wb')
+        for chunk in pdf_file.chunks():
+            fd.write(chunk)
+        fd.close()
+
+    #TODO this can be discarded when system is upgraded and there is a native ocrmypdf command
+    # also when there aren't two settings.py files and BASE_DIR is consistant in deploy 
+    if 'ocr_pdf' in os.listdir(settings.BASE_DIR):
+        cmd_path = os.path.join(settings.BASE_DIR, 'ocr_pdf', 'ocr.sh')
+
+    elif 'ocr_pdf' in os.listdir(os.path.dirname(settings.BASE_DIR)):
+        cmd_path = os.path.join(os.path.dirname(settings.BASE_DIR), 'ocr_pdf', 'ocr.sh')
+
+    else:
+        processing_error = 'cannot find parser directory'
+
+    if not processing_error:
+        cmd = [cmd_path, save_path]
+        p = subprocess.Popen(cmd)
+
+    #download_link = os.path.join('/static/drop-pdf', save_filename)
+
+    data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
+        'ocr_file_name': ocr_file_name}}
+
+    return render_to_response('ocr_pdf_result.html', data)
+
+
+@csrf_exempt
+def ocr_pdf_complete(request):
+    #check if output file exists yet
+    filename = request.POST.get('filename')
+
+    save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
+            'drop-pdf', filename)
+
+    if os.path.exists(save_path):
+        return JsonResponse({'document_exists': True})
+    else:
+        raise Http404('file not located yet')
+
+
 def youtube_video(request, video_id):
     condensed_transcript = []
 
@@ -224,7 +315,6 @@ def youtube_video(request, video_id):
         transcript = YouTubeTranscriptApi.get_transcript(video_id)
     except:
         return render_to_response('youtube_not_found.html', {})
-        #raise Http404('<h1>Transcript not available for video or video not located.</h1>')
 
     subseconds = 0
     condensed_entry = None
@@ -399,8 +489,6 @@ def fingerprinter_upload(request):
             except:
                 filename = re.sub(r'[^\x00-\x7F]+','.', filename)
 
-        print(filename);
-
         extension = s[1] 
 
         file_content = pdf_file.read()
@@ -475,7 +563,6 @@ def fingerprinter_upload(request):
             'archive_name': filename}
 
     return render_to_response('refingerprint_results.html', data)
-
 
 
 def fingerprinter_download(request, directory_name, filename):
