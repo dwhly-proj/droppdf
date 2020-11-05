@@ -262,20 +262,16 @@ def ocr_pdf_result(request):
     save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
             'drop-pdf', filename)
 
-    #ocr_name = filename.replace('.pdf', '_ocr.pdf')
-    ocr_name = filename_noextension + '-' + rand_key + '_ocr.pdf'
+    ocr_file_name = filename_noextension + '-' + rand_key + '_ocr.pdf'
 
     #save file
     if processing_error is None:
-        print('XX', save_path, processing_error)
-
         fd = open(save_path, 'wb')
         for chunk in pdf_file.chunks():
             fd.write(chunk)
         fd.close()
 
     #TODO this can be discarded when system is upgraded and there is a native ocrmypdf command
-    print('YY', settings.BASE_DIR)
     # also when there aren't two settings.py files and BASE_DIR is consistant in deploy 
     if 'ocr_pdf' in os.listdir(settings.BASE_DIR):
         cmd_path = os.path.join(settings.BASE_DIR, 'ocr_pdf', 'ocr.sh')
@@ -288,27 +284,28 @@ def ocr_pdf_result(request):
 
     if not processing_error:
         cmd = [cmd_path, save_path]
-
         p = subprocess.Popen(cmd)
 
-        #run ocr
-        #cmd =  '%s %s' % (cmd_path, save_path)
-        #print(cmd)
-        #t = subprocess.check_output(cmd_path, shell=True)
-        #t = subprocess.check_output(cmd_path, stdout=subprocess.PIPE)
-        #print(t)
-
-        #os.system(cmd)
+    #download_link = os.path.join('/static/drop-pdf', save_filename)
 
     data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
-        'ocr_name': ocr_name}}
-
-    #print(pdf_file)
-    #print(pdf_file.name)
-    #print(pdf_file.size)
-    #print(ocr_name)
+        'ocr_file_name': ocr_file_name}}
 
     return render_to_response('ocr_pdf_result.html', data)
+
+
+@csrf_exempt
+def ocr_pdf_complete(request):
+    #check if output file exists yet
+    filename = request.POST.get('filename')
+
+    save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
+            'drop-pdf', filename)
+
+    if os.path.exists(save_path):
+        return JsonResponse({'document_exists': True})
+    else:
+        raise Http404('file not located yet')
 
 
 def youtube_video(request, video_id):

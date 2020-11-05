@@ -25,6 +25,7 @@ urlpatterns = [
     url(r'^ocr/$', upload_views.ocr, name="ocr"),
     url(r'^ocr/pdf/$', upload_views.ocr_pdf, name="ocr_pdf"),
     url(r'^ocr/pdf/result/$', upload_views.ocr_pdf_result, name="ocr_pdf_result"),
+    url(r'^ocr_pdf_complete$', upload_views.ocr_pdf_complete, name="ocr_pdf_complete"),
     url(r'^fingerprinter/$', upload_views.fingerprinter, name="fingerprinter"),
     url(r'^fingerprinter/upload/$', upload_views.fingerprinter_upload, name="refingerprint_upload"),
     url(r'^fingerprinter/download/(?P<directory_name>.+)/(?P<filename>.+)/$',

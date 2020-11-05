@@ -122,24 +122,24 @@
 
     <div class="main-content">
         <div>
-            You submitted: "{{ file_info.filename }}", {{ file_info.size }} bytes for OCR.
+            You submitted: "{{ file_info.filename }}", {{ file_info.size }} bytes for OCR processing.
         </div>
 
         <br>
 
-        <table style="display: none">
+        <table id="download-info" style="display: none;">
             <thead>
                 <tr>
-                    <th>Filename</th>
+                    <!--<th>Filename</th>-->
                     <th>Download</th>
                     <th>Docdrop Link</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><span id="filename"></span></td>
+                    <!--<td><span id="filename"></span></td>-->
                     <td>
-                        <a id="file-download-link" href="javascript:void(0)">
+                        <a id="file-download-link" href="javascript:void(0)" target="_blank">
                             <i class="fa fa-download"></i>
                         </a>
                     </td>
@@ -157,7 +157,7 @@
                 <i class="fa fa-spinner fa-spin"></i>
             </div>
             <p>
-                OCR in progress. This may take a moment depending on file size. A download link will appear when processing is complete.
+                OCR in progress. This may take a few moments depending on file size. A download link will appear when processing is complete.
             </p>
         </div>
 
@@ -166,24 +166,7 @@
     </div>
 
     <script>
-        function downloadFile(path) {
-            var p = path.split('/');
-            var directory_name = p[0]; 
-            var filename = p[1]; 
-            var url = '/fingerprinter/download/'; 
-            url += directory_name + '/'
-            url += filename + '/'
-
-            window.open(url, "_blank")
-        };
-
-        function downloadZip(directory_name, archive_name) {
-            var url = '/fingerprinter/compressed/';
-            url += directory_name;
-            url += '/?archive_name=' + encodeURI(archive_name);
-
-            window.open(url, "_blank")
-        };
+        OCR_FILE_NAME = "{{ file_info.ocr_file_name }}";
     </script>
 
 </body>
