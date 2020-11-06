@@ -68,9 +68,11 @@ def index(request):
     scopes = SCOPES
     return render_to_response('index.html', locals())
 
+
 def pdf(request, filename, filefolder=None):
     pdf_name = filename
     return render_to_response('redirect.html', locals())
+
 
 def epub(request, filename):
     return render_to_response('epub.html', locals())
@@ -85,6 +87,7 @@ def csvAsTable(request, filename):
 
     return render_to_response('table.html', locals())
 
+
 @csrf_exempt
 def upload(request):
     filename = ""
@@ -98,6 +101,7 @@ def upload(request):
         filename = save_file(request.FILES['file'], 'drop-pdf', extension)
             
     return HttpResponse(filename)
+
 
 def drop(request):
     if 'filename' in request.GET:
@@ -251,7 +255,6 @@ def ocr_pdf_result(request):
 
     if extension != 'pdf':
         processing_error = 'Not a pdf'
-        #return HttpResponse(status=422)
 
     filename_noextension = '.'.join(filename.split('.')[:-1])
 
@@ -283,10 +286,10 @@ def ocr_pdf_result(request):
         processing_error = 'cannot find parser directory'
 
     if not processing_error:
-        cmd = [cmd_path, save_path]
-        p = subprocess.Popen(cmd)
-
-    #download_link = os.path.join('/static/drop-pdf', save_filename)
+	cmd = '%s %s' % (cmd_path, save_path)
+	p = subprocess.Popen(cmd, shell=True)
+        #cmd = [cmd_path, save_path]
+        #p = subprocess.Popen(cmd)
 
     data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
         'ocr_file_name': ocr_file_name}}
