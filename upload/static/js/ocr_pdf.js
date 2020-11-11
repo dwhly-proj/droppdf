@@ -1,7 +1,6 @@
 (function() {
 
 
-
     var check_interval = setInterval(function() {
         $.post('/ocr_pdf_complete', {filename: OCR_FILE_NAME})
         .done(function(result) {
