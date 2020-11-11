@@ -504,6 +504,13 @@ def fingerprinter_upload(request):
             file_id = str(content.ID[0]).replace('<', '').replace('>', '')\
                     .replace('(', '').replace(')', '')
 
+        #bad file_ids can contain strange characters
+        #TODO
+        try:
+            file_id.encode('utf-8').strip()
+        except UnicodeDecodeError:
+            file_id = 'Unreadable'
+
         file_info = {'filename': pdf_file.name, 'size': pdf_file.size, 'id': file_id, 'directory_name': rand_path}
 
         for copy_index in range(copy_count):
@@ -511,6 +518,8 @@ def fingerprinter_upload(request):
                 save_filename = filename + '-' + suffix + '-' + str(copy_index + 1) + extension
             else:
                 save_filename = filename + '-' + str(copy_index + 1) + extension
+
+            print('AAA', save_filename)
 
             file_path = os.path.join(fingerprint_dir, save_filename)
 
@@ -564,6 +573,8 @@ def fingerprinter_upload(request):
 
     data = {'processed_files': processed_files, 'file_info': file_info,
             'archive_name': filename}
+
+    print(data)
 
     return render_to_response('refingerprint_results.html', data)
 
