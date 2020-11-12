@@ -1,5 +1,8 @@
 (function() {
 
+    /* 4 minute max time */
+    var max = 48
+    var c = 0
 
 
     var check_interval = setInterval(function() {
@@ -16,10 +19,22 @@
             $('#file-docdrop-link').attr('href', '/pdf/' + OCR_FILE_NAME)
             $('#file-download-link').attr('href', '/static/drop-pdf/' + OCR_FILE_NAME)
 
+            return;
+
         })
         .fail(function(e) {
-            console.log(e)
-        })
+        });
+
+        c += 1
+
+        if (c > max) {
+            clearInterval(check_interval);
+            $('#in-progress').hide();
+            $('#download-info').hide();
+            $('#upload-error').show();
+
+        };
+
     }, 5000);
 
 

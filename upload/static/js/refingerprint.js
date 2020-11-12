@@ -23,8 +23,8 @@
             return 'document is not a pdf!'
         };
 
-        if (file.size > 12582912) {
-            return 'file is too large (12MB limit)'
+        if (file.size > 25165824) {
+            return 'file is too large (24MB limit)'
         };
 
         return null
