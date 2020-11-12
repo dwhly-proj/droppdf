@@ -505,7 +505,7 @@ def fingerprinter_upload(request):
                     .replace('(', '').replace(')', '')
 
         #bad file_ids can contain strange characters
-        #TODO
+        #TODO When we upgrade
         try:
             file_id.encode('utf-8').strip()
         except UnicodeDecodeError:
