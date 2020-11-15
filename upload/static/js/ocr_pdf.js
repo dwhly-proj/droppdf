@@ -1,7 +1,7 @@
 (function() {
 
-    /* 4 minute max time */
-    var max = 48
+    /* 5 minute max time */
+    var max = 60
     var c = 0
 
 
@@ -36,6 +36,18 @@
         };
 
     }, 5000);
+
+    $(document).ready(function() {
+        if (PROCESSING_ERROR != 'None') {
+            clearInterval(check_interval);
+
+            $('#in-progress').hide();
+            $('#download-info').hide();
+            $('#upload-error')
+                .text(PROCESSING_ERROR)
+                .show();
+        }
+    });
 
 
 }());

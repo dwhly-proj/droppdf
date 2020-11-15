@@ -227,16 +227,67 @@ def ocr_pdf(request):
     return render_to_response('ocr_pdf.html')
 
 
-#def ocr_pdf_submit(request):
+#@csrf_exempt
+#def ocr_upload_and_check(request):
     #pdf_file = request.FILES.get('pdf-file')
 
-    #print(pdf_file)
+    #processing_error = None
 
-    #return render_to_response('ocr_pdf_result.html')
+    #filename = pdf_file.name
+
+    #if isinstance(filename, unicode):
+        #try:
+            #filename = unidecode(filename)
+        #except:
+            #filename = re.sub(r'[^\x00-\x7F]+','.', filename)
+
+    #filename = filename.replace("'", '').replace('"', '')
+    #filename = re.sub(r"[\(,\),\s]+", "-", filename)
+
+    #extension = filename.split('.')[-1]
+
+    #if extension != 'pdf':
+        #processing_error = 'Not a pdf'
+
+    #filename_noextension = '.'.join(filename.split('.')[:-1])
+
+    #rand_key = randomword(5)
+
+    #filename = filename_noextension + "-" + rand_key + '.' + extension
+
+    #save_path = os.path.join(settings.BASE_DIR + settings.STATIC_URL,
+            #'drop-pdf', filename)
+
+    #ocr_file_name = filename_noextension + '-' + rand_key + '_ocr.pdf'
+
+    ##save file
+    #if processing_error is None:
+        #fd = open(save_path, 'wb')
+        #for chunk in pdf_file.chunks():
+            #fd.write(chunk)
+        #fd.close()
+
+    ##see if pdf has text already
+    #cmd = 'pdftotext "%s" -' % save_path
+
+    #txt = subprocess.check_output(cmd, shell=True)
+
+    #if len(txt) > 0:
+        #processing_error = 'This PDF already shows text. You may wish to try again with the "Force OCR" button.'
+        #os.remove(save_path)
+
+    #data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
+        #'ocr_file_name': ocr_file_name, 'processing_error': processing_error,
+        #'save_path': save_path, 'ocr_file_name': ocr_file_name}}
+
+    #return JsonResponse(data)
+
 
 @csrf_exempt
 def ocr_pdf_result(request):
     pdf_file = request.FILES.get('pdf-file')
+
+    force_flag = request.POST.get('force_flag')
 
     processing_error = None
 
@@ -274,6 +325,19 @@ def ocr_pdf_result(request):
             fd.write(chunk)
         fd.close()
 
+    #see if pdf has text already
+    if not force_flag:
+        cmd = 'pdftotext "%s" -' % save_path
+
+        txt = subprocess.check_output(cmd, shell=True)
+
+        txt = re.sub('\W', '', txt)
+
+        if len(txt) > 0:
+            processing_error = 'This PDF already has text. You may wish to try again with the "Force OCR" button.'
+            os.remove(save_path)
+
+
     #TODO this can be discarded when system is upgraded and there is a native ocrmypdf command
     # also when there aren't two settings.py files and BASE_DIR is consistant in deploy 
     if 'ocr_pdf' in os.listdir(settings.BASE_DIR):
@@ -287,12 +351,16 @@ def ocr_pdf_result(request):
 
     if not processing_error:
 	cmd = '%s %s' % (cmd_path, save_path)
+
+        if force_flag:
+            cmd += ' %s' % 'true'
+
 	p = subprocess.Popen(cmd, shell=True)
         #cmd = [cmd_path, save_path]
         #p = subprocess.Popen(cmd)
 
     data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
-        'ocr_file_name': ocr_file_name}}
+        'ocr_file_name': ocr_file_name, 'processing_error': processing_error}}
 
     return render_to_response('ocr_pdf_result.html', data)
 
