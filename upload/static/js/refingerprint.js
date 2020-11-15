@@ -23,8 +23,8 @@
             return 'document is not a pdf!'
         };
 
-        if (file.size > 25165824) {
-            return 'file is too large (24MB limit)'
+        if (file.size > 104857600) {
+            return 'file is too large (100MB limit)'
         };
 
         return null
@@ -60,7 +60,6 @@
 
         $('#copy-count').val(1);
 
-        //in_process = false;
     };
 
     function _showProcessed(file_htmls) {
@@ -74,14 +73,6 @@
     };
 
     function _uploadPDF() {
-        //if (in_process) {
-            //return;
-        //};
-
-        //console.log('asaa');
-        //return
-        //$('#param-form').submit();
-
         _hideError();
 
         var file = $('#pdf-file').prop('files')[0];
@@ -97,40 +88,6 @@
 
         $('#param-form').submit();
 
-        //$('#upload-button').addClass('disabled');
-        //$('#wait-icon').show();
-        //$('#pdf-file').prop('disabled', true);
-
-        //var formData = new FormData();
-        //formData.append('pdf_file', file); 
-
-        //formData.append('copy_count', $('#copy-count').val());
-        //formData.append('suffix', $('#file-suffix').val());
-
-        //$.ajax({
-            //url : '/refingerprint_upload/',
-            //type: 'POST',
-            //data: formData,
-            //cache: false,
-            //contentType: false,
-            //processData: false,
-            //dataType: 'json',
-            ////dataType: 'multipart/form-data',
-            //success: function(response) {
-                //console.log(response);
-
-                //if (response.files) {
-                    //_restoreReady();
-                    //_showProcessed(response.files);
-                //} else {
-                    //_showError('error processing the request')
-                //}
-            //},
-            //error: function(e) {
-                //console.log('error', e)
-                //_restoreReady();
-            //}
-        //});
     };
 
     window.uploadPDF = _uploadPDF;

@@ -78,6 +78,17 @@
             color: red;
         }
 
+        .button-box {
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .button-box .button{
+        }
+
         .button {
             border: 1px solid #000;
             border-radius: 2px;
@@ -194,6 +205,12 @@
             padding: 5px;
         }
 
+        .help-label {
+            font-size: .9em;
+            margin-left: 5px;
+            margin-top: -5px;
+        }
+
     </style>
 
 </head>
@@ -234,12 +251,31 @@
             <div style="height: 1em;"></div>
 
             <div>
-                <div id="upload-button" class="button" style="width: 8em" onclick="uploadPDF()">
-                    <i class="fa fa-upload"></i>
-                    Run OCR
+                <div class="button-box">
+                    <div id="upload-button" class="button" style="width: 8em; margin-right: 1em;" onclick="uploadPDF()">
+                        <i class="fa fa-upload"></i>
+                        Run OCR
+                    </div>
+
+                    <div id="upload-button" class="button" style="width: 8em" onclick="uploadForceOCR(true)">
+                        <i class="fa fa-upload"></i>
+                        Force OCR
+                    </div>
+                    <div class="help-label">
+                        <i class="fa fa-question-circle" title="Forcing OCR will replace any existing text with OCRd text. If there is a question, it's likely better to try 'Run OCR' first."></i>
+                    </div>
                 </div>
 
                 <div id="upload-error" class="small error" style="display: none;">
+                </div>
+
+                <div id="in-progress" style="display: none;">
+                    <div style="font-size: 2em">
+                        <i class="fa fa-spinner fa-spin"></i>
+                    </div>
+                    <p>
+                        Uploading...
+                    </p>
                 </div>
 
             </div>
@@ -250,6 +286,64 @@
 
     <script>
         CSRF_TOKEN = '{{ csrf_token }}';
+
+        uploadForceOCR = function() {
+            var force_field = $('<input id="force_flag" name="force_flag" value="true" type="hidden">');
+            $('#param-form').append(force_field);
+
+            uploadPDF();
+        };
+
+
+        (function() {
+
+            window.uploadAndCheck = function() {
+                $('.button-box').hide();
+                $('#upload-error').hide();
+                $('#in-progress').show();
+
+
+                var formData = new FormData();
+                formData.append('pdf-file', $('#pdf-file')[0].files[0]);
+                formData.append('csrfmiddlewaretoken', CSRF_TOKEN);
+
+                setTimeout(function() {
+
+                    $.ajax({
+                        url : '/ocr/upload_and_check',
+                        type : 'POST',
+                        data : formData,
+                        processData: false,
+                        contentType: false,
+                        success : function(response) {
+
+                            if (response && response.file_info) {
+                                $('.button-box').show();
+                                $('#in-progress').hide();
+
+                                if (response.file_info.processing_error) {
+                                    $('#upload-error')
+                                        .text(response.file_info.processing_error)
+                                        .show();
+                                };
+                            };
+
+                            console.log(response.file_info);
+                        },
+                        fail: function(error) {
+                            $('.button-box').show();
+                            $('#in-progress').hide();
+                            $('#upload-error')
+                                .text('error uploading document')
+                                .show();
+                        },
+                    });
+
+                }, 5000);
+            };
+
+        }());
+
     </script>
 
 </body>
