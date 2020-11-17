@@ -276,7 +276,6 @@ def ocr_upload_and_check(request):
 
     if len(txt) > 0:
         processing_error = 'This PDF already has text. Use the "Force OCR" button to overwrite text with a fresh OCR if desired.'
-        os.remove(save_path)
 
     data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
         'ocr_file_name': ocr_file_name, 'processing_error': processing_error,
@@ -295,7 +294,7 @@ def ocr_pdf_result(request):
 
     save_path = file_info.get('save_path')
 
-    processing_error = None 
+    processing_error = 'None'
 
     if save_path is None:
         processing_error = 'Uploaded file not located.'
