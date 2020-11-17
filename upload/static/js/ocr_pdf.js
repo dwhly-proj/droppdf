@@ -38,7 +38,8 @@
     }, 5000);
 
     $(document).ready(function() {
-        if (PROCESSING_ERROR != 'None') {
+        if (PROCESSING_ERROR != 'None' || !PROCESSING_ERROR || PROCESSING_ERROR === '') {
+
             clearInterval(check_interval);
 
             $('#in-progress').hide();

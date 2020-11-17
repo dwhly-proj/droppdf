@@ -275,7 +275,7 @@ def ocr_upload_and_check(request):
     txt = re.sub('\W', '', txt)
 
     if len(txt) > 0:
-        processing_error = 'This PDF already has text! However you can use the "Force OCR" button to overwrite it with fresh OCR.'
+        processing_error = 'This PDF already has text. Use the "Force OCR" button to overwrite text with a fresh OCR if desired.'
         os.remove(save_path)
 
     data = {'file_info': {'filename': pdf_file.name, 'size': pdf_file.size,
@@ -318,6 +318,8 @@ def ocr_pdf_result(request):
             cmd += ' %s' % 'true'
 
 	p = subprocess.Popen(cmd, shell=True)
+
+    file_info['processing_error'] = processing_error
 
     data = {'file_info':  file_info}
 
