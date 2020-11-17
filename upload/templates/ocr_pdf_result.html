@@ -13,7 +13,7 @@
 
 	<script src="{% static 'drag&dropfileupload/jquery-1.9.1.min.js' %}"></script>
 
-	<script src="{% static 'js/ocr_pdf.js' %}"></script>
+	<script src="{% static 'js/ocr_pdf.js' %}?"></script>
 
     <style>
         body {
@@ -130,24 +130,22 @@
         <table id="download-info" style="display: none;">
             <thead>
                 <tr>
-                    <!--<th>Filename</th>-->
                     <th>Download</th>
-                    <th>Docdrop Link</th>
+                    <!--<th>Docdrop Link</th>-->
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <!--<td><span id="filename"></span></td>-->
                     <td>
                         <a id="file-download-link" href="javascript:void(0)" target="_blank">
                             <i class="fa fa-download"></i>
                         </a>
                     </td>
-                    <td>
-                        <a id="file-docdrop-link" href="#" target="_blank">
-                            <i class="fa fa-file-pdf-o"></i>
-                        </a>
-                    </td>
+                    <!--<td>-->
+                        <!--<a id="file-docdrop-link" href="#" target="_blank">-->
+                            <!--<i class="fa fa-file-pdf-o"></i>-->
+                        <!--</a>-->
+                    <!--</td>-->
                 </tr>
             </tbody>
         </table>
