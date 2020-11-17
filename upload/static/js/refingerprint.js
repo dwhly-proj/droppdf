@@ -41,13 +41,18 @@
             var check_error = _checkFileError(file);
 
             if (check_error) {
-                return _showError(check_error);
+                _showError(check_error);
+
+                return false;
             }
 
             filename = file.name;
 
             $('#filename').text(filename);
+            $('#filesize').text(file.size + 'bytes');
         };
+
+        return true;
     };
 
     function _restoreReady() {

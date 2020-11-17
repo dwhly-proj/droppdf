@@ -211,6 +211,22 @@
             margin-top: -5px;
         }
 
+        #progress-bar-outer {
+            flex: 0 0 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 5px;
+            width: 100%;
+            min-width: 100%;
+        }
+
+        #progress-bar-inner {
+            height: 100%;
+            width: 0%;
+            background-color: rgba(49, 186, 228, .8);
+        }
+
     </style>
 
 </head>
@@ -234,30 +250,44 @@
 
             <div style="position: relative">
                 <div id="drag-box">
-                    <h3>Drag PDF Here</h3>
-                    <div class="small">
-                        (or click to select file)
+                    <div id="progress-bar-outer">
+                        <div id="progress-bar-inner"></div>
                     </div>
-                    <h4 id="filename"></h4>
 
-                    <div id="wait-icon" style="font-size: 2em; opacity: .7; display: none;">
-                        <i class="fa fa-wrench fa-spin"></i>
+                    <div id="drag-instruction">
+                        <h3>Drag PDF Here</h3>
+                        <div class="small">
+                            (or click to select file)
+                        </div>
                     </div>
+
+                    <h3 id="filename"></h3>
+                    <div class="small" id="filesize"></div>
+
+                    <div id="in-progress" style="display: none; text-align: center;">
+                        <div style="font-size: 2em">
+                            <i class="fa fa-spinner fa-spin"></i>
+                        </div>
+                        <p>
+                            Uploading...
+                        </p>
+                    </div>
+
                 </div>
 
-                <input type="file" id="pdf-file" name="pdf-file" onchange="updateFileName()">
+                <input type="file" id="pdf-file" name="pdf-file" onchange="checkThenUpload()">
             </div>
 
             <div style="height: 1em;"></div>
 
             <div>
                 <div class="button-box">
-                    <div id="upload-button" class="button" style="width: 8em; margin-right: 1em;" onclick="uploadPDF()">
+                    <div id="run-button" class="button" style="width: 8em; margin-right: 1em;" onclick="runOCR()">
                         <i class="fa fa-upload"></i>
                         Run OCR
                     </div>
 
-                    <div id="upload-button" class="button" style="width: 8em" onclick="uploadForceOCR(true)">
+                    <div id="run-force" class="button" style="width: 8em" onclick="runOCR(true)">
                         <i class="fa fa-upload"></i>
                         Force OCR
                     </div>
@@ -269,15 +299,6 @@
                 <div id="upload-error" class="small error" style="display: none;">
                 </div>
 
-                <div id="in-progress" style="display: none;">
-                    <div style="font-size: 2em">
-                        <i class="fa fa-spinner fa-spin"></i>
-                    </div>
-                    <p>
-                        Uploading...
-                    </p>
-                </div>
-
             </div>
 
         </form>
@@ -287,17 +308,13 @@
     <script>
         CSRF_TOKEN = '{{ csrf_token }}';
 
-        uploadForceOCR = function() {
-            var force_field = $('<input id="force_flag" name="force_flag" value="true" type="hidden">');
-            $('#param-form').append(force_field);
-
-            uploadPDF();
-        };
-
-
         (function() {
 
-            window.uploadAndCheck = function() {
+            upload_in_progress = false;
+
+            uploaded_file_info = null;
+
+            _uploadAndCheckText = function() {
                 $('.button-box').hide();
                 $('#upload-error').hide();
                 $('#in-progress').show();
@@ -307,39 +324,111 @@
                 formData.append('pdf-file', $('#pdf-file')[0].files[0]);
                 formData.append('csrfmiddlewaretoken', CSRF_TOKEN);
 
-                setTimeout(function() {
 
-                    $.ajax({
-                        url : '/ocr/upload_and_check',
-                        type : 'POST',
-                        data : formData,
-                        processData: false,
-                        contentType: false,
-                        success : function(response) {
+                $.ajax({
+                    url : '/ocr/upload_and_check',
+                    type : 'POST',
+                    data : formData,
+                    xhr: function() {
+                        var xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener("progress", function(evt) {
+                            if (evt.lengthComputable) {
+                                var percentComplete = (evt.loaded / evt.total) * 100;
 
-                            if (response && response.file_info) {
-                                $('.button-box').show();
-                                $('#in-progress').hide();
+                                $('#progress-bar-inner').css('width', percentComplete + '%');
 
-                                if (response.file_info.processing_error) {
-                                    $('#upload-error')
-                                        .text(response.file_info.processing_error)
-                                        .show();
-                                };
-                            };
+                                console.log(percentComplete);
+                            }
+                       }, false);
+                       return xhr;
+                    },
+                    processData: false,
+                    contentType: false,
+                    success : function(response) {
 
-                            console.log(response.file_info);
-                        },
-                        fail: function(error) {
+                        if (response && response.file_info) {
+
+                            uploaded_file_info = response.file_info;
+
                             $('.button-box').show();
                             $('#in-progress').hide();
-                            $('#upload-error')
-                                .text('error uploading document')
-                                .show();
-                        },
-                    });
 
-                }, 5000);
+                            $('#progress-bar-inner').css('width', '0%');
+
+                            upload_in_progress = false;
+
+                            $('#pdf-file').attr('disabled', false);
+
+                            $('#drag-instruction').show();
+
+                            if (response.file_info.processing_error) {
+
+                                $('#upload-error')
+                                    .text(response.file_info.processing_error)
+                                    .show();
+
+                                $('#run-button')
+                                    .addClass('disabled')
+                                    .attr('disabled', true)
+                            } else {
+                                $('#run-button')
+                                    .removeClass('disabled')
+                                    .attr('disabled', false)
+                            }
+
+                        };
+                    },
+                    fail: function(error) {
+                        $('#in-progress').hide();
+
+                        $('#pdf-file').attr('disabled', false);
+
+                        $('#progress-bar-inner').css('width', '0%');
+
+                        upload_in_progress = false;
+
+                        $('#drag-instruction').show();
+
+                        $('#upload-error')
+                            .text('error uploading document')
+                            .show();
+                    },
+                });
+            };
+
+            window.checkThenUpload = function() {
+                if (upload_in_progress) {
+                    return;
+                };
+
+                if (updateFileName()) {
+                    _uploadAndCheckText();
+
+                    $('#pdf-file').attr('disabled', true);
+
+                    $('#drag-instruction').hide();
+
+                    upload_in_progress = true;
+                };
+            };
+
+            runOCR = function(force) {
+                var form =  $('<form action="/ocr/result/" method="POST"></form>');
+
+                if (force) {
+                    var force_field = $('<input id="force_flag" name="force_flag" value="true" type="hidden">');
+                    $(form).append(force_field);
+                };
+
+                var file_info = JSON.stringify(uploaded_file_info);
+                var file_info_field = $('<input id="file_info" name="file_info" type="hidden">');
+                $(file_info_field).val(file_info);
+
+                $(form).append(file_info_field);
+
+                $('body').append(form);
+
+                $(form).submit();
             };
 
         }());

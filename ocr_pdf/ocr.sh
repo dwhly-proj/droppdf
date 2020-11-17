@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #source venv/bin/activate
-rt LC_ALL=C.UTF-8
+export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
 filename=$1
@@ -10,9 +10,9 @@ force_flag=$2
 
 echo ${force_flag}
 
-cd /home/www-data/droppdf/ocr_pdf
+#cd /home/www-data/droppdf/ocr_pdf
 
-. venv/bin/activate
+#. venv/bin/activate
 
 outfile="${filename/'.pdf'/'_ocr.pdf'}"
 
