@@ -131,7 +131,6 @@
             <thead>
                 <tr>
                     <th>Download</th>
-                    <!--<th>Docdrop Link</th>-->
                 </tr>
             </thead>
             <tbody>
@@ -141,11 +140,11 @@
                             <i class="fa fa-download"></i>
                         </a>
                     </td>
-                    <!--<td>-->
-                        <!--<a id="file-docdrop-link" href="#" target="_blank">-->
-                            <!--<i class="fa fa-file-pdf-o"></i>-->
-                        <!--</a>-->
-                    <!--</td>-->
+                </tr>
+                <tr>
+                    <td>
+                        Time to process: <span id="processing-time"></span> seconds.
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -155,7 +154,16 @@
                 <i class="fa fa-spinner fa-spin"></i>
             </div>
             <p>
-                OCR in progress. This may take a few moments depending on file size. A download link will appear when processing is complete.
+                OCR in progress. Started at <span id="time-start"></span>
+            </p>
+            <p>
+                Large files can sometimes take several minutes, or up to five or ten if the Force OCR option is used. 
+            </p>
+            <p>
+            A clickable download link will appear when processing is complete.
+            </p>
+            <p>
+            If you would rather check back later the OCR'd pdf will be available when complete at <code id="download-link"></code>
             </p>
         </div>
 

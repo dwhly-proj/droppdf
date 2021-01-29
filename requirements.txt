@@ -24,6 +24,7 @@ lxml==4.5.0
 oauth2==1.9.0.post1
 oauthlib==3.1.0
 pathtools==0.1.2
+pdfrw==0.4
 pexpect==4.8.0
 Pillow==6.2.2
 piston-mini-client==0.7.5
@@ -42,6 +43,7 @@ requests-oauthlib==1.3.0
 semantic-version==2.8.4
 six==1.14.0
 soupsieve==1.9.5
+Unidecode==1.1.2
 unoconv==0.9.0
 urllib3==1.25.9
 watchdog==0.10.2
