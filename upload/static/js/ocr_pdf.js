@@ -52,7 +52,13 @@
         var url = window.location.origin;
         url += '/static/drop-pdf/' + OCR_FILE_NAME;
 
-        $('#download-link').text(url);
+        $('#download-link')
+            .attr('href', url)
+            .text(url);
+
+        $('#docdrop-link')
+            .attr('href', '/pdf/' + OCR_FILE_NAME)
+            .text(OCR_FILE_NAME);
 
         if (PROCESSING_ERROR != 'None' || !PROCESSING_ERROR || PROCESSING_ERROR === '') {
 
