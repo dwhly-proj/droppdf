@@ -510,7 +510,7 @@ def fingerprinter_upload(request):
         os.makedirs(fingerprint_dir)
 
         s = os.path.splitext(pdf_file.name)
-        filename = s[0]
+        filename = s[0].replace("'", '').replace('"', '')
 
         #handle non ascii chars in file name
         #(strangly only wsgi seems to choke on those)
@@ -546,8 +546,6 @@ def fingerprinter_upload(request):
                 save_filename = filename + '-' + suffix + '-' + str(copy_index + 1) + extension
             else:
                 save_filename = filename + '-' + str(copy_index + 1) + extension
-
-            print('AAA', save_filename)
 
             file_path = os.path.join(fingerprint_dir, save_filename)
 
@@ -601,8 +599,6 @@ def fingerprinter_upload(request):
 
     data = {'processed_files': processed_files, 'file_info': file_info,
             'archive_name': filename}
-
-    print(data)
 
     return render_to_response('refingerprint_results.html', data)
 

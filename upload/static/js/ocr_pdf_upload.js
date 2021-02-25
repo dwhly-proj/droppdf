@@ -26,8 +26,6 @@
                         var percentComplete = (evt.loaded / evt.total) * 100;
 
                         $('#progress-bar-inner').css('width', percentComplete + '%');
-
-                        console.log(percentComplete);
                     }
                }, false);
                return xhr;
