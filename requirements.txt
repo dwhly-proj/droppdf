@@ -36,7 +36,7 @@ pyOpenSSL==19.1.0
 PyPDF2==1.26.0
 pypdfocr==0.9.1
 pytz==2019.3
-PyYAML==5.3.1
+PyYAML==5.4
 reportlab==3.5.42
 requests==2.23.0
 requests-oauthlib==1.3.0
