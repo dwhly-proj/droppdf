@@ -20,7 +20,7 @@ httplib2==0.17.2
 idna==2.9
 ipaddress==1.0.23
 lockfile==0.12.2
-lxml==4.5.0
+lxml==4.6.3
 oauth2==1.9.0.post1
 oauthlib==3.1.0
 pathtools==0.1.2
