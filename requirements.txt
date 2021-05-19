@@ -27,7 +27,7 @@ lxml==4.6.2
 ocrmypdf==11.7.0
 pdfminer.six==20201018
 pdfrw==0.4
-pikepdf==2.8.0
+pikepdf==2.10.0
 Pillow==8.1.1
 pluggy==0.13.1
 prompt-toolkit==3.0.16
