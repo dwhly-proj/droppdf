@@ -1,0 +1,81 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta http-equiv="expires" content="timestamp">
+  <meta http-equiv="cache-control" content="no-cache" />
+
+  <title>{{ filename }}</title>
+  <link rel="stylesheet" type="text/css" href="{% static '/vendor/epubjs/epub.css' %}">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'UA-181082912-1');
+  </script>
+
+  <script src="{% static '/vendor/epubjs/epub.min.js' %}"></script>
+  <script src="{% static '/vendor/jszip.js' %}"></script>
+
+  <script type="text/javascript">
+    window.hypothesisConfig = function () {
+      return {
+        openSidebar: false,
+        enableMultiFrameSupport: true,
+        onLayoutChange: function(state) {
+          var nav = document.getElementById("navigation");
+          if (state.expanded === true) {
+            nav.classList.remove("open");
+          }
+        }
+      };
+    };
+  </script>
+  <script src="https://cdn.hypothes.is/hypothesis?ver=1.1"></script>
+  <!--<script src="https://hypothes.is/embed.js?ver=1.1"></script>-->
+
+  <script>
+    window.bookUrl = "{{ book_url }}";
+  </script>
+
+  <script src="{% static '/vendor/epubjs/reader.js' %}?ver=1.1"></script>
+
+</head>
+<body>
+  <div id="main">
+    <a id="opener">
+      <i class="material-icons">menu</i>
+    </a>
+    <div id="viewer" class="spreads loading"></div>
+    <span id="hiddenTitle"></span>
+    <a id="prev" href="#prev" class="arrow">
+      <i class="material-icons">chevron_left</i>
+    </a>
+    <a id="next" href="#next" class="arrow">
+      <i class="material-icons">chevron_right</i>
+    </a>
+  </div>
+  <div id="navigation">
+    <a id="closer">
+      <i class="material-icons">close</i>
+    </a>
+    <h1 id="title">...</h1>
+    <image id="cover" width="150px"/>
+    <h2 id="author">...</h2>
+    <ul id="toc"></ul>
+  </div>
+
+  <script>
+  </script>
+
+</body>
+</html>

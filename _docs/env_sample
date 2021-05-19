@@ -1,0 +1,31 @@
+#Sample environmental variable file.
+
+#Copy this file to "droppdf" directory (directory with "manage.py") 
+#Fill out settings with specific information and rename to .env
+
+
+DB_NAME='<name of database>'
+DB_USER='<name of database user>'
+DB_PASSWORD='<database password>'
+DB_HOST='localhost or ip'
+DJANGO_SERVER='dev'
+DJANGO_DEBUG=true
+DJANGO_SECRET_KEY='<long random key>'
+
+#S3 settings
+AWS_SECRET_KEY='<S3 secret key>'
+AWS_ACCESS_KEY='<S3 access key>'
+
+#S3 bucket names.  
+AWS_ANNOTATIONS_BUCKET='docdrop-annotations-dev'
+AWS_OCR_BUCKET='docdrop-ocr-dev'
+AWS_FINGERPRINTER_BUCKET='docdrop-fingerprinter-dev'
+
+#Important: All buckets are assumed to be on same domain (same region)!
+AWS_CUSTOM_DOMAIN='https://s3.us-central-1.wasabisys.com'
+
+#How many simultanous OCR process to allow at one time 
+MAX_SIM_OCR_PROCESSES=3
+
+#rabbitmq broker url
+BROKER_URL='pyamqp://guest@localhost//'
