@@ -1,0 +1,468 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Video: {{ title }} (DocDrop)</title>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-181082912-1');
+    </script>
+
+    <link rel="canonical" href="{{ canonical_url }}">
+
+    <link rel="canonical" href="http://docdrop.org/video/{{ video_id }}/">
+
+	<link rel="stylesheet" type="text/css" href="{% static "/vendor/font-awesome-4.7.0/css/font-awesome.min.css" %}" />
+
+    <script src="https://hypothes.is/embed.js" async></script>
+
+	<script src="{% static '/vendor/jquery-3.5.1.min.js' %}"></script>
+
+	<script src="{% static '/apps/js/youtube.js' %}?"></script>
+
+    <style>
+        body {
+            font-family: sans-serif;
+            padding-bottom: .5vh;
+        }
+
+        header {
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #42812D;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .25em;
+            user-select: none;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
+        .button i {
+            margin-left: .25em;
+            margin-right: .25em;
+        }
+
+        .button-off {
+            background-color: #000;
+            color: #fff;
+        }
+
+        .button-inactive {
+            background-color: #c2c2c2;
+            border-color: #c2c2c2;
+            opacity: .3;
+        }
+
+        .button-inactive:hover {
+            cursor: not-allowed;
+        }
+
+        .play-button {
+            width: 4.5em;
+        }
+
+        .button-spacer {
+            width: .25em;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
+        .action-char {
+            font-size: 1.1em;
+            z-index: 1000;
+        }
+
+        .action-char:hover {
+            cursor: pointer;
+        }
+
+        .main-content {
+            width: 94%;
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+
+        .left-col {
+            position: relative;
+            display: flex;
+            box-sizing: border-box;
+            flex: 1;
+            flex-direction: column;
+            padding-right: 1.5em; 
+        }
+
+        .sub-box {
+            box-sizing: border-box;
+            padding-left: 20px;
+            padding-right: 20px;
+            margin-left: 1px;
+            position: relative;
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            max-height: 80vh;
+            overflow-y: scroll;
+            scrollbar-width: thin;
+            border: 1px solid #c2c2c2;
+            border-radius: 3px;
+        }
+
+        .sub-box::-webkit-scrollbar {
+            width: 10px; 
+        }
+
+        .sub-box::-webkit-scrollbar-track {
+            background: #f1f1f1;
+
+        }
+
+        .sub-box::-webkit-scrollbar-thumb {
+            background-color: #c2c2c2;
+            border: 1px solid #fff;
+        }
+
+        .subs {
+            position: relative;
+        }
+
+        .sub {
+            color: #696969;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding-top: .5em;
+            padding-bottom: .5em;
+        }
+
+        .sub-text {
+            flex: 1;
+            flex-basis: 0;
+        }
+
+        .sub-label {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+            padding-top: .5em;
+            padding-bottom: .5em;
+        }
+
+        .control-box {
+            position: relative;
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            justify-content: space-between; 
+            padding-bottom: 1em;
+        }
+
+        .control-box-subsection {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .highlight {
+            color:#000 !important;
+        }
+
+        .search-highlight {
+            background-color: #FFAB00; 
+        }
+
+        .sub-time {
+            color: #87878E; 
+            min-width: 5em;
+            max-width: 5em;
+            user-select: none;
+        }
+
+        .sub-text:hover {
+            cursor: text;
+            color: #42812D;
+        }
+
+        .player-box {
+            width: 55vw;
+        }
+
+        #video-player {
+            border-radius: 5px;
+            position: relative;
+            overflow: hidden; 
+            min-width: 100%;
+            max-width: 100%;
+            height: 0;
+            padding-bottom: 56.25%;
+        }
+
+        #video-player-iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (max-width: 992px) {
+            body {
+                height: 97vh;
+                max-height: 97vh;
+                display: flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                justify-content: flex-start;
+            }
+            .main-content {
+                width: 100vw;
+                max-width: 100%;
+                flex-wrap: nowrap;
+                flex: 1;
+                flex-direction: column-reverse;
+            }
+            .player-box {
+                width: 93%;
+                max-width: 93%;
+                min-width: 93%;
+                padding: 5px;
+            }
+            .left-col {
+                padding: 5px;
+                width: 94%;
+                max-width: 94%;
+                min-width: 94%;
+                overflow-x: hidden;
+            }
+            .sub-box {
+                flex: 1;
+                flex-basis: 0;
+                min-height: 200px;
+                border: none;
+                padding: 5px;
+                padding-left: 0px;
+                padding-right: 3px;
+                overflow-x: hidden;
+            }
+            .control-box {
+                position: relative;
+                min-width: 100%;
+                max-width: 100%;
+            }
+        }
+
+        @media only screen 
+        and (device-width : 414px) 
+        and (device-height : 896px) 
+        and (-webkit-device-pixel-ratio : 3)
+        and (orientation : portrait) {
+            body {
+                height: 97vh;
+                max-height: 97vh;
+                display: flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                justify-content: flex-start;
+            }
+            .main-content {
+                width: 100vw;
+                max-width: 100%;
+                flex-wrap: nowrap;
+                flex: 1;
+                flex-direction: column-reverse;
+            }
+            .player-box {
+                width: 93%;
+                max-width: 93%;
+                min-width: 93%;
+                padding: 5px;
+            }
+            .left-col {
+                padding: 5px;
+            }
+            .sub-box {
+                flex: 1;
+                flex-basis: 0;
+                width: 94%;
+                max-width: 94%;
+                min-width: 94%;
+                border: none;
+                padding: 5px;
+                min-height: 200px;
+                padding-left: 0px;
+                padding-right: 3px;
+            }
+            .control-box {
+                position: relative;
+                width: 93%;
+                min-width: 93%;
+                max-width: 93%;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+        <div>
+            <input style="padding: 3px; border: 0px; border-bottom: 1px solid #000; opacity: .7; margin-right: 1em;"
+            size="20"
+            placeholder="&nbsp;search transcript" 
+            id="search-input"
+            onchange="searchSubs($(this).val())">
+            </input>
+            <i class="fa fa-times-circle" onclick="searchSubs('', true)"></i>
+        </div>
+    </header>
+
+    <div class="main-content">
+
+        <div class="left-col">
+
+            <div class="control-box">
+
+                <div class="control-box-subsection">
+                    <div class="button play-button"
+                    id="play-button"
+                    style="display: none">
+                        <i class="fa fa-play"></i>Play
+                    </div>
+                    <div class="button play-button button-inactive"
+                     id="play-button-waiting">
+                        Waiting..
+                    </div>
+                    <div class="button play-button"
+                    id="pause-button"
+                    style="display: none"
+                    onclick="pauseVideo();">
+                        <i class="fa fa-pause"></i>Pause
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    id="autoscroll-button"
+                    onclick="toggleSync();">
+                        <i class="fa fa-thumbs-up"></i>Auto Scroll
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    onclick="syncScroll();">
+                        <i class="fa fa-refresh"></i>Sync
+                    </div>
+                </div>
+
+                <div class="control-box-subsection">
+                    <div class="button"
+                    onclick="scrollSubs();">
+                        <i class="fa fa-arrow-up"></i>Top
+                    </div>
+                    <div class="button-spacer"></div>
+                    <div class="button"
+                    onclick="scrollSubs('down');">
+                        <i class="fa fa-arrow-down"></i>Bottom
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="sub-box">
+                <div class="sub-label">
+                    <div id="substart-text" class="sub-text italic">Select text to annotate, Click play in YouTube to begin</div>
+                </div>
+                {% for sub in transcript %}
+                <div class="sub" dir="ltr">
+                    <div class="sub-time">
+                        {{ sub.start_display }}
+                    </div>
+                    <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
+                        {{ sub.text }}
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="sub-label">
+                    <div id="subend-text" class="sub-text italic">End of transcript</div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="player-box">
+            <div id="video-player">
+                <iframe id="video-player-iframe" type="text/html" src="{{ iframe_src }}">
+                </iframe>
+            </div>
+            <br>
+        </div>
+
+    </div>
+
+
+<script>
+    window.videoId = '{{ video_id }}';
+    window.startTimes = {{ start_times }};
+</script>
+
+</body>
+</html>

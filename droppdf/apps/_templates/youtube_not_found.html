@@ -1,0 +1,97 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>DocDrop Video Annotator</title>
+    <link rel="canonical" href="{{ url }}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        header {
+            position: absolue;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #42812D;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .button {
+            border: 1px solid #000;
+            border-radius: 2px;
+            font-size: .8em;
+            padding: .2em;
+        }
+
+        .button:hover {
+            cursor: pointer;
+        }
+
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+    </style>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+        <div>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <h4>Our video annotation capability works for YouTube videos that have either human or machine-generated transcripts.</h4>
+        
+        <h4>The video you’ve selected does not have one or is not a YouTube video.  Please either choose another video or contact the video creator to ask them to request a transcript be generated for this video.</h4>
+    </div>
+
+</body>
+</html>

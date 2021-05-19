@@ -1,0 +1,54 @@
+{% load static %}
+
+<html>
+<head><!-- WB Insert -->
+	<title>{{ title }}</title>
+
+    <script>
+    (function () {
+    // Only run injection for top-level window!
+    if (window != window.top) {
+        return;
+    }
+
+    var embed_script = document.createElement("script");
+    embed_script.src = "https://hypothes.is/embed.js";
+    document.head.appendChild(embed_script);
+    window.hypothesisConfig = function() {
+        return {showHighlights: true};
+    }
+    })();
+    </script>
+
+	<!-- End WB Insert -->
+	<link rel="stylesheet" href="https://via.hypothes.is/oe_/http://datapipes.okfnlabs.org/css/style.css">
+</head>
+
+<body class="view-html annotator-highlights-always-on">
+	<table>
+		<thead>
+			<tr>
+				<th class="counter header"></th>
+				{% for element in headers %}
+				<th class="header" title="{{ element }}">{{ element }}</th>
+				{% endfor %}
+				
+			</tr>
+		</thead>
+		<tbody>
+			{% for element in content %}
+			<tr id="L{{ forloop.counter0 }}">
+				<td class="counter"><a href="#L{{ forloop.counter0 }}">{{ forloop.counter0 }}</a></td>
+				{% for subelem in element %}
+				<td><div>{{ subelem }}</div></td>
+				{% endfor %}
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	<script src="{% static '/vendor/jquery-3.5.1.min.js' %}"></script>
+	<script src="https://via.hypothes.is/js_/http://datapipes.okfnlabs.org/js/jquery.tablesorter.js"></script>
+	<script src="https://via.hypothes.is/js_/http://datapipes.okfnlabs.org/js/table.js"></script>
+
+</body>
+</html>

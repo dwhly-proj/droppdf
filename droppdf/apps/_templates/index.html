@@ -1,0 +1,121 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>Drag and Drop a document</title>
+	<link rel="stylesheet" type="text/css" href="{% static "/apps/css/index.css" %}" />
+	<link rel="stylesheet" type="text/css" href="{% static "/apps/css/index.css" %}" />
+    <link rel="stylesheet" type="text/css" href="{% static "/apps/css/dropzone_custom.css" %}" />
+	<link rel="stylesheet" type="text/css" href="{% static "/vendor/font-awesome-4.7.0/css/font-awesome.min.css" %}" />
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'UA-181082912-1');
+	</script>
+
+	<script src="{% static '/vendor/jquery-3.5.1.min.js' %}"></script>
+    <script src="{% static '/vendor/dropzone-5.7.0/dist/min/dropzone.min.js' %}"></script>
+	<script src="{% static '/apps/js/index.js' %}"></script>
+    
+        
+
+</head>
+
+<body style="background: #2c2c2c;">
+	<div class="main" align="center">
+
+	    <div id="dropzone" class="dropzone_new">
+
+			<div class="label">
+
+                <div id="upload-error" class="error" style="display: none">
+                    <i class="fa fa-times-circle" style="position: absolute; right:3px; top:3px" onclick="closeError()"></i>
+                    <div id="upload-error-content">
+                    </div>
+                </div>
+
+                <div id="process-content-text">
+                </div>
+
+                <div id="main-content-text">
+
+                    Drag and drop a document to annotate it.
+                    <br/>
+
+                    <input style="border-radius: 3px; padding: 3px; border: 0px;"
+                    size="30"
+                    placeholder="&nbsp;or paste a YouTube video URL"
+                    id="youtube-url"
+                    onchange="openYouTubeUrl()">
+
+                    <div style="color: red; display: none; font-size: 10pt" id="youtube-url-error"></div>
+
+                    <p>
+                        Works with .pdf, .doc, .docx, .odt, .xls, .xlsx, .ods, .ppt, .pptx,
+                        <br>.odp, .rtf, .epub and .csv files.
+                        <br>
+                        <br/>.doc, .docx, .odt, .ppt, .pptx, .odp and .rtf are converted to .pdf.
+                        <br/>.xls and .xlsx and .ods are converted to .csv.
+                    </p>
+
+                    <p>You can also annotate PDFs inside Google Drive by <a href="javascript:void(0);" onClick="handleAuthClick();">authorizing Hypothes.is within your Google account.</a> <span style="font-weight: bold;">Hypothes.is PDF Annotator</span> will be listed under the "Open with" option for PDF files upon authorization.
+                    (<a href="https://security.google.com/settings/security/permissions">Uninstall</a>).
+                    <br> <a href="/privacy/">Privacy Policy</a>.
+                    </p>
+
+
+                    <!--<p>Scanned PDFs will be OCR’d<br/>(please ensure text is horizontal).</p>-->
+                    
+                    <p>
+                        <!--The OCR service uses <a href="https://github.com/tesseract-ocr">Tesseract</a>, an open source library.<br/>-->
+                    <!--You may have better results using a professional tool (<a href="https://www.youtube.com/watch?v=7Gq3ehpv-h0">tutorial</a>).-->
+                    The annotation functionality is enabled by <a href="https://hypothes.is/">Hypothes.is</a>.
+                    <br>
+                    The code for this site is <a href="https://github.com/dwhly-proj/droppdf">open source</a>.
+                    </p>
+                    <p>
+                    This is a personal project to explore different ideas and is maintained by Dan Whaley. I’d be delighted to hear any feedback at <a href="https://twitter.com/dwhly">@dwhly</a>.
+                    </p>
+                    <p>
+                    The intention is to keep the site up and running, but no guarantee around the preservation of documents is made. 
+                    <br>
+                    As an aside, annotations against PDFs or EPUBs with your Hypothes.is account, are discoverable on that PDF or EPUB regardless of its location (<a href="https://hypothes.is/blog/annotating-pdfs-without-urls/">Background</a>).  As long as you have the original PDF somewhere, you'll always be able to see your annotations on it with Hypothes.is.
+                    </p>
+
+                </div>
+				
+			</div>
+
+			<img src="{% static '/apps/img/background.png' %}" id="drop-icon"></img>
+	    </div>
+
+        {% csrf_token %}
+	    
+	</div>
+	
+	<script>
+
+        var CLIENT_ID = '{{ client_id }}';
+        var API_KEY = '{{ api_key }}';
+        var CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        var SCOPES = [
+        {% for scope in scopes %}
+        "{{ scope }}",
+        {% endfor %}
+        ];
+
+	</script>
+
+    <script src="https://apis.google.com/js/client.js"></script>
+</body>
+</html>
