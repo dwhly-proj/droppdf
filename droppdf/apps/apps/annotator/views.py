@@ -8,7 +8,7 @@ import shutil
 
 from sanitize_filename import sanitize
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 from django.http import HttpResponse, Http404, JsonResponse, HttpResponseNotFound,\
         HttpResponseNotAllowed 
@@ -212,3 +212,16 @@ def epub(request, filename):
 
 def privacy(request):
     return render(request, 'privacy.html')
+
+
+def download_static(request, filename):
+    '''to download documents from docdrop-v1 url format'''
+
+    s3 = S3(settings.AWS_ANNOTATIONS_BUCKET)
+
+    if s3.check_file_exists(filename): 
+        url = s3.get_presigned_download_url(filename, expire=2400)
+
+        return redirect(url)
+
+    raise HTTPExceptions.NOT_FOUND
