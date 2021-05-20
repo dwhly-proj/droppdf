@@ -220,7 +220,7 @@ def download_static(request, filename):
     s3 = S3(settings.AWS_ANNOTATIONS_BUCKET)
 
     if s3.check_file_exists(filename): 
-        url = s3.get_presigned_download_url(filename, expire=2400)
+        url = s3.get_presigned_url(filename, expire=240000, content_type="application/pdf")
 
         return redirect(url)
 
