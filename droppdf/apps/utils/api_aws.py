@@ -39,16 +39,23 @@ class S3():
         )
 
 
-    def get_presigned_url(self, file_name, expire=2400):
+    def get_presigned_url(self, file_name, expire=2400, content_type=None):
         '''generate presigned temp url for resource
             :param str file_name: name of resource
             :param int expire: seconds until temp url expires. 
-            :return: str url''' 
+            :return: str url'''
+
+        params = {
+            'Bucket': self.bucket,
+            'Key': file_name,
+            }
+
+        if content_type:
+            params['ResponseContentDisposition'] = 'inline'
+            params['ResponseContentType'] = content_type
 
         return self.client.generate_presigned_url('get_object',
-                Params={
-                    'Bucket': self.bucket,
-                    'Key': file_name},
+                Params = params,
                 ExpiresIn=expire)
 
 

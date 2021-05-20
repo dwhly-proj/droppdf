@@ -177,7 +177,7 @@ def download(request, filename):
     s3 = S3(settings.AWS_OCR_BUCKET)
 
     if s3.check_file_exists(filename): 
-        url = s3.get_presigned_url(filename)
+        url = s3.get_presigned_url(filename, expire=240000, content_type="application/pdf")
 
         return redirect(url)
 
