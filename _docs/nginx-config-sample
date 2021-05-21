@@ -1,0 +1,36 @@
+server {
+	client_max_body_size 2000M;
+    server_name docdrop.org www.docdrop.org;
+
+    location / {
+        include proxy_params;
+        proxy_pass http://unix:/home/droppdf/droppdf-v2-prod/droppdf/droppdf.sock;
+    }
+
+    location /static/drop-pdf/ {
+        rewrite /static/(.*) /download/$1;
+    }
+
+    location /static/ {
+        root /var/www/droppdf/;
+        autoindex off;
+    }
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/docdrop.org/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/docdrop.org/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+server {
+    if ($host = docdrop.org) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+    listen 80;
+    server_name docdrop.org www.docdrop.org;
+    return 404; # managed by Certbot
+
+}
