@@ -123,8 +123,8 @@ def upload(request):
         #transform process if needed
         process_to_file_type = False
 
-        if extension in ['doc', 'docx', 'epub', 'odt', 'ott', 'rtf', 'odp', 'ppt', 'pptx']:
-            process_to_file_type = 'pdf' 
+        if extension in ['doc', 'docx', 'odt', 'ott', 'rtf', 'odp', 'ppt', 'pptx']:
+            process_to_file_type = 'pdf'
 
         if extension in ['xls', 'xlsx', 'ods']:
             process_to_file_type = 'csv' 
