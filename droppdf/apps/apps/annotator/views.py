@@ -174,12 +174,10 @@ def pdf(request, filename):
 
     #file is in ocr bucket
     if request.GET.get('src') == 'ocr':
-        s3 = S3(settings.AWS_OCR_BUCKET)
+        url = f'/ocr/download/{filename}'
 
     else:
-        s3 = S3(settings.AWS_ANNOTATIONS_BUCKET)
-
-    url = s3.get_presigned_url(filename)
+        url = f'/download_annotation_doc/{filename}'
 
     return render(request, 'viewer.html', {'pdf_url': url})
 
