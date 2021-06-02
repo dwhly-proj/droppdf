@@ -9,8 +9,21 @@ import requests
 def youtube_video(request, video_id):
     condensed_transcript = []
 
+    #language may be passed as query string. ?lang=de
+    #multiple comma seperated languages are acceptable i.e ?lang=en,de
+    #if multiple language versions of subs exist first one will be used
+    lang = request.GET.get('lang')
+
+    if lang:
+        lang_list = lang.split(',')
+
+    else:
+        #find default available languages for transcript
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        lang_list = [i.language_code for i in transcript_list]
+
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
     except:
         return render(request, 'youtube_not_found.html', {})
 
