@@ -13,7 +13,7 @@ click-plugins==1.1.1
 click-repl==0.1.6
 coloredlogs==15.0
 cryptography==3.4.6
-Django==3.1.4
+Django==3.1.12
 django-celery-results==2.0.1
 django-environ==0.4.5
 django-http-exceptions==1.4.0
