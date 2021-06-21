@@ -19,7 +19,12 @@ def youtube_video(request, video_id):
 
     else:
         #find default available languages for transcript
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        try:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        except Exception as e:
+            #TODO extract actual error message and give better error.
+            return render(request, 'youtube_not_found.html', {})
+
         lang_list = [i.language_code for i in transcript_list]
 
     try:
