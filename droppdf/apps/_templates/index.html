@@ -104,12 +104,12 @@
 	
 	<script>
 
-        var CLIENT_ID = '{{ client_id }}';
-        var API_KEY = '{{ api_key }}';
+        var CLIENT_ID = '{{ CLIENT_ID }}';
+        var API_KEY = '{{ API_KEY }}';
         var CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
         var SCOPES = [
-        {% for scope in scopes %}
+        {% for scope in SCOPES %}
         "{{ scope }}",
         {% endfor %}
         ];

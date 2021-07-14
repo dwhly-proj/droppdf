@@ -166,6 +166,11 @@ AWS_FINGERPRINTER_BUCKET = env('AWS_FINGERPRINTER_BUCKET')
 # max number simultaneous ocr process 
 MAX_SIM_OCR_PROCESSES = env('MAX_SIM_OCR_PROCESSES')
 
-#celery
+# celery
 CELERY_RESULT_BACKEND = 'django-db'
 BROKER_URL = env('BROKER_URL')
+
+# Google Drive 
+CLIENT_ID = env('CLIENT_ID')
+API_KEY = env('API_KEY')
+SCOPES = eval(env('SCOPES'))

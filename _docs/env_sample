@@ -29,3 +29,8 @@ MAX_SIM_OCR_PROCESSES=3
 
 #rabbitmq broker url
 BROKER_URL='pyamqp://guest@localhost//'
+
+#Google Drive API
+CLIENT_ID = '<client id>.apps.googleusercontent.com'
+API_KEY = '<api key>'
+SCOPES = "['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/drive.install', 'https://www.googleapis.com/auth/drive.file']"

@@ -1,1 +1,97 @@
-privacy page here
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+
+	<title>Privacy</title>
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        header {
+            position: absolue;
+            width: 100%;
+            top: 0;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            align-items: end;
+            padding-bottom: .5em;
+        }
+
+        header div {
+            padding: 1em;
+            display: flex;
+            justify-content: center;
+            align-item: center;
+        }
+
+        header a.homelink {
+            color: #000;
+            font-size: 1.3em;
+            text-decoration: none;
+            font-family: "Montserrat Bold", sans-serif;
+            user-select: none;
+        }
+
+        a {
+            color: #000;
+            text-decoration: none;
+        }
+
+        a:hover {
+            cursor: pointer;
+        }
+
+        .small {
+            font-size: .8em;
+        }
+
+        .error {
+            padding-top: 1em;
+            color: red;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .italic {
+            font-style: italic;
+        }
+
+        .main-content {
+            width: 94%;
+            margin: 0 auto;
+        }
+
+    </style>
+
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-181082912-1"></script>
+
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments);}
+	  gtag('js', new Date());
+
+	  gtag('config', 'UA-181082912-1');
+	</script>
+
+</head>
+
+<body>
+    <header>
+        <div>
+            <a class="homelink" href="/">docdrop</a>
+        </div>
+    </header>
+
+    <div class="main-content">
+        test
+    </div>
+</body>
