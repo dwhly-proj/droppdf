@@ -80,7 +80,11 @@ def _soffice_process(tempfile_path, filename, md5_hash, process_type):
 
 
 def home(request):
-    return render(request, 'index.html', {'request': request})
+    #print(settings.API_KEY)
+    print(settings.SCOPES)
+    return render(request, 'index.html', {'request': request,
+        'CLIENT_ID': settings.CLIENT_ID, 'API_KEY': settings.API_KEY,
+        'SCOPES': settings.SCOPES})
 
 
 def upload(request):
