@@ -27,6 +27,11 @@ def youtube_video(request, video_id):
 
         lang_list = [i.language_code for i in transcript_list]
 
+        #default to English if it exists
+        #apparently first language in list is used in get_transcript
+        if 'en' in lang_list:
+            lang_list.insert(0, 'en')
+
     try:
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
     except:
