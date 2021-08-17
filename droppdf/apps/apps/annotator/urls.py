@@ -21,4 +21,9 @@ urlpatterns = [
         path('download_annotation_doc/<filename>', view=download_static,
             name="download_annotation_doc"),
 
+        path('handle_gdrive_doc', view=handle_gdrive_doc, name='handle_gdrive_doc'),
+
+        path('process_gdrive_request', view=process_gdrive_request,
+            name='process_gdrive_request')
+
         ]
