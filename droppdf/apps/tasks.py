@@ -28,7 +28,6 @@ class FileInProcessError(Exception):
 
 @shared_task
 def ocr_pdf(filename, parent_id, md5_hash, force_flag):
-
     if not os.path.exists('/tmp/ocr_clients'):
         os.makedirs('/tmp/ocr_clients')
 

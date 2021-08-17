@@ -3,9 +3,9 @@
 
 (function() {
 
-    upload_in_progress = false;
+    var upload_in_progress = false;
 
-    uploaded_file_info = null;
+    var uploaded_file_info = null;
 
     _uploadAndCheckText = function() {
         var percentComplete;
@@ -136,11 +136,12 @@
         };
     };
 
-    runOCR = function(force) {
+    window.runOCR = function(force) {
         var form =  $('<form action="/ocr/result" method="POST"></form>');
 
         if (force) {
             var force_field = $('<input id="force_flag" name="force_flag" value="true" type="hidden">');
+            uploaded_file_info.processing_error = null;
             $(form).append(force_field);
         };
 

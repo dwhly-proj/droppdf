@@ -96,6 +96,21 @@ def upload(request):
 
             cleanup_temp_file(new_filename)
 
+            ref = OCRUpload.objects.filter(md5_hash=md5_hash)
+
+            if ref.exists():
+                ref = ref.first()
+
+            else:
+                ref = OCRUpload(filename=new_filename, md5_hash=md5_hash)
+
+            ref.is_original = True
+
+            ref.save()
+            
+            cleanup_temp_file(new_filename)
+
+
         data = {'file_info': {'filename': filename, 'size': file_.size,
                     'new_filename': new_filename, 'processing_error': processing_error,
                     'tempfile_path': tempfile_path, 'already_exists': already_exists,
@@ -169,7 +184,6 @@ def result(request):
 
         return render(request, 'ocr_pdf_result.html', data)
 
-
     return HttpResponseNotAllowed(['POST,'])
 
 
@@ -177,7 +191,7 @@ def download(request, filename):
     s3 = S3(settings.AWS_OCR_BUCKET)
 
     if s3.check_file_exists(filename): 
-        url = s3.get_presigned_url(filename, expire=240000, content_type="application/pdf")
+        url = s3.get_presigned_download_url(filename, expire=240000)
 
         return redirect(url)
 
