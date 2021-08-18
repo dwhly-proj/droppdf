@@ -28,7 +28,6 @@ class FileInProcessError(Exception):
 
 @shared_task
 def ocr_pdf(filename, parent_id, md5_hash, force_flag):
-
     if not os.path.exists('/tmp/ocr_clients'):
         os.makedirs('/tmp/ocr_clients')
 
@@ -113,7 +112,7 @@ def ocr_pdf(filename, parent_id, md5_hash, force_flag):
 @shared_task
 def delete_refingerprint(base_dir):
     '''clean up fingerprinted files'''
-    time.sleep(10 * 60)
+    time.sleep(5 * 60)
 
     shutil.rmtree(base_dir)
 

@@ -205,7 +205,6 @@ $(document).ready(function(){
         $('#dropzone').click();
 
     });
-
 });
 
 

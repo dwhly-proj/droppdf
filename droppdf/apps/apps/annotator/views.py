@@ -3,6 +3,7 @@ import urllib
 import os
 #import subprocess
 import csv
+import json
 import time
 import shutil
 
@@ -80,8 +81,6 @@ def _soffice_process(tempfile_path, filename, md5_hash, process_type):
 
 
 def home(request):
-    #print(settings.API_KEY)
-    print(settings.SCOPES)
     return render(request, 'index.html', {'request': request,
         'CLIENT_ID': settings.CLIENT_ID, 'API_KEY': settings.API_KEY,
         'SCOPES': settings.SCOPES})
@@ -175,7 +174,6 @@ def upload(request):
 
 
 def pdf(request, filename):
-
     #file is in ocr bucket
     if request.GET.get('src') == 'ocr':
         url = f'/ocr/download/{filename}'
@@ -227,3 +225,36 @@ def download_static(request, filename):
         return redirect(url)
 
     raise HTTPExceptions.NOT_FOUND
+
+
+def handle_gdrive_doc(request):
+    '''Handle open document from Google drive.
+    Check mimetype of file and route to correct template with url for download from drive.
+    '''
+    gdrive_state = request.GET.get('state')
+
+    try:
+        s = json.loads(gdrive_state)
+        file_id = s.get('ids')[0]
+    except:
+        raise HTTPExceptions.UNPROCESSABLE_ENTITY
+
+    return render(request, 'process_gdrive_request.html', {'request': request,
+        'CLIENT_ID': settings.CLIENT_ID, 'API_KEY': settings.API_KEY,
+        'scopes': settings.SCOPES})
+
+    #return render(request, 'process_gdrive_request.html', {'file_id': file_id})
+    #return render({'file_id': file_id}, 'process_gdrive_request.html')
+
+    #return redirect(request)
+
+
+def process_gdrive_request(request):
+    pass
+
+    #url = f'https://www.googleapis.com/drive/v3/files/{file_id}?fields=mimeType'
+
+    #print(url)
+
+    #return url
+
