@@ -141,9 +141,11 @@
 
         if (force) {
             var force_field = $('<input id="force_flag" name="force_flag" value="true" type="hidden">');
-            uploaded_file_info.processing_error = null;
+            //uploaded_file_info.processing_error = null;
             $(form).append(force_field);
         };
+
+        uploaded_file_info.processing_error = null;
 
         var file_info = JSON.stringify(uploaded_file_info);
 
