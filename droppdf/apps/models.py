@@ -2,9 +2,9 @@ from django.db import models
 
 class FileUpload(models.Model):
     '''Reference to cloud upload'''
-    filename = models.CharField(max_length=75)
+    filename = models.CharField(max_length=200)
 
-    md5_hash = models.CharField(max_length=64)
+    md5_hash = models.CharField(max_length=100)
 
     extension = models.CharField(max_length=8)
 
@@ -26,9 +26,9 @@ class FileUpload(models.Model):
 
 class OCRUpload(models.Model):
     '''Reference to cloud upload for pdf files to be/have been ocrd'''
-    filename = models.CharField(max_length=75)
+    filename = models.CharField(max_length=200)
 
-    md5_hash = models.CharField(max_length=64)
+    md5_hash = models.CharField(max_length=100)
 
     is_original = models.BooleanField(default=True)
 

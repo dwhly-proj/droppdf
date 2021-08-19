@@ -92,9 +92,9 @@ def upload(request):
         else:
             already_exists = True
 
-            new_filename = existing_name
+            cleanup_temp_file(existing_name)
 
-            cleanup_temp_file(new_filename)
+            new_filename = existing_name
 
             ref = OCRUpload.objects.filter(md5_hash=md5_hash)
 
@@ -155,7 +155,6 @@ def result(request):
 
         #ocr has been performed already
         if child.exists():
-
             child = child.first()
 
             file_info['existing'] = True
