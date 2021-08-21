@@ -80,6 +80,15 @@
             color: red;
         }
 
+        .success-msg {
+            padding-top: 1em;
+            color: green;
+        }
+
+        .black-text {
+            color: #000;
+        }
+
         .button-box {
             display: flex;
             flex: 1;
@@ -245,7 +254,7 @@
             Add text to an image PDF.
         </div>
 
-        <form id="param-form" action="/ocr/upload/" method="POST" enctype="multipart/form-data">
+        <form id="param-form" action="/ocr/upload/" method="POST" autocomplete="off" enctype="multipart/form-data">
 
             <div class="option-box">
             </div>
@@ -288,17 +297,25 @@
                         <i class="fa fa-upload"></i>
                         Run OCR
                     </div>
-
-                    <div id="run-force" class="button" style="width: 8em" onclick="runOCR(true)">
-                        <i class="fa fa-upload"></i>
-                        Force OCR
-                    </div>
-                    <div class="help-label">
-                        <i class="fa fa-question-circle" title="Forcing OCR will replace any existing text with OCRd text. If there is a question, it's likely better to try 'Run OCR' first."></i>
-                    </div>
                 </div>
 
                 <div id="upload-error" class="small error" style="display: none;">
+                </div>
+
+                <div id="upload-has-text" class="small success-msg" style="display: none;">
+                    <span style="font-size: 1.2em">
+                        <i class="fa fa-check"></i>
+                    </span>
+                    This document already has selectable text and is most likely ready to use for annotations.
+                    <br><br>
+                    If the quality of the current OCR'd text is not acceptable you can redo the OCR process which may give better results.
+                    <br>
+                    (This process will take some time and in rare instances will not be successful, depending on the qualities of the uploaded document). 
+                    <br><br>
+                    <div id="run-force" class="button black-text" style="width: 8em" onclick="runOCR(true)">
+                        <i class="fa fa-upload"></i>
+                        Redo OCR
+                    </div>
                 </div>
 
             </div>

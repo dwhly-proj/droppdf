@@ -79,10 +79,17 @@
                         $('#run-button')
                             .addClass('disabled')
                             .attr('disabled', true)
+
+                    } else if (response.file_info.has_text) {
+
+                        $('#run-button').hide();
+                        $('#upload-has-text').show();
+
                     } else {
                         $('#run-button')
                             .removeClass('disabled')
                             .attr('disabled', false)
+                            .show()
                     }
                 };
             },
@@ -164,8 +171,13 @@
     $(document).ready(function() {
         upload_in_progress = false;
         $('.button-box').hide();
+        $('#upload-has-text').hide();
         $('#in-progress').hide();
-        $('#pdf-file').attr('disabled', false);
+
+        $('#pdf-file')
+            .attr('disabled', false)
+            .val('')
+
         $('#progress-bar-inner').css('width', '0%');
         $('#pdf-file')
             .attr('disabled', false)
