@@ -17,10 +17,13 @@
         </style>
 
         <script src="https://hypothes.is/embed.js" async></script>
-
     </head>
     <body>
-        <iframe src="{{ url }}" style="border:none; width: 100%; height: 100%;" title="Panopto document">
+        <iframe 
+            src="/panopto_proxy?url={{ url | urlencode }}"
+            style="border:none; width: 100%; height: 100%;" 
+            title="Panopto document"
+            enable-annotation>
         </iframe>
     </body>
 </html>
