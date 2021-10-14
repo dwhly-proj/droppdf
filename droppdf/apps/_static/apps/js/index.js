@@ -244,3 +244,43 @@ function openYouTubeUrl() {
     window.open('/video/' + video + '/', '_blank');
 
 }
+
+
+function openPanoptoUrl() {
+    var match, video
+
+    var url = $('#panopto-url').val();
+
+    //if (url.length < 1 || !url) {
+        //$('#youtube-url-error')
+            //.text('')
+            //.hide();
+        //return;
+    //};
+
+    //if ((url.indexOf('youtube.com/watch?') == -1) && (url.indexOf('youtu.be') == -1)) {
+        //$('#youtube-url-error')
+            //.text('not a valid youtube video link')
+            //.show();
+            //return;
+    //};
+
+    //if ( (url.indexOf('youtu.be') != -1) && (url.indexOf('youtube') == -1) )  {
+        //video = url.split('/').slice(-1).pop(); 
+    //} else {
+        //match = RegExp('[?&]' + 'v=([^&]*)').exec(url);
+        //video = decodeURIComponent(match[1].replace(/\+/g, ' '));
+    //}
+
+    //if (!video || video.length < 5) {
+        //$('#youtube-url-error')
+            //.text('missing or incorrect video id in link')
+            //.show();
+            //return;
+    //};
+
+    window.open('/panopto/?url=' + encodeURIComponent(url))
+
+}
+
+

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+        <link rel="canonical" href="{{ url }}" />
+        <title></title>
+
+        <style>
+            html, body {
+                padding: 0;
+                padding-right: 18px;
+                margin: 0;
+
+                height: 100vh;
+            }
+        </style>
+
+        <script src="https://hypothes.is/embed.js" async></script>
+    </head>
+    <body>
+        <iframe 
+            src="/panopto_proxy?url={{ url | urlencode }}"
+            style="border:none; width: 100%; height: 100%;" 
+            title="Panopto document"
+            enable-annotation>
+        </iframe>
+    </body>
+</html>
