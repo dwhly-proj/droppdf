@@ -21,6 +21,10 @@ class MaxProcessesExceededError(Exception):
     pass
 
 
+class PDFInfo():
+    pass
+
+
 class FileInProcessError(Exception):
     '''raised when file with identical hash is already being processed'''
     pass
@@ -158,6 +162,9 @@ def refingerprint_pdf(filename, directory, copy_count, suffix):
             content = PdfReader(base_file_path)
 
             #add some random meta data
+            if not content.Info:
+                content.Info = PDFInfo() 
+
             content.Info.randomMetaData = binascii.b2a_hex(os.urandom(20)).upper()
 
             _filename = filename.strip().encode('utf-8')
