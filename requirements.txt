@@ -47,5 +47,5 @@ typing-extensions==3.7.4.3
 urllib3==1.26.4
 vine==5.0.0
 wcwidth==0.2.5
-youtube-transcript-api==0.3.1
+youtube-transcript-api==0.4.3
 zipp==3.4.0
