@@ -2,6 +2,7 @@ import time
 import re
 import random
 import json
+import requests
 
 from sanitize_filename import sanitize
 
@@ -195,7 +196,14 @@ def download(request, filename):
     if s3.check_file_exists(filename): 
         url = s3.get_presigned_download_url(filename, expire=240000)
 
-        return redirect(url)
+        print('Download')
+
+        #return redirect(url)
+        r = requests.get(url=url, stream=True)
+        r.raise_for_status()
+        response = HttpResponse(r.raw, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename={ filename }'
+        return response
 
     raise HTTPExceptions.NOT_FOUND
 

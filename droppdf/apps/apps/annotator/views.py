@@ -6,6 +6,7 @@ import csv
 import json
 import time
 import shutil
+import requests
 
 from sanitize_filename import sanitize
 
@@ -222,7 +223,13 @@ def download_static(request, filename):
     if s3.check_file_exists(filename): 
         url = s3.get_presigned_url(filename, expire=240000, content_type="application/pdf")
 
-        return redirect(url)
+        #return redirect(url)
+        r = requests.get(url=url, stream=True)
+        r.raise_for_status()
+        response = HttpResponse(r.raw, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename={ filename }'
+        return response
+
 
     raise HTTPExceptions.NOT_FOUND
 
@@ -242,11 +249,6 @@ def handle_gdrive_doc(request):
     return render(request, 'process_gdrive_request.html', {'request': request,
         'CLIENT_ID': settings.CLIENT_ID, 'API_KEY': settings.API_KEY,
         'scopes': settings.SCOPES})
-
-    #return render(request, 'process_gdrive_request.html', {'file_id': file_id})
-    #return render({'file_id': file_id}, 'process_gdrive_request.html')
-
-    #return redirect(request)
 
 
 def process_gdrive_request(request):
