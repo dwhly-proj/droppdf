@@ -116,7 +116,7 @@ def ocr_pdf(filename, parent_id, md5_hash, force_flag):
 @shared_task
 def delete_refingerprint(base_dir):
     '''clean up fingerprinted files'''
-    time.sleep(5 * 60)
+    time.sleep(3 * 60)
 
     shutil.rmtree(base_dir)
 
