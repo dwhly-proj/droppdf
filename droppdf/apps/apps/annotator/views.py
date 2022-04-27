@@ -182,7 +182,9 @@ def pdf(request, filename):
     else:
         url = f'/download_annotation_doc/{filename}'
 
-    return render(request, 'viewer.html', {'pdf_url': url})
+    cannonical_url = f'/pdf/{filename}'
+
+    return render(request, 'viewer.html', {'pdf_url': url, 'cannonical_url': cannonical_url})
 
 
 def csv_view(request, filename):
