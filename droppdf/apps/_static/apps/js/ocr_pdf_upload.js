@@ -1,8 +1,4 @@
-
-//const CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
 (function() {
-
     var upload_in_progress = false;
 
     var uploaded_file_info = null;

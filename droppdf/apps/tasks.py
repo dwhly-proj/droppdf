@@ -85,9 +85,7 @@ def ocr_pdf(filename, parent_id, md5_hash, force_flag):
         #save to s3 
         with open(output_path, 'rb') as file_:
             s3.save_to_bucket(processed_filename, file_)
-
             file_.seek(0)
-
             hash_ = md5(file_.read()).hexdigest()
 
         #record to db

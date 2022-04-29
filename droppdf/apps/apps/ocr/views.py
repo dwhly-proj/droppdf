@@ -71,7 +71,6 @@ def upload(request):
 
         #already_has_text?
         if check_pdf_has_text(new_filename):
-            #processing_error = 'This PDF already has text. Use the "Force OCR" button to overwrite text with a fresh OCR if desired. If file was OCRd on previous upload those results will be provided'
             has_text = True
         else:
             has_text = False
@@ -113,7 +112,6 @@ def upload(request):
             ref.save()
             
             cleanup_temp_file(new_filename)
-
 
         data = {'file_info': {'filename': filename, 'size': file_.size,
                     'new_filename': new_filename, 'processing_error': processing_error,
@@ -196,9 +194,6 @@ def download(request, filename):
     if s3.check_file_exists(filename): 
         url = s3.get_presigned_download_url(filename, expire=240000)
 
-        print('Download')
-
-        #return redirect(url)
         r = requests.get(url=url, stream=True)
         r.raise_for_status()
         response = HttpResponse(r.raw, content_type='application/pdf')
