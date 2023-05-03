@@ -153,6 +153,9 @@ STATICFILES_DIRS = (
 
 MIGRATION_MODULES = {'apps': 'apps._migrations'}
 
+# Allow display in iframe
+X_FRAME_OPTIONS = 'ALLOWALL'
+
 # AWS Settings
 AWS_ACCESS_KEY = env('AWS_ACCESS_KEY')
 AWS_SECRET_KEY = env('AWS_SECRET_KEY')
