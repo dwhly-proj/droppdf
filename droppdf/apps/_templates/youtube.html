@@ -190,9 +190,19 @@
             padding-bottom: .5em;
         }
 
+        .sub-text:before {
+            width: 2em;
+            display: inline-block;
+            border-right: 1px solid black;
+            margin-right: 0.5em;
+        }
+
         .sub-text {
             flex: 1;
             flex-basis: 0;
+            padding-left: 6.5em;
+            text-indent: -2.6em;
+            margin-right: 3em;
         }
 
         .sub-label {
@@ -262,6 +272,8 @@
             width: 100%;
             height: 100%;
         }
+
+        {% for sub in transcript %}div.sub-text div.line{{ loop.index }}:before {content: "{{ sub.start_display }}";}
 
         @media (max-width: 992px) {
             body {
@@ -432,11 +444,7 @@
                     <div id="substart-text" class="sub-text italic">Select text to annotate, Click play in YouTube to begin</div>
                 </div>
                 {% for sub in transcript %}
-                <div class="sub" dir="ltr">
-                    <div class="sub-time">
-                        {{ sub.start_display }}
-                    </div>
-                    <div class="sub-text" onclick="updatePlayerTime({{ sub.start }});">
+                    <div class="sub-text line{{ loop.index }}" onclick="updatePlayerTime({{ sub.start }});" dir="ltr">
                         {{ sub.text }}
                     </div>
                 </div>
