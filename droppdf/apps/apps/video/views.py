@@ -33,7 +33,6 @@ def youtube_video(request, video_id):
                 transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
 
         except Exception as e:
-            print(e)
             #TODO extract actual error message and give better error.
             return render(request, 'youtube_not_found.html', {})
 
