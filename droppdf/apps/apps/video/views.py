@@ -1,6 +1,7 @@
 import time
 
 from django.shortcuts import render
+from django.conf import settings
 
 from youtube_transcript_api import YouTubeTranscriptApi
 import requests
@@ -8,6 +9,9 @@ import requests
 
 def youtube_video(request, video_id):
     condensed_transcript = []
+
+    # if proxy url was provided
+    proxy_url = settings.YOUTUBE_TRANSCRIPT_API_PROXY
 
     #language may be passed as query string. ?lang=de
     #multiple comma seperated languages are acceptable i.e ?lang=en,de
@@ -20,7 +24,14 @@ def youtube_video(request, video_id):
     else:
         #find default available languages for transcript
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            if proxy_url is not None:
+                transcript_list = YouTubeTranscriptApi.list_transcripts(
+                        video_id, 
+                        proxies={'http': proxy_url}
+                        )
+            else:
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
         except Exception as e:
             #TODO extract actual error message and give better error.
             return render(request, 'youtube_not_found.html', {})
@@ -33,8 +44,15 @@ def youtube_video(request, video_id):
             lang_list.insert(0, 'en')
 
     try:
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
-    except:
+        if proxy_url is not None:
+            transcript = YouTubeTranscriptApi.get_transcript(
+                    video_id,
+                    languages=lang_list,
+                    proxies={'https': proxy_url}
+                    )
+        else:
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
+    except Exception as e:
         return render(request, 'youtube_not_found.html', {})
 
     subseconds = 0

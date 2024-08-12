@@ -34,3 +34,6 @@ BROKER_URL='pyamqp://guest@localhost//'
 CLIENT_ID = '<client id>.apps.googleusercontent.com'
 API_KEY = '<api key>'
 SCOPES = "['https://www.googleapis.com/auth/drive.metadata.readonly', 'https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/drive.install', 'https://www.googleapis.com/auth/drive.file']"
+
+# YouTubeTranscriptAPI proxy (optional- add to use proxy otherwise none used)
+YOUTUBE_TRANSCRIPT_API_PROXY='https://user:pass@domain:port'

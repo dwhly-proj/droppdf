@@ -177,3 +177,6 @@ BROKER_URL = env('BROKER_URL')
 CLIENT_ID = env('CLIENT_ID')
 API_KEY = env('API_KEY')
 SCOPES = eval(env('SCOPES'))
+
+# YouTube Transcript API Proxy
+YOUTUBE_TRANSCRIPT_API_PROXY = env('YOUTUBE_TRANSCRIPT_API_PROXY', default=None)
