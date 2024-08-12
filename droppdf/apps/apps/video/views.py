@@ -27,7 +27,7 @@ def youtube_video(request, video_id):
             if proxy_url is not None:
                 transcript_list = YouTubeTranscriptApi.list_transcripts(
                         video_id, 
-                        proxies={'https': proxy_url}
+                        proxies={'http': proxy_url}
                         )
             else:
                 transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
@@ -52,7 +52,7 @@ def youtube_video(request, video_id):
                     )
         else:
             transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
-    except:
+    except Exception as e:
         return render(request, 'youtube_not_found.html', {})
 
     subseconds = 0
