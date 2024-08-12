@@ -27,7 +27,7 @@ def youtube_video(request, video_id):
             if proxy_url is not None:
                 transcript_list = YouTubeTranscriptApi.list_transcripts(
                         video_id, 
-                        proxies={'http': proxy_url}
+                        proxies={'https': proxy_url}
                         )
             else:
                 transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
