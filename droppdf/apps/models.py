@@ -46,3 +46,23 @@ class OCRUpload(models.Model):
 
     class Meta:
         db_table = 'apps_ocr_upload'
+
+
+class VideoSubtitle(models.Model): 
+   
+    lang_list = models.CharField(max_length=1024)
+    
+    video_id = models.CharField(max_length=100)
+    
+    subtitle = models.JSONField()                                                                                    
+    
+    created = models.DateTimeField(auto_now=False, auto_now_add=True)                                                                  
+    
+    updated = models.DateTimeField(auto_now=True)                                                                                      
+
+    def __str__(self):
+        return self.video_id
+
+    class Meta:
+        db_table = 'apps_video_subtitle'
+

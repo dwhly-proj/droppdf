@@ -52,6 +52,9 @@ def youtube_video(request, video_id):
                     )
         else:
             transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
+
+        print(lang_list) 
+        print(type(transcript))
     except Exception as e:
         return render(request, 'youtube_not_found.html', {})
 
