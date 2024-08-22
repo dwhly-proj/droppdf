@@ -49,7 +49,6 @@ class OCRUpload(models.Model):
 
 
 class VideoSubtitle(models.Model): 
-   
     lang_list = models.CharField(max_length=1024)
     
     video_id = models.CharField(max_length=100)
@@ -65,4 +64,3 @@ class VideoSubtitle(models.Model):
 
     class Meta:
         db_table = 'apps_video_subtitle'
-

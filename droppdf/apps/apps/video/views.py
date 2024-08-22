@@ -1,47 +1,55 @@
 import time
+from datetime import timedelta
 
+from django.utils import timezone
 from django.shortcuts import render
 from django.conf import settings
 
 from youtube_transcript_api import YouTubeTranscriptApi
 import requests
 
+from apps.models import VideoSubtitle
 
-def youtube_video(request, video_id):
-    condensed_transcript = []
 
-    # if proxy url was provided
+def _cache_transcript(video_id, lang, transcript):
+    # if sub already exists, delete it first
+    existing_subtitle = VideoSubtitle.objects.filter(
+        video_id=video_id,
+        lang_list=lang
+    ).first()
+
+    if existing_subtitle:
+        existing_subtitle.delete()
+
+    video_subtitle = VideoSubtitle(
+        lang_list=lang,
+        video_id=video_id,
+        subtitle=transcript
+    )
+
+    video_subtitle.save()
+
+
+def _get_transcript_from_cache(video_id, language):
+    subtitle = VideoSubtitle.objects.filter(
+        video_id=video_id,
+        lang_list=language
+    ).first()
+
+    if subtitle:
+
+        # if the subtitle is old, retrieve from youtube and re-cache
+        one_month_ago = timezone.now() - timedelta(days=30)
+        if subtitle.updated < one_month_ago:
+            return None
+
+        return subtitle.subtitle
+
+    return None
+
+
+def _get_transcript_from_youtube(video_id, lang_list):
     proxy_url = settings.YOUTUBE_TRANSCRIPT_API_PROXY
-
-    #language may be passed as query string. ?lang=de
-    #multiple comma seperated languages are acceptable i.e ?lang=en,de
-    #if multiple language versions of subs exist first one will be used
-    lang = request.GET.get('lang')
-
-    if lang:
-        lang_list = lang.split(',')
-
-    else:
-        #find default available languages for transcript
-        try:
-            if proxy_url is not None:
-                transcript_list = YouTubeTranscriptApi.list_transcripts(
-                        video_id, 
-                        proxies={'https': proxy_url}
-                        )
-            else:
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-
-        except Exception as e:
-            #TODO extract actual error message and give better error.
-            return render(request, 'youtube_not_found.html', {})
-
-        lang_list = [i.language_code for i in transcript_list]
-
-        #default to English if it exists
-        #apparently first language in list is used in get_transcript
-        if 'en' in lang_list:
-            lang_list.insert(0, 'en')
 
     try:
         if proxy_url is not None:
@@ -52,10 +60,74 @@ def youtube_video(request, video_id):
                     )
         else:
             transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=lang_list)
-
-        print(lang_list) 
-        print(type(transcript))
     except Exception as e:
+        # TODO error log
+        return None
+
+    _cache_transcript(video_id, lang_list[0], transcript)
+
+    return transcript
+
+
+def _get_language_list(video_id):
+    # find default available languages for transcript
+    proxy_url = settings.YOUTUBE_TRANSCRIPT_API_PROXY
+
+    try:
+        if proxy_url is not None:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(
+                    video_id, 
+                    proxies={'https': proxy_url}
+                    )
+        else:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
+    except Exception as e:
+        #TODO extract actual error message and give better error.
+        return None
+
+    lang_list = [i.language_code for i in transcript_list]
+
+    if 'en' in lang_list:
+        lang_list.insert(0, 'en')
+
+    return lang_list
+
+
+def youtube_video(request, video_id):
+    transcript = None
+    condensed_transcript = []
+
+    #language may be passed as query string. ?lang=de
+    #multiple comma seperated languages are acceptable i.e ?lang=en,de
+    #if multiple language versions of subs exist first one will be used
+    lang = request.GET.get('lang')
+
+    if lang:
+        lang_list = lang.split(',')
+
+    # See if the transcript is cached for the language.
+    if lang is None:
+        # If no language was passed in the request assume English.
+        transcript = _get_transcript_from_cache(video_id, 'en')
+    else:
+        transcript = _get_transcript_from_cache(video_id, lang_list[0])
+
+    # transcript not found in cache, try to get it from youtube.
+    if transcript is None:
+
+        if lang is None:
+            # get language list from youtube
+            lang_list = _get_language_list(video_id)
+
+            if lang_list is None:
+                # No language list from youtube means no subs
+                print('no lang')
+                return render(request, 'youtube_not_found.html', {})
+
+        transcript = _get_transcript_from_youtube(video_id, lang_list)
+
+    if transcript is None:
         return render(request, 'youtube_not_found.html', {})
 
     subseconds = 0
@@ -106,8 +178,6 @@ def youtube_video(request, video_id):
     source = 'https://www.youtube.com/embed/'
     source += video_id
     source += '?enablejsapi=1'
-    #source += '?enablejsapi=1&origin='
-    #source += 'https://docdrop.org'
     source += '&widgetid=1'
     source += '&start=0&name=me'
 
