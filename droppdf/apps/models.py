@@ -64,3 +64,15 @@ class VideoSubtitle(models.Model):
 
     class Meta:
         db_table = 'apps_video_subtitle'
+
+
+class VideoAccessLog(models.Model): 
+    
+    video_id = models.CharField(max_length=100)
+
+    user_ip = models.CharField(max_length=100)
+
+    created = models.DateTimeField(auto_now=False, auto_now_add=True)                                                                  
+
+    class Meta:
+        db_table = 'apps_video_access_log'
