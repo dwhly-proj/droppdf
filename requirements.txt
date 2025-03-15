@@ -23,7 +23,7 @@ img2pdf==0.4.0
 importlib-metadata==3.7.0
 jmespath==0.10.0
 kombu==5.0.2
-lxml==4.6.2
+lxml==4.9.1
 ocrmypdf==11.7.0
 pdfminer.six==20201018
 pdfrw==0.4
